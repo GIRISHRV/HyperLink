@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HyperLink Dashboard</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffd900",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#23200f",
+                        "bauhaus-blue": "#1e40af",
+                        "bauhaus-red": "#dc2626",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-white min-h-screen flex flex-col overflow-x-hidden">
+<!-- Top Navigation -->
+<nav class="w-full border-b border-[#4b4520] bg-[#24210f] px-6 py-4 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<!-- Logo Section -->
+<div class="flex items-center gap-3">
+<div class="bg-primary text-[#23200f] p-1 rounded-sm">
+<span class="material-symbols-outlined text-3xl">hub</span>
+</div>
+<h1 class="text-2xl font-bold tracking-tight text-white uppercase">HyperLink</h1>
+</div>
+<!-- Navigation Links -->
+<div class="hidden md:flex items-center gap-8">
+<a class="text-primary font-bold border-b-2 border-primary pb-0.5" href="#">Home</a>
+<a class="text-gray-400 hover:text-white transition-colors font-medium" href="#">History</a>
+<a class="text-gray-400 hover:text-white transition-colors font-medium" href="#">Settings</a>
+</div>
+<!-- User Profile -->
+<div class="flex items-center gap-4">
+<div class="hidden sm:flex flex-col items-end mr-2">
+<span class="text-sm font-bold text-white leading-none">Alex Construct</span>
+<span class="text-xs text-primary leading-none mt-1">Pro Member</span>
+</div>
+<div aria-label="User Avatar" class="size-10 bg-gray-700 rounded-full border-2 border-primary overflow-hidden relative" role="img">
+<img alt="Abstract user avatar profile picture" class="object-cover w-full h-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZ7NH2X8rGS12Z__tVi-GJCidh4EEcur2ynCOwhHsV3upw0VmeNyJOsu9vBFqoZ_T3NeRLx8rC9ztI0bCV7pU6SACfwySJhjznp4vyVrXHZUhSGsL-gLIeXFdqxw-HNI8RMXGU7JVa2YWpjZB2JueIp_OGfTnXCvQPw9HKcj8n2Om1iWBRil5xm6Z3qgB2N3MZybtayISWEQNPJwENDJTjSXFRjMuAN_Bmz2RxLH4lj3IUXPsujd1jiovekj05Z_68AliLkGRRY6lU"/>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 w-full max-w-7xl mx-auto p-6 md:p-8 lg:p-12 flex flex-col gap-12">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b-4 border-[#4b4520]">
+<div>
+<p class="text-primary font-medium tracking-widest mb-2 uppercase text-sm">System Overview</p>
+<h2 class="text-5xl md:text-7xl font-black text-white leading-[0.85] tracking-tighter uppercase">Dash<br/><span class="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-500">Board</span></h2>
+</div>
+<!-- Quick Stats -->
+<div class="flex gap-4 md:gap-8">
+<div class="flex flex-col border-l-2 border-primary pl-4">
+<span class="text-gray-400 text-xs uppercase tracking-wider">Total Shared</span>
+<span class="text-2xl font-bold text-white">2.4<span class="text-primary text-lg">GB</span></span>
+</div>
+<div class="flex flex-col border-l-2 border-primary pl-4">
+<span class="text-gray-400 text-xs uppercase tracking-wider">Active Peers</span>
+<span class="text-2xl font-bold text-white">12</span>
+</div>
+</div>
+</header>
+<!-- Action Cards Grid (Asymmetric) -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[320px]">
+<!-- SEND FILES Card (Blue Accent) - Takes 7/12 columns on large screens -->
+<div class="lg:col-span-7 relative group overflow-hidden bg-[#2a2614] border border-[#4b4520] rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.2)] hover:-translate-y-1">
+<!-- Geometric Decoration -->
+<div class="absolute right-0 top-0 w-64 h-64 bg-bauhaus-blue rounded-bl-full opacity-20 group-hover:opacity-30 transition-opacity"></div>
+<div class="absolute right-8 top-8 text-bauhaus-blue opacity-50">
+<span class="material-symbols-outlined text-8xl rotate-45 group-hover:rotate-0 transition-transform duration-500">send</span>
+</div>
+<div class="relative z-10 h-full flex flex-col justify-between p-8">
+<div>
+<div class="w-12 h-12 bg-bauhaus-blue flex items-center justify-center rounded mb-6 text-white shadow-lg">
+<span class="material-symbols-outlined">arrow_upward</span>
+</div>
+<h3 class="text-4xl font-bold text-white mb-2 uppercase tracking-tight">Send Files</h3>
+<p class="text-gray-400 max-w-sm">Initiate a secure P2P transfer. Drag and drop files here or click to browse local storage.</p>
+</div>
+<div class="mt-8">
+<button class="bg-bauhaus-blue hover:bg-blue-600 text-white font-bold py-3 px-8 rounded flex items-center gap-2 transition-colors">
+<span>Select Files</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- RECEIVE FILES Card (Red Accent) - Takes 5/12 columns on large screens -->
+<div class="lg:col-span-5 relative group overflow-hidden bg-[#2a2614] border border-[#4b4520] rounded-lg transition-all duration-300 hover:border-red-500 hover:shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:-translate-y-1">
+<!-- Geometric Decoration -->
+<div class="absolute -left-12 -bottom-12 w-48 h-48 bg-bauhaus-red rounded-full opacity-20 group-hover:opacity-30 transition-opacity"></div>
+<div class="absolute right-8 top-8 text-bauhaus-red opacity-50">
+<span class="material-symbols-outlined text-8xl group-hover:scale-110 transition-transform duration-500">qr_code_scanner</span>
+</div>
+<div class="relative z-10 h-full flex flex-col justify-between p-8">
+<div>
+<div class="w-12 h-12 bg-bauhaus-red flex items-center justify-center rounded mb-6 text-white shadow-lg">
+<span class="material-symbols-outlined">arrow_downward</span>
+</div>
+<h3 class="text-4xl font-bold text-white mb-2 uppercase tracking-tight">Receive</h3>
+<p class="text-gray-400">Open a connection to receive files from peers securely.</p>
+</div>
+<div class="mt-8 flex justify-end">
+<button class="bg-bauhaus-red hover:bg-red-600 text-white font-bold py-3 px-8 rounded flex items-center gap-2 transition-colors w-full justify-center">
+<span class="material-symbols-outlined text-sm">link</span>
+<span>Generate Link</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Transfers Section -->
+<section class="flex flex-col gap-6">
+<div class="flex items-center justify-between border-b border-[#4b4520] pb-2">
+<h3 class="text-2xl font-bold text-white uppercase tracking-tight flex items-center gap-3">
+<span class="w-3 h-3 bg-primary block"></span>
+                    Recent Transfers
+                </h3>
+<a class="text-sm text-primary hover:text-white font-medium flex items-center gap-1 transition-colors" href="#">
+                    View All History <span class="material-symbols-outlined text-sm">arrow_outward</span>
+</a>
+</div>
+<!-- Table Header (Visible on Desktop) -->
+<div class="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs text-gray-500 font-bold uppercase tracking-wider">
+<div class="col-span-5">File Name</div>
+<div class="col-span-2">Size</div>
+<div class="col-span-3">Transfer Details</div>
+<div class="col-span-2 text-right">Status</div>
+</div>
+<!-- List Items -->
+<div class="flex flex-col gap-3">
+<!-- Item 1: Pending -->
+<div class="group bg-[#2a2614] border border-[#4b4520] hover:border-primary/50 transition-colors rounded p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+<div class="col-span-12 md:col-span-5 flex items-center gap-4">
+<div class="w-10 h-10 bg-gray-800 rounded flex items-center justify-center text-gray-300 group-hover:bg-primary group-hover:text-black transition-colors">
+<span class="material-symbols-outlined">folder_zip</span>
+</div>
+<div>
+<p class="font-bold text-white truncate">Project_Alpha_Assets.zip</p>
+<p class="text-xs text-gray-500 md:hidden">450 MB • Waiting for peer...</p>
+</div>
+</div>
+<div class="hidden md:block col-span-2 text-gray-300 font-medium">450 MB</div>
+<div class="hidden md:block col-span-3 text-gray-400 text-sm">Waiting for peer connection...</div>
+<div class="col-span-12 md:col-span-2 flex items-center justify-between md:justify-end gap-3">
+<span class="md:hidden text-sm font-medium text-primary">Pending</span>
+<span class="flex items-center gap-2 bg-yellow-900/30 px-3 py-1 rounded-full border border-yellow-900/50">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-xs font-bold text-primary uppercase">Pending</span>
+</span>
+</div>
+</div>
+<!-- Item 2: Transferring -->
+<div class="group bg-[#2a2614] border border-[#4b4520] hover:border-blue-500/50 transition-colors rounded p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center relative overflow-hidden">
+<!-- Progress Bar Background (Subtle) -->
+<div class="absolute bottom-0 left-0 h-0.5 bg-blue-600 z-0" style="width: 45%;"></div>
+<div class="relative z-10 col-span-12 md:col-span-5 flex items-center gap-4">
+<div class="w-10 h-10 bg-gray-800 rounded flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">movie</span>
+</div>
+<div>
+<p class="font-bold text-white truncate">Keynote_Presentation_Video.mp4</p>
+<p class="text-xs text-gray-500 md:hidden">1.2 GB • 45% • 12 MB/s</p>
+</div>
+</div>
+<div class="hidden md:block relative z-10 col-span-2 text-gray-300 font-medium">1.2 GB</div>
+<div class="hidden md:block relative z-10 col-span-3 text-gray-400 text-sm">
+<div class="flex items-center gap-2">
+<span>45%</span>
+<span class="h-1 w-24 bg-gray-700 rounded-full overflow-hidden">
+<span class="block h-full bg-blue-500 w-[45%]"></span>
+</span>
+<span class="text-xs text-gray-500">12 MB/s</span>
+</div>
+</div>
+<div class="relative z-10 col-span-12 md:col-span-2 flex items-center justify-between md:justify-end gap-3">
+<span class="md:hidden text-sm font-medium text-blue-400">Syncing</span>
+<span class="flex items-center gap-2 bg-blue-900/30 px-3 py-1 rounded-full border border-blue-900/50">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span>
+<span class="text-xs font-bold text-blue-400 uppercase">Syncing</span>
+</span>
+</div>
+</div>
+<!-- Item 3: Complete -->
+<div class="group bg-[#2a2614] border border-[#4b4520] hover:border-green-500/50 transition-colors rounded p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+<div class="col-span-12 md:col-span-5 flex items-center gap-4">
+<div class="w-10 h-10 bg-gray-800 rounded flex items-center justify-center text-green-400 group-hover:bg-green-600 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div>
+<p class="font-bold text-white truncate">Invoice_Q3_2023.pdf</p>
+<p class="text-xs text-gray-500 md:hidden">2 MB • Complete</p>
+</div>
+</div>
+<div class="hidden md:block col-span-2 text-gray-300 font-medium">2 MB</div>
+<div class="hidden md:block col-span-3 text-gray-400 text-sm">Shared with @design_lead</div>
+<div class="col-span-12 md:col-span-2 flex items-center justify-between md:justify-end gap-3">
+<span class="md:hidden text-sm font-medium text-green-400">Sent</span>
+<span class="flex items-center gap-2 bg-green-900/30 px-3 py-1 rounded-full border border-green-900/50">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+<span class="text-xs font-bold text-green-400 uppercase">Sent</span>
+</span>
+</div>
+</div>
+<!-- Item 4: Complete -->
+<div class="group bg-[#2a2614] border border-[#4b4520] hover:border-green-500/50 transition-colors rounded p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+<div class="col-span-12 md:col-span-5 flex items-center gap-4">
+<div class="w-10 h-10 bg-gray-800 rounded flex items-center justify-center text-green-400 group-hover:bg-green-600 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">image</span>
+</div>
+<div>
+<p class="font-bold text-white truncate">Bauhaus_Poster_V2.png</p>
+<p class="text-xs text-gray-500 md:hidden">14 MB • Complete</p>
+</div>
+</div>
+<div class="hidden md:block col-span-2 text-gray-300 font-medium">14 MB</div>
+<div class="hidden md:block col-span-3 text-gray-400 text-sm">Received from @creative_dir</div>
+<div class="col-span-12 md:col-span-2 flex items-center justify-between md:justify-end gap-3">
+<span class="md:hidden text-sm font-medium text-green-400">Received</span>
+<span class="flex items-center gap-2 bg-green-900/30 px-3 py-1 rounded-full border border-green-900/50">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+<span class="text-xs font-bold text-green-400 uppercase">Received</span>
+</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer decoration (Bauhaus Strip) -->
+<div class="mt-auto w-full h-2 flex">
+<div class="w-1/3 bg-bauhaus-blue"></div>
+<div class="w-1/3 bg-bauhaus-red"></div>
+<div class="w-1/3 bg-primary"></div>
+</div>
+</body></html>
