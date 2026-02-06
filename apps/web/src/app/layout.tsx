@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import BackgroundGrid from "@/components/background-grid";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -23,9 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body
-        className={`${spaceGrotesk.className} font-display selection:bg-primary selection:text-black`}
+        className={`${spaceGrotesk.className} font-display selection:bg-primary selection:text-black bg-[#0a0a0a] min-h-screen`}
       >
-        {children}
+        <div className="relative z-10">{children}</div>
+        <BackgroundGrid />
       </body>
     </html>
   );

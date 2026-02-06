@@ -8,6 +8,9 @@ import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileSender } from "@/lib/transfer/sender";
 import type { PeerConfig, TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
+import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
+import { useWakeLock } from "@/lib/hooks/use-wake-lock";
+import ChatDrawer from "@/components/chat-drawer";
 
 export default function SendPage() {
   const router = useRouter();
@@ -21,14 +24,22 @@ export default function SendPage() {
   const [progress, setProgress] = useState<TransferProgress | null>(null);
   const [transferId, setTransferId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false); // Global drag state
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
     "Waiting for peer connection...",
   ]);
 
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [messages, setMessages] = useState<import("@repo/types").ChatMessage[]>([]);
+  const [hasUnread, setHasUnread] = useState(false);
+
   const peerManagerRef = useRef<PeerManager | null>(null);
   const fileSenderRef = useRef<FileSender | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const connectionRef = useRef<any>(null); // Keep track of active connection
+  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
 
   useEffect(() => {
     checkAuthAndInitPeer();
@@ -52,8 +63,149 @@ export default function SendPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [status]);
 
+  // Robustness: Tab Title & Notifications
+  useEffect(() => {
+    // Request permission on load
+    requestNotificationPermission();
+  }, []);
+
+  useEffect(() => {
+    // 1. Tab Title Progress
+    if (status === "transferring" && progress) {
+      document.title = `${progress.percentage.toFixed(0)}% - Uploading...`;
+    } else if (status === "complete") {
+      document.title = "Transfer Complete - HyperLink";
+    } else {
+      document.title = "HyperLink - Secure P2P";
+    }
+
+    // 2. Browser Notifications
+    if (status === "complete") {
+      notifyTransferComplete("sent", file?.name || "File");
+    }
+    // 3. Screen Wake Lock
+    if (status === "connecting" || status === "transferring") {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [status, progress, file, requestWakeLock, releaseWakeLock]);
+
+  // QoL: Global Drag & Drop + Paste
+  useEffect(() => {
+    // 1. Paste Support
+    const handlePaste = (e: ClipboardEvent) => {
+      if (e.clipboardData && e.clipboardData.files.length > 0) {
+        const pastedFile = e.clipboardData.files[0];
+        if (pastedFile) {
+          const validation = validateFileSize(pastedFile.size);
+          if (validation.valid) {
+            setFile(pastedFile);
+            setError("");
+            addLog(`✓ Pasted file: ${pastedFile.name}`);
+          } else {
+            setError(validation.error!);
+            addLog(`✗ Paste failed: ${validation.error}`);
+          }
+        }
+      }
+    };
+
+    // 2. Global Drag & Drop
+    const handleGlobalDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer?.types.includes("Files")) {
+        setIsDraggingOver(true);
+      }
+    };
+
+    const handleGlobalDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Only set false if leaving the window (relatedTarget is null)
+      if (e.relatedTarget === null) {
+        setIsDraggingOver(false);
+      }
+    };
+
+    const handleGlobalDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(true); // Ensure it stays true while over
+    };
+
+    const handleGlobalDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile) {
+          const validation = validateFileSize(droppedFile.size);
+          if (validation.valid) {
+            setFile(droppedFile);
+            setError("");
+            addLog(`✓ Dropped file: ${droppedFile.name}`);
+          } else {
+            setError(validation.error!);
+            addLog(`✗ Drop failed: ${validation.error}`);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    window.addEventListener("dragenter", handleGlobalDragEnter);
+    window.addEventListener("dragleave", handleGlobalDragLeave);
+    window.addEventListener("dragover", handleGlobalDragOver);
+    window.addEventListener("drop", handleGlobalDrop);
+
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+      window.removeEventListener("dragenter", handleGlobalDragEnter);
+      window.removeEventListener("dragleave", handleGlobalDragLeave);
+      window.removeEventListener("dragover", handleGlobalDragOver);
+      window.removeEventListener("drop", handleGlobalDrop);
+    };
+  }, []);
+
   function addLog(message: string) {
     setLogs((prev) => [...prev, message]);
+  }
+
+  // Handle incoming chat messages
+  function handleData(data: any) {
+    if (data && data.type === "chat-message") {
+      const msg = data.payload as import("@repo/types").ChatMessage;
+      setMessages((prev) => [...prev, msg]);
+      if (!isChatOpen) {
+        setHasUnread(true);
+      }
+    }
+  }
+
+  function handleSendMessage(text: string) {
+    if (!connectionRef.current || !user) return;
+
+    const msg: import("@repo/types").ChatMessage = {
+      id: crypto.randomUUID(),
+      senderId: user.id, // Current user ID
+      text,
+      timestamp: Date.now(),
+    };
+
+    // Send to peer
+    connectionRef.current.send({
+      type: "chat-message",
+      transferId: transferId || "", // Optional context
+      payload: msg,
+      timestamp: Date.now(),
+    });
+
+    // Add to local state
+    setMessages((prev) => [...prev, msg]);
   }
 
   async function checkAuthAndInitPeer() {
@@ -76,6 +228,31 @@ export default function SendPage() {
       path: process.env.NEXT_PUBLIC_PEER_SERVER_PATH!,
       secure: window.location.protocol === "https:",
       debug: 0,
+      config: {
+        iceServers: [
+          // Google's public STUN servers
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          // Free TURN servers from OpenRelay (no signup required)
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+        ],
+        iceTransportPolicy: "all", // Try all connection types (relay, srflx, host)
+        iceCandidatePoolSize: 10, // Pre-gather candidates for faster connections
+      },
     };
 
     peerManagerRef.current = new PeerManager(config);
@@ -143,6 +320,7 @@ export default function SendPage() {
       addLog(`✓ Transfer record created: ${transfer.id.slice(0, 8)}`);
 
       const connection = peerManagerRef.current.connectToPeer(receiverPeerId);
+      connectionRef.current = connection; // Store reference
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Connection timeout")), 30000);
@@ -152,6 +330,9 @@ export default function SendPage() {
           addLog("✓ Peer connection established");
           resolve();
         });
+
+        // Listen for chat messages here as well to ensure we catch them
+        connection.on("data", handleData);
 
         connection.on("error", (err) => {
           clearTimeout(timeout);
@@ -176,18 +357,18 @@ export default function SendPage() {
         }
       });
 
-      await fileSenderRef.current.sendOffer();
-      addLog("> File metadata sent to receiver");
-      setStatus("waiting");
-      addLog("> Waiting for receiver to accept...");
-
-      // Give connection time to stabilize
-      await new Promise(r => setTimeout(r, 1000));
+      fileSenderRef.current.onReject(() => {
+        setStatus("error");
+        setError("Receiver rejected the file offer");
+        addLog("✗ Receiver rejected the file");
+      });
 
       // Track if we've already switched to transferring state
       let hasStartedTransfer = false;
 
-      await fileSenderRef.current.startTransfer((progressData) => {
+      // Start listening for accept/reject events BEFORE sending the offer
+      // This prevents a race condition where the receiver accepts before we're listening
+      const transferPromise = fileSenderRef.current.startTransfer((progressData) => {
         // Update status to transferring on first progress update
         if (!hasStartedTransfer) {
           hasStartedTransfer = true;
@@ -201,6 +382,14 @@ export default function SendPage() {
           addLog(`> Progress: ${percentage.toFixed(0)}%`);
         }
       });
+
+      await fileSenderRef.current.sendOffer();
+      addLog("> File metadata sent to receiver");
+      setStatus("waiting");
+      addLog("> Waiting for receiver to accept...");
+
+      // Wait for the transfer to complete (or fail)
+      await transferPromise;
 
       await updateTransferStatus(transfer.id, "complete");
       setStatus("complete");
@@ -225,6 +414,8 @@ export default function SendPage() {
     setTransferId(null);
     setIsPaused(false);
     fileSenderRef.current = null;
+    connectionRef.current = null;
+    setMessages([]); // Clear chat on reset? Or keep? Let's clear for now
     setLogs([
       "Initializing WebRTC handshake...",
       "Waiting for peer connection...",
@@ -255,7 +446,7 @@ export default function SendPage() {
   }
 
   return (
-    <div className="bg-background-light dark:bg-[#121212] min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
       {/* Navbar: Split Header Design */}
       <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
         {/* Left: Logo Block */}
@@ -293,7 +484,8 @@ export default function SendPage() {
       {/* Main Layout */}
       <main className="flex-grow flex flex-col relative">
         {/* Central Workspace with Grid Background */}
-        <section className="flex-1 flex flex-col relative bg-grid-pattern">
+        {/* Central Workspace */}
+        <section className="flex-1 flex flex-col relative">
           {/* Content Container */}
           <div className="flex-1 p-6 md:p-12 flex flex-col max-w-7xl mx-auto w-full gap-8">
             {/* Page Header */}
@@ -311,13 +503,17 @@ export default function SendPage() {
 
             {status === "idle" && (
               <>
-                {/* Drag & Drop Zone */}
+                {/* Drag & Drop Zone - Mechanical/Breathing */}
                 <div
-                  className="group relative w-full h-64 md:h-80 border-[6px] border-dashed border-primary bg-[#23210f]/50 hover:bg-[#23210f] transition-all cursor-pointer flex flex-col items-center justify-center gap-6"
-                  onDragOver={(e) => e.preventDefault()}
+                  className="group relative w-full h-80 md:h-96 border-[2px] border-white/10 bg-[#0a0a0a]/50 backdrop-blur-sm hover:bg-[#0a0a0a]/80 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-6 overflow-hidden hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_50px_-10px_rgba(255,234,46,0.1)]"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
+                  {/* Breathing Glow Border */}
+                  <div className="absolute inset-0 border-[2px] border-primary/20 group-hover:border-primary/60 transition-colors duration-500 mask-container"></div>
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,rgba(255,234,46,0.05)_0%,transparent_70%)]"></div>
+
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -325,32 +521,43 @@ export default function SendPage() {
                     className="hidden"
                   />
 
-                  {/* Bauhaus Plus Icon */}
-                  <div className="relative">
-                    <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform duration-300" style={{ fontSize: '80px', fontWeight: '700' }}>
-                      add
-                    </span>
+                  {/* Animated Center Icon */}
+                  <div className="relative z-10 flex flex-col items-center gap-4 group-hover:-translate-y-2 transition-transform duration-300">
+                    <div className="relative w-24 h-24 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-20 group-hover:opacity-40 duration-1000"></div>
+                      <div className="absolute inset-0 border border-primary/30 rounded-full scale-100 group-hover:scale-110 transition-transform duration-500"></div>
+                      <span className="material-symbols-outlined text-primary text-6xl group-hover:scale-110 transition-transform duration-300 drop-shadow-[0_0_15px_rgba(255,234,46,0.5)]">
+                        add_circle
+                      </span>
+                    </div>
+
+                    {file ? (
+                      <div className="text-center space-y-2">
+                        <p className="text-xl font-bold uppercase tracking-widest text-primary drop-shadow-md">
+                          {file.name}
+                        </p>
+                        <p className="text-sm font-mono text-white/50">{formatFileSize(file.size)}</p>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-2">
+                        <p className="text-2xl font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors">
+                          Initiate Sequence
+                        </p>
+                        <p className="font-mono text-[#bcb89a] text-xs uppercase tracking-widest">
+                          Drop Payload or Click to Browse
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  {file ? (
-                    <div className="text-center z-10 space-y-2">
-                      <p className="text-xl font-bold uppercase tracking-widest text-primary">
-                        {file.name}
-                      </p>
-                      <p className="text-sm font-mono text-white/50">{formatFileSize(file.size)}</p>
-                    </div>
-                  ) : (
-                    <div className="text-center z-10 space-y-2">
-                      <p className="text-2xl font-bold text-white mb-2">DROP PAYLOAD HERE</p>
-                      <p className="font-mono text-[#bcb89a] text-sm">or click to browse local drive</p>
-                    </div>
-                  )}
+                  {/* Mechanical Corner Brackets */}
+                  <div className="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
+                  <div className="absolute top-4 right-4 w-4 h-4 border-r-2 border-t-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
+                  <div className="absolute bottom-4 left-4 w-4 h-4 border-l-2 border-b-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
+                  <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
 
-                  {/* Decorative corner accents */}
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white"></div>
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white"></div>
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white"></div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white"></div>
+                  {/* Scanline Effect */}
+                  <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(255,255,255,0.02)_50%,transparent_100%)] h-[200%] w-full animate-[scan_4s_linear_infinite] pointer-events-none opacity-0 group-hover:opacity-100"></div>
                 </div>
 
                 {/* File Preview & Transfer Controls */}
@@ -403,6 +610,7 @@ export default function SendPage() {
                           className="w-full bg-transparent border-b-2 border-white/20 focus:border-primary px-0 py-3 text-lg font-mono text-white placeholder-white/20 outline-none transition-colors"
                           placeholder="Enter hash..."
                           type="text"
+                          autoFocus
                           value={receiverPeerId}
                           onChange={(e) => setReceiverPeerId(e.target.value)}
                         />
@@ -464,57 +672,132 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Transferring State */}
+            {/* Transferring State - Split Layout */}
             {status === "transferring" && file && progress && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <div className="bg-[#11110f] p-4 border border-[#3a3827]">
-                    <div className="flex justify-between text-white font-mono text-xs mb-2">
-                      <span>TRANSFER_PROGRESS</span>
-                      <span>{progress.percentage.toFixed(0)}%</span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 h-full">
+                {/* Left Column: Controls & Progress */}
+                <div className="lg:col-span-5 flex flex-col gap-6">
+                  {/* Connected Peer Card */}
+                  <div className="bg-[#1a1a1a] p-4 border-l-4 border-primary flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-[#2d2b1f] rounded-full flex items-center justify-center border border-primary/30">
+                          <span className="material-symbols-outlined text-primary">hub</span>
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-[#1a1a1a] rounded-full animate-pulse"></div>
+                      </div>
+                      <div>
+                        <p className="text-[#bcb89a] text-[10px] font-bold uppercase tracking-widest">Secure Uplink Established</p>
+                        <p className="text-white font-bold font-mono text-sm tracking-tight">ID: {receiverPeerId.slice(0, 8)}...{receiverPeerId.slice(-4)}</p>
+                      </div>
                     </div>
-                    <div className="w-full h-4 bg-[#2a2a26]">
-                      <div className="h-full bg-bauhaus-blue transition-all" style={{ width: `${progress.percentage}%` }}></div>
+                    <span className="text-primary material-symbols-outlined animate-pulse">lock</span>
+                  </div>
+
+                  {/* Main Progress Card */}
+                  <div className="bg-[#11110f]/90 backdrop-blur-sm p-6 border border-[#3a3827] flex-1 flex flex-col gap-6 relative overflow-hidden group">
+                    {/* Background Grid */}
+                    <div className="absolute inset-0 bg-[radial-gradient(#3a3827_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start z-10">
+                      <div>
+                        <h3 className="text-white font-black uppercase text-xl tracking-tighter">Uploading Payload</h3>
+                        <p className="text-[#bcb89a] text-xs font-mono mt-1">{file.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-primary font-mono text-2xl font-bold block">{progress.percentage.toFixed(0)}%</span>
+                        <span className="text-white/30 text-[10px] uppercase tracking-wider">Completion</span>
+                      </div>
                     </div>
-                    <div className="mt-2 flex justify-between font-mono text-xs text-[#bcb89a]">
-                      <span>{formatFileSize(progress.speed)}/s</span>
-                      <span>ETA: {formatTime(progress.timeRemaining)}</span>
+
+                    {/* Industrial Progress Bar */}
+                    <div className="relative z-10 py-4">
+                      <div className="flex justify-between text-[10px] font-mono text-[#bcb89a] mb-2 uppercase tracking-widest">
+                        <span>Transmission Speed: {formatFileSize(progress.speed)}/s</span>
+                        <span>ETA: {formatTime(progress.timeRemaining)}</span>
+                      </div>
+                      <div className="h-4 w-full bg-[#1a1a1a] border border-[#3a3827] p-[2px]">
+                        <div className={`h-full ${isPaused ? "bg-orange-400" : "bg-primary"} relative overflow-hidden transition-all duration-300`} style={{ width: `${progress.percentage}%` }}>
+                          {!isPaused && <div className="absolute inset-0 bg-[linear-gradient(-45deg,rgba(0,0,0,0.2)_25%,transparent_25%,transparent_50%,rgba(0,0,0,0.2)_50%,rgba(0,0,0,0.2)_75%,transparent_75%,transparent)] bg-[length:10px_10px] animate-[progress-stripes_1s_linear_infinite]" />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="grid grid-cols-2 gap-3 mt-auto z-10">
+                      <button
+                        onClick={handlePauseResume}
+                        className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${isPaused
+                          ? "bg-primary text-black border-primary hover:bg-white"
+                          : "bg-transparent text-white border-white/20 hover:border-white hover:bg-white/5"
+                          }`}
+                      >
+                        <span className="material-symbols-outlined !text-[18px]">
+                          {isPaused ? "play_arrow" : "pause"}
+                        </span>
+                        {isPaused ? "Resume Uplink" : "Pause"}
+                      </button>
+                      <button
+                        onClick={handleCancel}
+                        className="h-12 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                      >
+                        <span className="material-symbols-outlined !text-[18px]">block</span>
+                        Abort
+                      </button>
                     </div>
                   </div>
                 </div>
-                <div className="lg:col-span-1 flex flex-col gap-4">
-                  <div className="flex items-center gap-4 py-3 border border-[#3a3827] px-4 bg-[#11110f]">
-                    <div className="relative w-10 h-10 bg-bauhaus-blue rounded-full flex items-center justify-center">
-                      <span className="material-symbols-outlined text-white">person</span>
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary border-2 border-black"></div>
+
+                {/* Right Column: Uplink Visualizer */}
+                <div className="lg:col-span-7 relative min-h-[400px] border border-[#3a3827] bg-[#0a0a0a] overflow-hidden flex items-center justify-center">
+                  {/* Background Elements */}
+                  <div className="absolute inset-0 pointer-events-none opacity-20"
+                    style={{
+                      backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
+                      backgroundSize: '40px 40px'
+                    }}
+                  />
+
+                  {/* Central Emitter */}
+                  <div className="relative z-10 flex items-center justify-center">
+                    <div className="absolute w-[300px] h-[300px] border border-primary/20 rounded-full animate-[spin_10s_linear_infinite]" />
+                    <div className="absolute w-[200px] h-[200px] border border-dashed border-primary/40 rounded-full animate-[spin_20s_linear_infinite_reverse]" />
+                    <div className="absolute w-[100px] h-[100px] bg-primary/10 rounded-full blur-xl animate-pulse" />
+
+                    {/* Core */}
+                    <div className="w-16 h-16 bg-[#1a1a1a] border border-primary rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,234,46,0.5)] z-20">
+                      <span className={`material-symbols-outlined text-primary text-3xl ${!isPaused && "animate-ping"}`}>upload</span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-white font-bold text-sm">Connected to Peer</span>
-                      <span className="text-[#bcb89a] font-mono text-xs">ID: {receiverPeerId.slice(0, 4)}...{receiverPeerId.slice(-4)}</span>
-                    </div>
+
+                    {/* Particles (CSS Simulated) */}
+                    {!isPaused && (
+                      <>
+                        <div className="absolute w-2 h-2 bg-primary rounded-full animate-[ping_2s_linear_infinite]" style={{ top: '-100px' }} />
+                        <div className="absolute w-2 h-2 bg-primary rounded-full animate-[ping_2.5s_linear_infinite]" style={{ bottom: '-80px', right: '-40px' }} />
+                        <div className="absolute w-2 h-2 bg-primary rounded-full animate-[ping_1.8s_linear_infinite]" style={{ bottom: '-20px', left: '-90px' }} />
+                      </>
+                    )}
+
+                    {/* Scanning Line */}
+                    <div className="absolute inset-0 w-full h-[2px] bg-primary/50 top-1/2 -translate-y-1/2 animate-[spin_4s_linear_infinite] shadow-[0_0_10px_rgba(255,234,46,0.8)]" />
                   </div>
 
-                  {/* Pause/Resume and Cancel buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handlePauseResume}
-                      className={`flex-1 h-10 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors ${isPaused
-                        ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
-                        : "bg-orange-400/20 text-orange-400 border border-orange-400/40 hover:bg-orange-400/30"
-                        }`}
-                    >
-                      <span className="material-symbols-outlined !text-[16px]">
-                        {isPaused ? "play_arrow" : "pause"}
-                      </span>
-                      {isPaused ? "Resume" : "Pause"}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="flex-1 h-10 bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <span className="material-symbols-outlined !text-[16px]">close</span>
-                      Cancel
-                    </button>
+                  {/* Status Overlays */}
+                  <div className="absolute top-6 left-6 flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest border border-primary px-2 py-1 bg-primary/10">Uplink Active</span>
+                    <span className="text-[10px] font-mono text-white/50">CHANNEL_SECURE</span>
+                  </div>
+
+                  <div className="absolute bottom-6 right-6 text-right">
+                    <p className="text-[#bcb89a] font-mono text-xs uppercase tracking-widest">
+                      {isPaused ? "TRANSMISSION HALTED" : "PACKETS_OUTBOUND..."}
+                    </p>
+                    <div className="flex justify-end gap-1 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className={`w-1 h-3 ${!isPaused ? "bg-primary animate-pulse" : "bg-white/10"}`} style={{ animationDelay: `${i * 0.1}s` }} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -578,6 +861,34 @@ export default function SendPage() {
         </div>
       </footer>
 
+      <ChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        currentUserId={user?.id || "sender"}
+        peerId={receiverPeerId}
+      />
+
+      {/* Floating Chat Button */}
+      {status !== "idle" && (
+        <button
+          onClick={() => {
+            setIsChatOpen(true);
+            setHasUnread(false);
+          }}
+          className="fixed bottom-6 right-6 z-40 bg-primary text-black p-4 rounded-full shadow-xl hover:scale-110 transition-transform flex items-center justify-center border-2 border-[#121212]"
+        >
+          <span className="material-symbols-outlined text-2xl">forum</span>
+          {hasUnread && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[10px] text-white font-bold items-center justify-center">!</span>
+            </span>
+          )}
+        </button>
+      )}
+
       {/* Custom Styles */}
       <style jsx>{`
         /* Corner Fold Effect */
@@ -603,12 +914,24 @@ export default function SendPage() {
           pointer-events: none;
         }
 
-        /* Dotted Grid Background Pattern */
-        .bg-grid-pattern {
-          background-image: radial-gradient(#3a3827 1px, transparent 1px);
-          background-size: 24px 24px;
+        @keyframes scan {
+          0% { transform: translateY(-50%); }
+          100% { transform: translateY(0%); }
         }
       `}</style>
+
+      {/* Global Drag Overlay */}
+      {isDraggingOver && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
+          <div className="w-64 h-64 rounded-full border-4 border-dashed border-primary animate-[spin_10s_linear_infinite] flex items-center justify-center mb-8">
+            <div className="w-48 h-48 rounded-full bg-primary/20 animate-pulse"></div>
+          </div>
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
+            Drop Payload Here
+          </h2>
+          <p className="text-primary font-mono mt-4">Initiating Transfer Sequence</p>
+        </div>
+      )}
     </div>
   );
 }

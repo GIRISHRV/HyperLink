@@ -2,7 +2,9 @@ import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import { generateTransferId, calculateChunkCount } from "@repo/utils";
 
-const CHUNK_SIZE = 16384; // 16KB (reduced from 64KB for better reliability)
+const CHUNK_SIZE = 64 * 1024; // 64KB chunks for higher throughput
+const WINDOW_SIZE = 16; // reduced window size to prevent buffer overflow with larger chunks
+const MAX_BUFFERED_AMOUNT = 1 * 1024 * 1024; // 1MB backpressure limit
 
 export class FileSender {
   private file: File;
@@ -10,6 +12,7 @@ export class FileSender {
   private transferId: string;
   private totalChunks: number;
   private currentChunk: number = 0;
+  private activeChunks: number = 0; // Number of un-acked chunks in flight
   private isCancelled: boolean = false;
   private isPaused: boolean = false;
   private bytesSent: number = 0;
@@ -52,7 +55,7 @@ export class FileSender {
     return this.transferId;
   }
   /**
-   * Start ACK-based transfer - waits for receiver to confirm each chunk
+   * Start Sliding Window transfer
    */
   async startTransfer(onProgress?: (progress: TransferProgress) => void): Promise<void> {
     if (this.isTransferring) {
@@ -68,44 +71,41 @@ export class FileSender {
       this.rejectTransfer = reject;
       this.resolveTransfer = resolve;
 
-      console.log("[SENDER] Setting up ACK listener...");
+      console.log("[SENDER] Setting up Turbo Mode (Sliding Window)...");
 
       let transferStarted = false;
 
       // Listen for ACKs and control messages from receiver
       this.connection.on("data", (data: any) => {
-        console.log("[SENDER] Received data:", data?.type);
         const message = data as PeerMessage;
 
         if (message.transferId !== this.transferId) return;
 
         // Wait for file-accept before sending first chunk
         if (message.type === "file-accept" && !transferStarted) {
-          console.log("[SENDER] Received file-accept, starting transfer...");
+          console.log("[SENDER] Received file-accept, pumping chunks...");
           transferStarted = true;
-          this.sendNextChunk();
+          this.pump();
           return;
         }
 
         if (message.type === "chunk-ack") {
-          console.log(`[SENDER] Got ACK for chunk ${(message.payload as any)?.chunkIndex}`);
-          // Receiver confirmed chunk, send next one
-          this.currentChunk++;
+          // Receiver confirmed chunk, slide window
+          this.activeChunks--;
 
           if (this.isCancelled) return;
+          if (this.isPaused) return;
 
-          if (this.isPaused) {
-            console.log("[SENDER] Transfer paused, waiting for resume...");
+          // If we finished sending everything and all ACKs are back
+          if (this.currentChunk >= this.totalChunks && this.activeChunks <= 0) {
+            this.sendComplete();
+            this.resolveTransfer?.();
             return;
           }
 
-          if (this.currentChunk < this.totalChunks) {
-            this.sendNextChunk();
-          } else if (this.currentChunk >= this.totalChunks) {
-            // All chunks sent and acknowledged
-            this.sendComplete();
-            this.resolveTransfer?.();
-          }
+          // Pump more chunks if window allows
+          this.pump();
+
         } else if (message.type === "file-reject") {
           console.log("[SENDER] Receiver rejected the file offer");
           this.isCancelled = true;
@@ -124,17 +124,35 @@ export class FileSender {
           console.log("[SENDER] Receiver requested resume");
           this.isPaused = false;
           this.pauseCallback?.(false);
-          // Continue sending from where we left off
-          if (this.currentChunk < this.totalChunks && !this.isCancelled) {
-            this.sendNextChunk();
-          }
+          this.pump();
         }
       });
 
-      // NOTE: We no longer send the first chunk here!
-      // Instead, we wait for file-accept message above before starting
       console.log("[SENDER] Waiting for receiver to accept...");
     });
+  }
+
+  /**
+   * Pump chunks until window is full or buffer is saturated
+   */
+  private pump(): void {
+    if (this.isCancelled || this.isPaused) return;
+
+    // While we have chunks left AND window has space
+    while (this.currentChunk < this.totalChunks && this.activeChunks < WINDOW_SIZE) {
+      // Check backpressure - if PeerJS buffer is too full, stop pushing
+      // @ts-ignore - bufferedAmount exists on DataConnection but might be missing in types
+      const bufferedAmount = this.connection.dataChannel?.bufferedAmount || 0;
+
+      if (bufferedAmount > MAX_BUFFERED_AMOUNT) {
+        // Wait for buffer to drain (simple retry via timeout or just wait for next ACK)
+        // Since we get ACKs, the pump will be called again soon.
+        // We can break here and let the next ACK trigger another pump.
+        break;
+      }
+
+      this.sendNextChunk();
+    }
   }
 
   /**
@@ -143,7 +161,12 @@ export class FileSender {
   private sendNextChunk(): void {
     if (this.isCancelled) return;
 
-    const start = this.currentChunk * CHUNK_SIZE;
+    // Capture current index for the closure
+    const chunkIndex = this.currentChunk;
+    this.currentChunk++;
+    this.activeChunks++;
+
+    const start = chunkIndex * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, this.file.size);
     const blob = this.file.slice(start, end);
 
@@ -152,7 +175,7 @@ export class FileSender {
       if (!event.target?.result || this.isCancelled) return;
 
       const arrayBuffer = event.target.result as ArrayBuffer;
-      this.sendChunk(arrayBuffer);
+      this.sendChunk(arrayBuffer, chunkIndex);
     };
 
     reader.onerror = () => {
@@ -166,32 +189,28 @@ export class FileSender {
   /**
    * Send binary chunk over DataChannel
    */
-  private sendChunk(data: ArrayBuffer): void {
+  private sendChunk(data: ArrayBuffer, chunkIndex: number): void {
     const chunkMessage: PeerMessage<ChunkPayload> = {
       type: "chunk",
       transferId: this.transferId,
       payload: {
-        chunkIndex: this.currentChunk,
+        chunkIndex: chunkIndex,
         data,
       },
       timestamp: Date.now(),
     };
 
     this.connection.send(chunkMessage);
-    console.log(`[SENDER] Sent chunk ${this.currentChunk}/${this.totalChunks}, waiting for ACK...`);
     this.bytesSent += data.byteLength;
 
-    // Log progress every 10%
+    // Log progress periodically
     const percentage = (this.bytesSent / this.file.size) * 100;
-    if (Math.floor(percentage) % 10 === 0 && Math.floor(percentage) !== Math.floor((this.bytesSent - data.byteLength) / this.file.size * 100)) {
-      console.log(`[SENDER] Progress: ${percentage.toFixed(0)}% (chunk ${this.currentChunk + 1}/${this.totalChunks})`);
-    }
 
     // Update progress callback
     if (this.progressCallback) {
-      const elapsedTime = Date.now() - this.startTime;
-      const speed = this.bytesSent / (elapsedTime / 1000);
-      const timeRemaining = (this.file.size - this.bytesSent) / speed;
+      const elapsedTime = Math.max(1, Date.now() - this.startTime);
+      const speed = this.bytesSent / (elapsedTime / 1000); // bytes per second
+      const timeRemaining = speed > 0 ? (this.file.size - this.bytesSent) / speed : 0;
 
       this.progressCallback({
         transferId: this.transferId,
@@ -289,11 +308,8 @@ export class FileSender {
     } catch (e) {
       console.warn("[SENDER] Failed to send resume message:", e);
     }
-    console.log("[SENDER] Transfer resumed, continuing from chunk", this.currentChunk);
-    // Continue sending
-    if (this.currentChunk < this.totalChunks) {
-      this.sendNextChunk();
-    }
+    console.log("[SENDER] Transfer resumed, pumping...");
+    this.pump();
   }
 
   /**

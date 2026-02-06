@@ -92,13 +92,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
-      {/* Geometric Background Decorations */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
-        <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full border border-primary/10"></div>
-        <div className="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-[#242424]/20"></div>
-      </div>
+    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
+
 
       {/* Navigation */}
       <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md">
@@ -116,7 +111,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link href="/settings">
-              <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+              <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
                 <span className="material-symbols-outlined">settings</span>
               </button>
             </Link>
@@ -170,7 +165,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 w-full flex justify-end">
                   <Link href="/receive">
-                    <button className="bg-[#242424] border border-white/20 hover:border-white/60 text-white font-bold py-3 px-6 rounded-sm uppercase tracking-wider text-sm whitespace-nowrap transition-colors">
+                    <button className="bg-[#242424] border border-white/20 hover:border-white/60 text-white font-bold py-3 px-6 rounded-sm uppercase tracking-wider text-sm whitespace-nowrap transition-all active:scale-95">
                       Go to Receive
                     </button>
                   </Link>
@@ -221,7 +216,7 @@ export default function DashboardPage() {
             <div className="flex items-end justify-between mb-6 border-b border-white/10 pb-2">
               <h3 className="font-black text-xl text-white uppercase tracking-tight">Recent Activity</h3>
               <Link href="/history">
-                <button className="text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1">
+                <button className="text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1">
                   View All History
                   <span className="material-symbols-outlined text-sm">arrow_right_alt</span>
                 </button>
@@ -285,14 +280,14 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleDelete(transfer.id)}
-                              className="p-1 bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-colors rounded-sm"
+                              className="p-1 bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all active:scale-90 rounded-sm"
                               title="Confirm delete"
                             >
                               <span className="material-symbols-outlined text-sm">check</span>
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(null)}
-                              className="p-1 text-gray-400 hover:text-white transition-colors rounded-sm"
+                              className="p-1 text-gray-400 hover:text-white transition-all active:scale-90 rounded-sm"
                               title="Cancel"
                             >
                               <span className="material-symbols-outlined text-sm">close</span>
@@ -301,7 +296,7 @@ export default function DashboardPage() {
                         ) : (
                           <button
                             onClick={() => setConfirmDeleteId(transfer.id)}
-                            className="p-1 text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 rounded-sm"
+                            className="p-1 text-gray-500 hover:text-red-400 transition-all active:scale-90 opacity-0 group-hover:opacity-100 rounded-sm"
                             title="Delete transfer"
                           >
                             <span className="material-symbols-outlined text-sm">delete</span>

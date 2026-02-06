@@ -54,7 +54,7 @@ export default function StatusPage() {
   };
 
   return (
-    <div className="bg-background-light dark:bg-[#121212] min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
       {/* Navbar: Split Header Design */}
       <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
         {/* Left: Logo Block */}

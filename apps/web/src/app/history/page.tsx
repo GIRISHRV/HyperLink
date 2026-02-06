@@ -113,7 +113,7 @@ export default function HistoryPage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col font-display bg-[#0a0a0a] text-white relative overflow-x-hidden">
+    <div className="min-h-screen flex flex-col font-display bg-transparent text-white relative overflow-x-hidden">
       {/* Navigation */}
       <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-[#6b6644]/30 bg-[#1a1a1a] sticky top-0">
         <div className="flex items-center gap-3">
@@ -124,12 +124,12 @@ export default function HistoryPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
               <span className="material-symbols-outlined">dashboard</span>
             </button>
           </Link>
           <Link href="/settings">
-            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
               <span className="material-symbols-outlined">settings</span>
             </button>
           </Link>
@@ -158,7 +158,7 @@ export default function HistoryPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilter("all")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-opacity ${filter === "all"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 ${filter === "all"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -167,7 +167,7 @@ export default function HistoryPage() {
             </button>
             <button
               onClick={() => setFilter("complete")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${filter === "complete"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 ${filter === "complete"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -176,7 +176,7 @@ export default function HistoryPage() {
             </button>
             <button
               onClick={() => setFilter("failed")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${filter === "failed"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 ${filter === "failed"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -192,13 +192,13 @@ export default function HistoryPage() {
                     <span className="text-xs text-gray-400">Clear {deletableTransfers.length} finished transfers?</span>
                     <button
                       onClick={handleClearAll}
-                      className="px-3 py-1.5 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/40 transition-colors rounded-sm"
+                      className="px-3 py-1.5 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/40 transition-all active:scale-95 rounded-sm"
                     >
                       Confirm
                     </button>
                     <button
                       onClick={() => setShowClearAll(false)}
-                      className="px-3 py-1.5 text-xs font-bold uppercase text-gray-400 border border-white/10 hover:border-white/30 transition-colors rounded-sm"
+                      className="px-3 py-1.5 text-xs font-bold uppercase text-gray-400 border border-white/10 hover:border-white/30 transition-all active:scale-95 rounded-sm"
                     >
                       Cancel
                     </button>
@@ -206,7 +206,7 @@ export default function HistoryPage() {
                 ) : (
                   <button
                     onClick={() => setShowClearAll(true)}
-                    className="px-4 py-2 uppercase text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-1.5 rounded-sm"
+                    className="px-4 py-2 uppercase text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all active:scale-95 flex items-center gap-1.5 rounded-sm"
                   >
                     <span className="material-symbols-outlined text-sm">delete_sweep</span>
                     Clear All

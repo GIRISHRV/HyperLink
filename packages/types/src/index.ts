@@ -43,6 +43,7 @@ export interface PeerConfig {
   path: string;
   secure?: boolean;
   debug?: number;
+  config?: any; // RTCConfiguration
 }
 
 /**
@@ -76,7 +77,19 @@ export type PeerMessageType =
   | "transfer-cancel"
   | "transfer-pause"
   | "transfer-resume"
-  | "receiver-busy";
+  | "receiver-busy"
+  | "chat-message";
+
+/**
+ * Chat message payload
+ */
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: number;
+  isSystem?: boolean;
+}
 
 /**
  * Peer message structure
@@ -98,6 +111,12 @@ export interface FileOfferPayload {
   totalChunks: number;
   /** The Supabase DB transfer ID so the receiver can reference the same record */
   dbTransferId?: string;
+
+  /** Multi-file Batch Metadata */
+  batchId?: string;      // Unique ID for the group
+  batchSize?: number;    // Total number of files
+  batchIndex?: number;   // Current file index (0-based)
+  totalBatchSize?: number; // Total bytes of all files (optional)
 }
 
 /**

@@ -109,12 +109,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
-      {/* Geometric Background Decorations */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
-        <div className="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-[#242424]/20"></div>
-      </div>
+    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
+
 
       {/* Navigation */}
       <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md">
@@ -126,7 +122,7 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
               <span className="material-symbols-outlined">dashboard</span>
             </button>
           </Link>
@@ -242,7 +238,7 @@ export default function SettingsPage() {
                   <button
                     key={icon}
                     onClick={() => setSelectedIcon(icon)}
-                    className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 rounded-sm text-white ${selectedIcon === icon
+                    className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 active:scale-95 rounded-sm text-white ${selectedIcon === icon
                       ? "border-primary bg-primary/20"
                       : "border-white/10 hover:border-white/30 bg-black/20"
                       }`}
@@ -264,7 +260,7 @@ export default function SettingsPage() {
                   <button
                     key={color.value}
                     onClick={() => setSelectedColor(color)}
-                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 rounded-sm ${selectedColor.value === color.value
+                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 active:scale-[0.98] rounded-sm ${selectedColor.value === color.value
                       ? "border-white bg-white/5"
                       : "border-white/10 hover:border-white/30"
                       }`}
@@ -287,14 +283,14 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Link
                   href="/status"
-                  className="bg-gray-800/50 hover:bg-gray-800 border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
+                  className="bg-gray-800/50 hover:bg-gray-800 border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
                 >
                   <span className="material-symbols-outlined">radar</span>
                   Network Status
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
+                  className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
                 >
                   <span className="material-symbols-outlined">logout</span>
                   Sign Out
@@ -307,7 +303,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg"
+                className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg"
               >
                 <span className="material-symbols-outlined text-xl">save</span>
                 {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
