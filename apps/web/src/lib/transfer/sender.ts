@@ -106,6 +106,11 @@ export class FileSender {
             this.sendComplete();
             this.resolveTransfer?.();
           }
+        } else if (message.type === "file-reject") {
+          console.log("[SENDER] Receiver rejected the file offer");
+          this.isCancelled = true;
+          this.rejectCallback?.();
+          reject(new Error("File offer rejected by receiver"));
         } else if (message.type === "transfer-cancel") {
           console.log("[SENDER] Receiver cancelled transfer");
           this.isCancelled = true;
