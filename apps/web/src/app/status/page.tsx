@@ -19,9 +19,10 @@ export default function StatusPage() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch(
-          `http://${process.env.NEXT_PUBLIC_PEER_SERVER_HOST}:${parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!) + 1}/health`
-        );
+        const protocol = window.location.protocol === "https:" ? "https" : "http";
+        const host = process.env.NEXT_PUBLIC_PEER_SERVER_HOST;
+        const port = process.env.NEXT_PUBLIC_PEER_SERVER_PORT;
+        const response = await fetch(`${protocol}://${host}:${port}/health`);
 
         if (response.ok) {
           const data = await response.json();
