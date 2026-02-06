@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings - HyperLink</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Config -->
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffe500", // Yellow
+                        "bauhaus-red": "#E93425", // Red
+                        "bauhaus-blue": "#0A3B8C", // Blue
+                        "background-light": "#f0f0f0",
+                        "background-dark": "#181810",
+                        "surface-dark": "#23210f",
+                        "border-gold": "#8a8558",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem", // 2px
+                        "sm": "0.125rem",
+                        "md": "0.25rem",
+                        "lg": "0.375rem",
+                        "xl": "0.5rem",
+                        "none": "0px",
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Bauhaus Toggle Switch Custom Styles */
+        .bauhaus-toggle-checkbox:checked {
+            right: 0;
+            border-color: #ffe500;
+        }
+        .bauhaus-toggle-checkbox:checked + .bauhaus-toggle-label {
+            background-color: #ffe500;
+        }
+        .bauhaus-toggle-checkbox:checked + .bauhaus-toggle-label:before {
+            transform: translateX(100%);
+            background-color: #181810;
+        }
+        
+        .bauhaus-toggle-label {
+            width: 50px;
+            height: 26px;
+            background-color: #3a3827;
+            display: flex;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid #8a8558;
+            transition: background-color 0.2s;
+        }
+        
+        .bauhaus-toggle-label:before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 18px;
+            height: 18px;
+            background-color: #8a8558;
+            transition: transform 0.2s;
+        }
+
+        /* Custom scrollbar for raw feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181810; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3a3827; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ffe500; 
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased selection:bg-primary selection:text-black">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<!-- Header -->
+<header class="flex shrink-0 items-center justify-between border-b-2 border-solid border-[#3a3827] bg-[#181810] px-6 py-4 z-10">
+<div class="flex items-center gap-4">
+<div class="size-8 flex items-center justify-center bg-primary text-black">
+<span class="material-symbols-outlined font-bold">share</span>
+</div>
+<div>
+<h2 class="text-white text-xl font-black tracking-tighter uppercase leading-none">HYPERLINK</h2>
+<p class="text-primary text-[10px] font-mono tracking-widest uppercase leading-none mt-1">P2P Encrypted Transfer</p>
+</div>
+</div>
+<div class="hidden md:flex flex-1 justify-end items-center gap-8">
+<nav class="flex items-center gap-8">
+<a class="text-[#8a8558] hover:text-white text-sm font-bold uppercase tracking-wider transition-colors" href="#">Dashboard</a>
+<a class="text-[#8a8558] hover:text-white text-sm font-bold uppercase tracking-wider transition-colors" href="#">Transfers</a>
+<a class="text-white border-b-2 border-primary pb-1 text-sm font-bold uppercase tracking-wider" href="#">Settings</a>
+</nav>
+<div class="flex items-center gap-4 pl-8 border-l-2 border-[#3a3827]">
+<div class="flex flex-col items-end">
+<span class="text-xs font-bold text-white uppercase">Construct_01</span>
+<span class="text-[10px] text-green-500 font-mono uppercase">Online</span>
+</div>
+<div class="size-10 bg-bauhaus-red flex items-center justify-center border-2 border-white/10" data-alt="User avatar abstract geometric red square">
+<div class="size-4 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+<button class="md:hidden text-white">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<!-- Main Layout -->
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-64 flex-col bg-[#1c1c16] border-r-2 border-[#3a3827] hidden md:flex">
+<div class="flex flex-col py-8 px-0 gap-1">
+<div class="px-6 mb-6">
+<h3 class="text-[#5c5945] text-xs font-black uppercase tracking-[0.2em] mb-2">Configuration</h3>
+</div>
+<a class="flex items-center gap-3 px-6 py-3 border-l-4 border-transparent hover:bg-[#25241a] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#8a8558] group-hover:text-white">settings</span>
+<span class="text-[#bcb89a] font-bold text-sm tracking-wide uppercase group-hover:text-white">General</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 border-l-4 border-bauhaus-red bg-[#25241a] group" href="#">
+<span class="material-symbols-outlined text-bauhaus-red fill-1">person</span>
+<span class="text-white font-bold text-sm tracking-wide uppercase">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 border-l-4 border-transparent hover:bg-[#25241a] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#8a8558] group-hover:text-white">hub</span>
+<span class="text-[#bcb89a] font-bold text-sm tracking-wide uppercase group-hover:text-white">Network</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 border-l-4 border-transparent hover:bg-[#25241a] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#8a8558] group-hover:text-white">encrypted</span>
+<span class="text-[#bcb89a] font-bold text-sm tracking-wide uppercase group-hover:text-white">Security</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-3 border-l-4 border-transparent hover:bg-[#25241a] group transition-colors mt-8" href="#">
+<span class="material-symbols-outlined text-[#8a8558] group-hover:text-white">logout</span>
+<span class="text-[#bcb89a] font-bold text-sm tracking-wide uppercase group-hover:text-white">Logout</span>
+</a>
+</div>
+<div class="mt-auto p-6">
+<div class="border-2 border-[#3a3827] p-4 bg-[#181810]">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] text-[#8a8558] uppercase font-mono">Storage Used</span>
+<span class="text-[10px] text-primary font-mono">2.4 GB</span>
+</div>
+<div class="w-full h-2 bg-[#3a3827]">
+<div class="h-full w-[45%] bg-primary"></div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Content Area -->
+<main class="flex-1 overflow-y-auto bg-[#181810] p-6 md:p-12 relative">
+<!-- Grid background effect -->
+<div class="absolute inset-0 z-0 pointer-events-none opacity-[0.03]" style="background-image: linear-gradient(#ffe500 1px, transparent 1px), linear-gradient(90deg, #ffe500 1px, transparent 1px); background-size: 40px 40px;"></div>
+<div class="relative z-10 max-w-4xl mx-auto flex flex-col gap-12">
+<!-- Header -->
+<div class="flex flex-col gap-2 border-b-2 border-[#3a3827] pb-6">
+<h1 class="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">Profile Settings</h1>
+<p class="text-[#8a8558] font-mono text-sm uppercase tracking-widest">// Manage Identity &amp; Connection Parameters</p>
+</div>
+<!-- Profile Section (Red Accent) -->
+<section class="flex flex-col gap-6">
+<div class="flex items-center gap-4">
+<div class="h-4 w-4 bg-bauhaus-red"></div>
+<h2 class="text-xl font-bold text-white uppercase tracking-wide">Identity</h2>
+</div>
+<div class="bg-[#23210f] border-l-[8px] border-bauhaus-red p-6 md:p-8 flex flex-col md:flex-row gap-8 shadow-xl">
+<!-- Avatar Picker -->
+<div class="flex flex-col gap-4 min-w-[200px]">
+<label class="text-xs font-bold text-[#8a8558] uppercase tracking-wider">Avatar Representation</label>
+<div class="grid grid-cols-2 gap-3 w-fit">
+<button class="size-16 bg-bauhaus-red border-4 border-white flex items-center justify-center hover:opacity-90 transition-opacity relative group">
+<div class="size-6 bg-white rounded-full"></div>
+<div class="absolute -top-2 -right-2 bg-primary text-black p-0.5 z-10">
+<span class="material-symbols-outlined text-sm font-bold">check</span>
+</div>
+</button>
+<button class="size-16 bg-bauhaus-blue border-4 border-[#3a3827] flex items-center justify-center hover:border-white transition-colors">
+<div class="size-6 bg-white rotate-45"></div>
+</button>
+<button class="size-16 bg-primary border-4 border-[#3a3827] flex items-center justify-center hover:border-white transition-colors">
+<div class="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[20px] border-b-black"></div>
+</button>
+<button class="size-16 bg-white border-4 border-[#3a3827] flex items-center justify-center hover:border-[#8a8558] transition-colors">
+<span class="material-symbols-outlined text-black">add</span>
+</button>
+</div>
+</div>
+<!-- Inputs -->
+<div class="flex-1 flex flex-col gap-6">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-[#8a8558] uppercase tracking-wider">Display Name</label>
+<input class="bg-[#181810] border-2 border-border-gold text-white px-4 py-3 font-mono text-sm focus:border-primary focus:ring-0 placeholder-[#3a3827] outline-none transition-colors w-full uppercase tracking-wider" type="text" value="Construct_01"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-[#8a8558] uppercase tracking-wider">Public Handle / ID</label>
+<div class="flex">
+<span class="bg-[#3a3827] text-[#8a8558] px-4 py-3 font-mono text-sm border-2 border-r-0 border-border-gold flex items-center">@</span>
+<input class="bg-[#181810] border-2 border-border-gold text-[#5c5945] px-4 py-3 font-mono text-sm flex-1 outline-none cursor-not-allowed" readonly="" type="text" value="8f92-ka20-poly"/>
+<button class="bg-border-gold hover:bg-primary text-black px-4 font-bold uppercase text-xs transition-colors">Copy</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Connection Section (Yellow Accent) -->
+<section class="flex flex-col gap-6">
+<div class="flex items-center gap-4">
+<div class="h-4 w-4 bg-primary"></div>
+<h2 class="text-xl font-bold text-white uppercase tracking-wide">Connection Protocols</h2>
+</div>
+<div class="bg-[#23210f] border-l-[8px] border-primary p-6 md:p-8 flex flex-col gap-6 shadow-xl">
+<!-- Toggle Item -->
+<div class="flex items-center justify-between border-b border-[#3a3827] pb-6">
+<div class="flex flex-col gap-1">
+<h4 class="text-white font-bold uppercase text-sm">Use Relay Server (TURN)</h4>
+<p class="text-[#8a8558] text-xs max-w-md">Route traffic through relay servers when direct P2P fails. Slower but more reliable.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer bauhaus-toggle-checkbox" type="checkbox" value=""/>
+<div class="bauhaus-toggle-label"></div>
+</label>
+</div>
+<!-- Toggle Item -->
+<div class="flex items-center justify-between border-b border-[#3a3827] pb-6">
+<div class="flex flex-col gap-1">
+<h4 class="text-white font-bold uppercase text-sm">Force Encryption (DTLS)</h4>
+<p class="text-[#8a8558] text-xs max-w-md">Mandate end-to-end encryption for all data packets. Cannot be disabled on public networks.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer bauhaus-toggle-checkbox" disabled="" type="checkbox" value=""/>
+<div class="bauhaus-toggle-label opacity-50 cursor-not-allowed"></div>
+</label>
+</div>
+<!-- Toggle Item -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col gap-1">
+<h4 class="text-white font-bold uppercase text-sm">Local Discovery (mDNS)</h4>
+<p class="text-[#8a8558] text-xs max-w-md">Broadcast presence to other HyperLink peers on the same local network.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer bauhaus-toggle-checkbox" type="checkbox" value=""/>
+<div class="bauhaus-toggle-label"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Storage Section (Blue Accent) -->
+<section class="flex flex-col gap-6 mb-24">
+<div class="flex items-center gap-4">
+<div class="h-4 w-4 bg-bauhaus-blue"></div>
+<h2 class="text-xl font-bold text-white uppercase tracking-wide">Local Storage</h2>
+</div>
+<div class="bg-[#23210f] border-l-[8px] border-bauhaus-blue p-6 md:p-8 flex flex-col gap-6 shadow-xl">
+<div class="flex flex-col gap-2">
+<label class="text-xs font-bold text-[#8a8558] uppercase tracking-wider">Default Download Path</label>
+<div class="flex gap-4">
+<input class="bg-[#181810] border-2 border-border-gold text-white px-4 py-3 font-mono text-sm focus:border-primary focus:ring-0 placeholder-[#3a3827] outline-none transition-colors w-full uppercase tracking-wider flex-1" type="text" value="C:/Users/Admin/Downloads/HyperLink"/>
+<button class="border-2 border-white hover:bg-white hover:text-black text-white px-6 py-3 font-bold uppercase text-xs transition-colors whitespace-nowrap">
+                                        Browse
+                                    </button>
+</div>
+</div>
+<div class="flex justify-start">
+<button class="flex items-center gap-2 text-bauhaus-red border border-bauhaus-red px-4 py-2 hover:bg-bauhaus-red hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg">delete</span>
+<span class="text-xs font-bold uppercase tracking-wide">Clear Local Cache</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+<!-- Sticky Action Bar -->
+<div class="fixed bottom-0 left-0 md:left-64 right-0 bg-[#181810] border-t-2 border-[#3a3827] p-6 z-50 flex items-center justify-end gap-6 shadow-2xl">
+<a class="text-[#8a8558] hover:text-white text-sm font-bold uppercase tracking-wider transition-colors" href="#">Discard Changes</a>
+<button class="bg-bauhaus-red text-white h-12 px-8 font-black uppercase tracking-widest text-sm hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_#ffffff] transition-all active:translate-y-0 active:shadow-none">
+                        Save Changes
+                    </button>
+</div>
+</main>
+</div>
+</div>
+</body></html>

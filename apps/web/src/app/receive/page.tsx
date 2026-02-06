@@ -30,23 +30,39 @@ export default function ReceivePage() {
   const fileReceiverRef = useRef<FileReceiver | null>(null);
 
   useEffect(() => {
-    checkAuthAndInitPeer();
+    console.log("[RECEIVE PAGE] Mounted, initializing...");
+    let isMounted = true;
+
+    checkAuthAndInitPeer(() => isMounted);
 
     return () => {
+      console.log("[RECEIVE PAGE] Unmounting...");
+      isMounted = false;
       if (peerManagerRef.current) {
         peerManagerRef.current.destroy();
+        peerManagerRef.current = null;
       }
     };
   }, []);
 
-  async function checkAuthAndInitPeer() {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
+  async function checkAuthAndInitPeer(isMountedCheck: () => boolean) {
+    try {
+      const currentUser = await getCurrentUser();
+
+      if (!isMountedCheck()) return;
+
+      if (!currentUser) {
+        router.push("/auth");
+        return;
+      }
+      setUser(currentUser);
+    } catch (e) {
+      console.error("Auth check failed:", e);
       router.push("/auth");
       return;
     }
 
-    setUser(currentUser);
+
 
     const config: PeerConfig = {
       host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
@@ -59,11 +75,38 @@ export default function ReceivePage() {
     peerManagerRef.current = new PeerManager(config);
 
     try {
+      console.log("[RECEIVE PAGE] Initializing PeerManager...");
       const peerId = await peerManagerRef.current.initialize();
+
+      if (!isMountedCheck()) return;
+
+      console.log("[RECEIVE PAGE] Peer initialized with ID:", peerId);
       setMyPeerId(peerId);
 
       peerManagerRef.current.on("incoming-connection", async (connection: any) => {
+        console.log("[RECEIVE PAGE] Incoming connection from:", connection.peer);
         setStatus("connecting");
+
+        connection.on("open", () => {
+          console.log("[RECEIVE PAGE] Connection OPEN (Event)!");
+          setStatus("receiving");
+        });
+
+        // Check if already open
+        if (connection.open) {
+          console.log("[RECEIVE PAGE] Connection OPEN (Immediate)!");
+          setStatus("receiving");
+        }
+
+        connection.on("close", () => {
+          console.log("[RECEIVE PAGE] Connection CLOSED");
+          setStatus("idle");
+        });
+
+        connection.on("error", (err: any) => {
+          console.error("[RECEIVE PAGE] Connection ERROR:", err);
+          setError(`Conn Error: ${err}`);
+        });
 
         connection.on("data", async (data: any) => {
           const message = data as PeerMessage;
@@ -88,6 +131,10 @@ export default function ReceivePage() {
             setStatus("receiving");
 
             fileReceiverRef.current = new FileReceiver();
+
+            // CRITICAL: Pass connection so receiver can send ACKs
+            fileReceiverRef.current.setConnection(connection);
+
             fileReceiverRef.current.onProgress((progressData) => {
               setProgress(progressData);
             });
@@ -100,9 +147,14 @@ export default function ReceivePage() {
 
             fileReceiverRef.current.handleOffer(message as any);
           } else if (message.type === "chunk") {
+            console.log("[RECEIVE PAGE] Received chunk message", (message.payload as any)?.chunkIndex);
             if (fileReceiverRef.current) {
               await fileReceiverRef.current.handleChunk(message as any);
+            } else {
+              console.warn("[RECEIVE PAGE] FileReceiver not initialized!");
             }
+          } else {
+            console.log("[RECEIVE PAGE] Received other message:", message.type);
           }
         });
 
@@ -167,8 +219,8 @@ export default function ReceivePage() {
               </label>
               <div className="flex items-stretch gap-3">
                 <div className="flex-1 bg-black border border-white/20 px-4 py-3 flex items-center">
-                  <span className="font-mono text-xl md:text-2xl tracking-widest text-white">
-                    {myPeerId ? myPeerId.slice(0, 12) : "Loading..."}
+                  <span className="font-mono text-lg md:text-xl tracking-widest text-white break-all">
+                    {myPeerId ? myPeerId : "Loading..."}
                   </span>
                 </div>
                 <button

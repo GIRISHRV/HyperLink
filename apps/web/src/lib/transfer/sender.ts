@@ -2,8 +2,7 @@ import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import { generateTransferId, calculateChunkCount } from "@repo/utils";
 
-const CHUNK_SIZE = 65536; // 64KB
-const BUFFER_THRESHOLD = 16 * 1024 * 1024; // 16MB
+const CHUNK_SIZE = 16384; // 16KB (reduced from 64KB for better reliability)
 
 export class FileSender {
   private file: File;
@@ -11,11 +10,11 @@ export class FileSender {
   private transferId: string;
   private totalChunks: number;
   private currentChunk: number = 0;
-  private isPaused: boolean = false;
+  private isCancelled: boolean = false;
   private bytesSent: number = 0;
   private startTime: number = 0;
-  private reader: FileReader | null = null;
   private progressCallback?: (progress: TransferProgress) => void;
+  private rejectTransfer?: (error: Error) => void;
 
   constructor(file: File, connection: DataConnection) {
     this.file = file;
@@ -25,7 +24,7 @@ export class FileSender {
   }
 
   /**
-   * CRITICAL: Send file offer to receiver
+   * Send file offer to receiver
    */
   async sendOffer(): Promise<string> {
     const offerMessage: PeerMessage<FileOfferPayload> = {
@@ -45,59 +44,70 @@ export class FileSender {
   }
 
   /**
-   * CRITICAL: Start chunked transfer with backpressure control
+   * Start ACK-based transfer - waits for receiver to confirm each chunk
    */
   async startTransfer(onProgress?: (progress: TransferProgress) => void): Promise<void> {
     this.progressCallback = onProgress;
     this.startTime = Date.now();
 
     return new Promise((resolve, reject) => {
-      this.reader = new FileReader();
+      this.rejectTransfer = reject;
 
-      this.reader.onload = (event) => {
-        if (!event.target?.result || this.isPaused) return;
+      console.log("[SENDER] Setting up ACK listener...");
 
-        const arrayBuffer = event.target.result as ArrayBuffer;
-        this.sendChunk(arrayBuffer);
-
-        // Check backpressure BEFORE reading next chunk
-        this.checkBackpressure(() => {
+      // Listen for ACKs from receiver
+      this.connection.on("data", (data: any) => {
+        console.log("[SENDER] Received data:", data?.type);
+        const message = data as PeerMessage;
+        if (message.type === "chunk-ack" && message.transferId === this.transferId) {
+          console.log(`[SENDER] Got ACK for chunk ${(message.payload as any)?.chunkIndex}`);
+          // Receiver confirmed chunk, send next one
           this.currentChunk++;
 
-          if (this.currentChunk < this.totalChunks) {
-            this.readNextChunk();
-          } else {
+          if (this.currentChunk < this.totalChunks && !this.isCancelled) {
+            this.sendNextChunk();
+          } else if (this.currentChunk >= this.totalChunks) {
+            // All chunks sent and acknowledged
             this.sendComplete();
             resolve();
           }
-        });
-      };
+        }
+      });
 
-      this.reader.onerror = (error) => {
-        this.sendError("File read error");
-        reject(error);
-      };
-
-      // Start reading first chunk
-      this.readNextChunk();
+      // Send first chunk
+      console.log("[SENDER] Sending first chunk...");
+      this.sendNextChunk();
     });
   }
 
   /**
-   * CRITICAL: Read file chunk (64KB at a time)
+   * Read and send the next chunk
    */
-  private readNextChunk(): void {
-    if (!this.reader || this.isPaused) return;
+  private sendNextChunk(): void {
+    if (this.isCancelled) return;
 
     const start = this.currentChunk * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, this.file.size);
     const blob = this.file.slice(start, end);
 
-    this.reader.readAsArrayBuffer(blob);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (!event.target?.result || this.isCancelled) return;
+
+      const arrayBuffer = event.target.result as ArrayBuffer;
+      this.sendChunk(arrayBuffer);
+    };
+
+    reader.onerror = () => {
+      this.sendError("File read error");
+      this.rejectTransfer?.(new Error("File read error"));
+    };
+
+    reader.readAsArrayBuffer(blob);
   }
 
   /**
-   * CRITICAL: Send binary chunk over DataChannel
+   * Send binary chunk over DataChannel
    */
   private sendChunk(data: ArrayBuffer): void {
     const chunkMessage: PeerMessage<ChunkPayload> = {
@@ -111,9 +121,16 @@ export class FileSender {
     };
 
     this.connection.send(chunkMessage);
+    console.log(`[SENDER] Sent chunk ${this.currentChunk}/${this.totalChunks}, waiting for ACK...`);
     this.bytesSent += data.byteLength;
 
-    // Update progress
+    // Log progress every 10%
+    const percentage = (this.bytesSent / this.file.size) * 100;
+    if (Math.floor(percentage) % 10 === 0 && Math.floor(percentage) !== Math.floor((this.bytesSent - data.byteLength) / this.file.size * 100)) {
+      console.log(`[SENDER] Progress: ${percentage.toFixed(0)}% (chunk ${this.currentChunk + 1}/${this.totalChunks})`);
+    }
+
+    // Update progress callback
     if (this.progressCallback) {
       const elapsedTime = Date.now() - this.startTime;
       const speed = this.bytesSent / (elapsedTime / 1000);
@@ -123,44 +140,11 @@ export class FileSender {
         transferId: this.transferId,
         bytesTransferred: this.bytesSent,
         totalBytes: this.file.size,
-        percentage: (this.bytesSent / this.file.size) * 100,
+        percentage,
         speed,
         timeRemaining,
       });
     }
-  }
-
-  /**
-   * CRITICAL: Monitor bufferedAmount and pause/resume (BACKPRESSURE CONTROL)
-   */
-  private checkBackpressure(onReady: () => void): void {
-    const channel = (this.connection as any)._channel;
-
-    if (!channel) {
-      onReady();
-      return;
-    }
-
-    const checkBuffer = () => {
-      if (channel.bufferedAmount > BUFFER_THRESHOLD) {
-        // PAUSE: Buffer is too full
-        this.isPaused = true;
-
-        // Wait for buffer to drain
-        const drainInterval = setInterval(() => {
-          if (channel.bufferedAmount < BUFFER_THRESHOLD / 2) {
-            clearInterval(drainInterval);
-            this.isPaused = false;
-            onReady();
-          }
-        }, 100);
-      } else {
-        // RESUME: Buffer is healthy
-        onReady();
-      }
-    };
-
-    checkBuffer();
   }
 
   /**
@@ -175,6 +159,7 @@ export class FileSender {
     };
 
     this.connection.send(completeMessage);
+    console.log("[SENDER] Transfer complete!");
   }
 
   /**
@@ -195,8 +180,7 @@ export class FileSender {
    * Cancel transfer
    */
   cancel(): void {
-    this.isPaused = true;
-    this.reader = null;
+    this.isCancelled = true;
   }
 
   /**

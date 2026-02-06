@@ -131,6 +131,19 @@ export function useUserTransfersRealtime() {
             );
           }
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "transfers",
+          },
+          (payload) => {
+            setTransfers((prev) =>
+              prev.filter((t) => t.id !== payload.old.id)
+            );
+          }
+        )
         .subscribe();
     }
 

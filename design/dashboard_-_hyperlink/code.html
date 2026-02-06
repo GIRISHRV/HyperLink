@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HyperLink Dashboard</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffe500",
+                        "bauhaus-blue": "#0048ff",
+                        "bauhaus-red": "#ff2a00",
+                        "background-dark": "#1a1a1a",
+                        "surface-dark": "#242424",
+                        "surface-dark-lighter": "#2f2f2f",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "sm": "0.125rem", 
+                        "md": "0.25rem",
+                        "lg": "0.5rem",
+                        "full": "9999px"
+                    },
+                    backgroundImage: {
+                         'grid-pattern': "linear-gradient(to right, #ffffff05 1px, transparent 1px), linear-gradient(to bottom, #ffffff05 1px, transparent 1px)",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #1a1a1a;
+            color: white;
+        }
+        .monument-sim {
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ffe500; 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
+<!-- Geometric Background Decorations -->
+<div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+<!-- Top Right Circle -->
+<div class="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
+<div class="absolute -top-10 -right-10 w-64 h-64 rounded-full border border-primary/10"></div>
+<!-- Bottom Left Triangle approximation using borders -->
+<div class="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-surface-dark/20"></div>
+<!-- Grid Pattern Overlay -->
+<div class="absolute inset-0 bg-grid-pattern bg-[length:40px_40px] opacity-20"></div>
+</div>
+<!-- Navigation -->
+<header class="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md">
+<div class="flex items-center gap-3">
+<div class="size-8 bg-primary flex items-center justify-center rounded-sm text-black">
+<span class="material-symbols-outlined text-[24px]">link</span>
+</div>
+<h1 class="monument-sim text-xl tracking-wider text-white">HyperLink</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-surface-dark rounded-sm border border-white/5">
+<div class="size-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="text-xs font-bold text-gray-400 tracking-wider">NODE ACTIVE</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 rounded-sm bg-surface-dark hover:bg-surface-dark-lighter transition-colors text-white border border-white/5">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="size-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border border-white/10 relative overflow-hidden" data-alt="User Avatar Abstract Gradient">
+<!-- Avatar placeholder -->
+</div>
+</div>
+</div>
+</header>
+<!-- Main Dashboard -->
+<main class="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">
+<!-- Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+<!-- LEFT COLUMN (Actions) - Spans 8 cols -->
+<div class="lg:col-span-8 flex flex-col gap-6">
+<!-- Send File Card -->
+<div class="group relative bg-surface-dark border-l-[8px] border-bauhaus-blue p-8 md:p-10 rounded-r-sm overflow-hidden hover:bg-surface-dark-lighter transition-all duration-300">
+<!-- Card Decoration -->
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[120px]">upload_file</span>
+</div>
+<div class="relative z-10 flex flex-col h-full justify-between gap-8">
+<div>
+<h2 class="monument-sim text-3xl md:text-4xl text-white mb-2">Send File</h2>
+<p class="text-gray-400 max-w-md">Secure peer-to-peer transfer. Drag and drop your encrypted payloads here.</p>
+</div>
+<div class="border-2 border-dashed border-white/20 rounded-sm bg-black/20 p-8 flex flex-col items-center justify-center gap-4 transition-colors group-hover:border-bauhaus-blue/50">
+<div class="p-4 bg-surface-dark rounded-full">
+<span class="material-symbols-outlined text-bauhaus-blue text-4xl">cloud_upload</span>
+</div>
+<div class="text-center">
+<p class="text-white font-bold text-lg">Drop files to send</p>
+<p class="text-sm text-gray-500 mt-1">or <span class="text-bauhaus-blue cursor-pointer underline decoration-bauhaus-blue/30 underline-offset-4">browse local drive</span></p>
+</div>
+</div>
+<div class="flex items-center justify-between mt-2">
+<div class="flex -space-x-2">
+<!-- Peers icons placeholder -->
+</div>
+<button class="bg-primary hover:bg-yellow-400 text-black font-bold py-3 px-8 rounded-sm uppercase tracking-wider text-sm flex items-center gap-2 transition-transform active:scale-95">
+<span>Generate Link</span>
+<span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Receive File Card -->
+<div class="bg-surface-dark border-l-[8px] border-bauhaus-red p-8 rounded-r-sm hover:bg-surface-dark-lighter transition-all duration-300">
+<div class="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
+<div class="flex-1">
+<h2 class="monument-sim text-2xl text-white mb-2">Receive File</h2>
+<p class="text-gray-400 text-sm">Enter the secure key provided by the sender to establish connection.</p>
+</div>
+<div class="flex-1 w-full flex flex-col sm:flex-row gap-3">
+<div class="relative flex-1">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 material-symbols-outlined text-lg">key</span>
+<input class="w-full bg-black/40 border border-white/10 text-white text-sm rounded-sm py-3 pl-10 pr-4 focus:ring-1 focus:ring-bauhaus-red focus:border-bauhaus-red placeholder-gray-600 outline-none transition-all" placeholder="Paste Transfer Key" type="text"/>
+</div>
+<button class="bg-surface-dark border border-white/20 hover:border-white/60 text-white font-bold py-3 px-6 rounded-sm uppercase tracking-wider text-sm whitespace-nowrap transition-colors">
+                                Connect
+                            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN (Stats) - Spans 4 cols -->
+<div class="lg:col-span-4 flex flex-col gap-6">
+<!-- Total Transferred -->
+<div class="bg-surface-dark p-6 rounded-sm border-t-4 border-primary relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Lifetime Data</h3>
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+<p class="monument-sim text-5xl text-white">45.2 <span class="text-2xl text-gray-500 font-normal ml-1">GB</span></p>
+<div class="mt-4 flex items-center gap-2 text-xs text-green-400">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+2.4 GB this week</span>
+</div>
+</div>
+<!-- Decorative background graphic -->
+<div class="absolute -bottom-4 -right-4 w-24 h-24 bg-primary/5 rounded-full blur-xl"></div>
+</div>
+<!-- Active Connections -->
+<div class="bg-surface-dark p-6 rounded-sm border-t-4 border-white relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Active Peers</h3>
+<span class="material-symbols-outlined text-white">hub</span>
+</div>
+<p class="monument-sim text-5xl text-white">02</p>
+<div class="mt-4 flex items-center gap-2">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-blue-500 border border-surface-dark"></div>
+<div class="size-6 rounded-full bg-red-500 border border-surface-dark"></div>
+</div>
+<span class="text-xs text-gray-500">Connected via WebRTC</span>
+</div>
+</div>
+</div>
+<!-- Network Visualizer (Abstract) -->
+<div class="flex-1 bg-surface-dark p-6 rounded-sm flex flex-col min-h-[200px] relative overflow-hidden">
+<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 z-10">Network Health</h3>
+<div class="flex-1 flex items-center justify-center relative">
+<!-- Abstract Bauhaus Graphic -->
+<div class="relative size-32">
+<div class="absolute inset-0 border-2 border-primary/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
+<div class="absolute inset-4 border-2 border-bauhaus-blue/30 transform rotate-45 animate-[pulse_3s_ease-in-out_infinite]"></div>
+<div class="absolute inset-8 bg-bauhaus-red/10 backdrop-blur-sm rounded-full flex items-center justify-center">
+<div class="size-2 bg-primary rounded-full shadow-[0_0_10px_#ffe500]"></div>
+</div>
+</div>
+</div>
+<div class="mt-4 z-10">
+<div class="flex justify-between text-xs text-gray-500 mb-1">
+<span>Latency</span>
+<span class="text-primary">24ms</span>
+</div>
+<div class="w-full bg-black/50 h-1 rounded-full overflow-hidden">
+<div class="bg-primary w-[85%] h-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- BOTTOM SECTION (Recent Activity) - Spans 12 cols -->
+<div class="lg:col-span-12 mt-4">
+<div class="flex items-end justify-between mb-6 border-b border-white/10 pb-2">
+<h3 class="monument-sim text-xl text-white">Recent Activity</h3>
+<button class="text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1">
+                        View All History
+                        <span class="material-symbols-outlined text-sm">arrow_right_alt</span>
+</button>
+</div>
+<div class="bg-surface-dark rounded-sm overflow-hidden">
+<!-- Table Header -->
+<div class="grid grid-cols-12 gap-4 px-6 py-3 bg-black/20 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/5">
+<div class="col-span-5 md:col-span-4">Filename</div>
+<div class="col-span-3 md:col-span-2">Size</div>
+<div class="hidden md:block md:col-span-3">Peer ID</div>
+<div class="col-span-4 md:col-span-3 text-right">Status</div>
+</div>
+<!-- List Item 1 -->
+<div class="group grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors border-b border-white/5 relative">
+<!-- Bauhaus Color Strip -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="bg-white/10 p-2 rounded-sm text-white">
+<span class="material-symbols-outlined text-sm">folder_zip</span>
+</div>
+<div>
+<p class="text-sm font-bold text-white group-hover:text-primary transition-colors">design_v2_assets.zip</p>
+<p class="text-xs text-gray-500 md:hidden">To: 8f3...a29</p>
+</div>
+</div>
+<div class="col-span-3 md:col-span-2 text-sm text-gray-400">245.5 MB</div>
+<div class="hidden md:block md:col-span-3">
+<code class="text-xs bg-black/30 px-2 py-1 rounded text-gray-400 font-mono">8f3...a29</code>
+</div>
+<div class="col-span-4 md:col-span-3 flex justify-end">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+<div class="size-1.5 rounded-full bg-green-500"></div>
+<span class="text-xs font-bold text-green-500 uppercase">Completed</span>
+</div>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="group grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors border-b border-white/5 relative">
+<!-- Bauhaus Color Strip -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-bauhaus-blue"></div>
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="bg-white/10 p-2 rounded-sm text-white">
+<span class="material-symbols-outlined text-sm">movie</span>
+</div>
+<div>
+<p class="text-sm font-bold text-white group-hover:text-bauhaus-blue transition-colors">render_sequence_04.mp4</p>
+<p class="text-xs text-gray-500 md:hidden">From: 2b1...c99</p>
+</div>
+</div>
+<div class="col-span-3 md:col-span-2 text-sm text-gray-400">1.2 GB</div>
+<div class="hidden md:block md:col-span-3">
+<code class="text-xs bg-black/30 px-2 py-1 rounded text-gray-400 font-mono">2b1...c99</code>
+</div>
+<div class="col-span-4 md:col-span-3 flex justify-end">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-bauhaus-blue/10 border border-bauhaus-blue/20">
+<span class="material-symbols-outlined text-xs text-bauhaus-blue animate-spin">progress_activity</span>
+<span class="text-xs font-bold text-bauhaus-blue uppercase">Syncing 45%</span>
+</div>
+</div>
+</div>
+<!-- List Item 3 -->
+<div class="group grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors relative">
+<!-- Bauhaus Color Strip -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-bauhaus-red"></div>
+<div class="col-span-5 md:col-span-4 flex items-center gap-3">
+<div class="bg-white/10 p-2 rounded-sm text-white">
+<span class="material-symbols-outlined text-sm">description</span>
+</div>
+<div>
+<p class="text-sm font-bold text-white group-hover:text-bauhaus-red transition-colors">contract_signed.pdf</p>
+<p class="text-xs text-gray-500 md:hidden">To: 5e4...d11</p>
+</div>
+</div>
+<div class="col-span-3 md:col-span-2 text-sm text-gray-400">4.8 MB</div>
+<div class="hidden md:block md:col-span-3">
+<code class="text-xs bg-black/30 px-2 py-1 rounded text-gray-400 font-mono">5e4...d11</code>
+</div>
+<div class="col-span-4 md:col-span-3 flex justify-end">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-500/10 border border-gray-500/20">
+<div class="size-1.5 rounded-full bg-gray-400"></div>
+<span class="text-xs font-bold text-gray-400 uppercase">Expired</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

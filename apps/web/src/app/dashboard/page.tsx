@@ -20,13 +20,18 @@ export default function DashboardPage() {
   }, []);
 
   async function checkUser() {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        router.push("/auth");
+        return;
+      }
+      setUser(currentUser);
+      setLoading(false);
+    } catch (e) {
+      console.error("Auth check failed:", e);
       router.push("/auth");
-      return;
     }
-    setUser(currentUser);
-    setLoading(false);
   }
 
   if (loading) {

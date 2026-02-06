@@ -21,6 +21,12 @@ export class PeerManager {
           path: this.config.path,
           secure: this.config.secure ?? false,
           debug: this.config.debug ?? 0,
+          config: {
+            iceServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+            ],
+          },
         };
 
         if (peerId) {

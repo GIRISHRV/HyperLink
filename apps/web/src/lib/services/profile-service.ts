@@ -33,8 +33,9 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     .single();
 
   if (error) {
-    console.error("Error fetching user profile:", error);
-    return null;
+    console.warn("User profile not found or error fetching, creating default profile...", error);
+    // Fallback: Create a default profile if one doesn't exist
+    return await createUserProfile(user.id, user.email?.split("@")[0] || "User");
   }
 
   return data;

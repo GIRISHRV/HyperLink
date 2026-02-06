@@ -37,13 +37,20 @@ export default function SendPage() {
   }, []);
 
   async function checkAuthAndInitPeer() {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        router.push("/auth");
+        return;
+      }
+      setUser(currentUser);
+    } catch (e) {
+      console.error("Auth check failed:", e);
+      // Optional: Redirect to auth or show error state? 
+      // For now, redirecting to auth seems safest as we can't verify identity
       router.push("/auth");
       return;
     }
-
-    setUser(currentUser);
 
     const config: PeerConfig = {
       host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
@@ -93,10 +100,12 @@ export default function SendPage() {
   }
 
   async function handleSend() {
+    console.log("[SEND PAGE] handleSend called", { file: !!file, receiverPeerId, peerManager: !!peerManagerRef.current });
     if (!file || !receiverPeerId || !peerManagerRef.current) return;
 
     setStatus("connecting");
     setError("");
+    console.log("[SEND PAGE] Starting transfer...");
 
     try {
       const transfer = await createTransfer({
@@ -131,6 +140,9 @@ export default function SendPage() {
 
       fileSenderRef.current = new FileSender(file, connection);
       await fileSenderRef.current.sendOffer();
+
+      // Give connection time to stabilize
+      await new Promise(r => setTimeout(r, 1000));
 
       await fileSenderRef.current.startTransfer((progressData) => {
         setProgress(progressData);
@@ -295,6 +307,40 @@ export default function SendPage() {
               </>
             )}
 
+            {/* Connecting State */}
+            {status === "connecting" && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary rounded-full flex items-center justify-center animate-pulse">
+                  <span className="material-symbols-outlined text-3xl text-black animate-spin">sync</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Connecting...</h3>
+                <p className="text-gray-400 mb-6">Establishing peer-to-peer connection</p>
+                <button
+                  onClick={resetTransfer}
+                  className="px-6 py-3 border border-white/20 hover:border-red-500 text-white font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Error State */}
+            {status === "error" && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl text-white">error</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Transfer Failed</h3>
+                <p className="text-red-400 mb-6">{error || "Unknown error occurred"}</p>
+                <button
+                  onClick={resetTransfer}
+                  className="px-6 py-3 bg-primary hover:bg-white text-black font-semibold transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+
             {/* Transferring State */}
             {status === "transferring" && file && progress && (
               <div className="border border-white/10 bg-surface-dark p-6 relative overflow-hidden">
@@ -365,16 +411,14 @@ export default function SendPage() {
           <div className="space-y-8">
             <div className="border-b border-white/10 pb-2">
               <h3 className="font-bold text-white uppercase tracking-widest text-sm mb-4">
-                Network Stats
+
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-white/5 border border-white/10">
-                  <p className="text-xs text-white/40 uppercase">Peers</p>
-                  <p className="text-xl font-mono text-primary">128</p>
+
                 </div>
                 <div className="p-3 bg-white/5 border border-white/10">
-                  <p className="text-xs text-white/40 uppercase">Latency</p>
-                  <p className="text-xl font-mono text-green-400">24ms</p>
+
                 </div>
               </div>
             </div>

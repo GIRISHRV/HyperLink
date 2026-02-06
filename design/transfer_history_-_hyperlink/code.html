@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HyperLink - Transfer History</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ffe500",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#0a0a0a", /* Overriding to darker black for Bauhaus contrast */
+                        "surface-dark": "#1a1a1a", /* Deep Charcoal */
+                        "border-gold": "#6b6644", /* Muted Gold */
+                        "status-blue": "#2E9AFE",
+                        "status-red": "#FF4D4D",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem", 
+                        "lg": "0.25rem", 
+                        "xl": "0.5rem", 
+                        "full": "0.75rem"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444; 
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ffe500; 
+        }
+        
+        .bauhaus-hover:hover {
+            transform: translateX(4px);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen text-slate-900 dark:text-white font-display overflow-x-hidden flex flex-col">
+<!-- Top Navigation -->
+<nav class="border-b border-border-gold/30 bg-surface-dark px-6 py-4 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto flex items-center justify-between">
+<!-- Logo -->
+<div class="flex items-center gap-3">
+<div class="size-8 bg-primary text-black flex items-center justify-center rounded-sm">
+<span class="material-symbols-outlined font-bold">link</span>
+</div>
+<h1 class="text-xl font-black tracking-tighter uppercase text-white">HyperLink</h1>
+</div>
+<!-- Nav Links -->
+<div class="hidden md:flex items-center gap-8">
+<a class="text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-primary transition-colors" href="#">Send</a>
+<a class="text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-primary transition-colors" href="#">Receive</a>
+<a class="text-sm font-bold uppercase tracking-widest text-primary border-b-2 border-primary pb-0.5" href="#">History</a>
+<a class="text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-primary transition-colors" href="#">Settings</a>
+</div>
+<!-- Profile/Settings Icon -->
+<button class="flex items-center justify-center size-10 rounded-sm bg-background-dark border border-gray-700 hover:border-primary hover:text-primary text-white transition-all">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-grow w-full max-w-7xl mx-auto px-6 py-10">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div>
+<h2 class="text-4xl md:text-5xl font-black uppercase tracking-[-0.05em] leading-tight mb-2">Transfer History</h2>
+<p class="text-gray-400 max-w-lg font-normal">View and manage your past peer-to-peer file transfer logs. Secure, encrypted, and direct.</p>
+</div>
+<!-- Filter Actions -->
+<div class="flex flex-wrap gap-2">
+<button class="bg-primary text-black px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm hover:opacity-90 transition-opacity">
+                    All Transfers
+                </button>
+<button class="bg-transparent border border-gray-700 text-gray-300 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm hover:border-primary hover:text-primary transition-colors">
+                    Completed
+                </button>
+<button class="bg-transparent border border-gray-700 text-gray-300 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm hover:border-primary hover:text-primary transition-colors">
+                    Failed
+                </button>
+</div>
+</div>
+<!-- Table Container -->
+<div class="w-full overflow-x-auto border border-border-gold/20 rounded-sm bg-surface-dark shadow-2xl">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-gold bg-[#121212]">
+<th class="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-1/4">File</th>
+<th class="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px]">Size</th>
+<th class="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[180px]">Peer</th>
+<th class="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[140px]">Status</th>
+<th class="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Date</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-gold/20">
+<!-- Row 1: Completed -->
+<tr class="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+<span class="material-symbols-outlined">folder_zip</span>
+</div>
+<span class="font-bold text-white group-hover:text-primary transition-colors">project_alpha_v2.zip</span>
+</div>
+</td>
+<td class="py-5 px-6 font-mono text-sm text-gray-400">1.2 GB</td>
+<td class="py-5 px-6">
+<div class="flex items-center gap-2">
+<div class="size-6 bg-blue-900/50 rounded-full flex items-center justify-center text-[10px] font-bold text-blue-200">X</div>
+<span class="text-sm font-medium text-gray-300">User-X92</span>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-status-blue/10 text-status-blue text-[10px] font-black uppercase tracking-wider border border-status-blue/20">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                Completed
+                            </span>
+</td>
+<td class="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">2023-10-24 14:00</td>
+</tr>
+<!-- Row 2: Pending -->
+<tr class="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<span class="font-bold text-white group-hover:text-primary transition-colors">design_system_spec.pdf</span>
+</div>
+</td>
+<td class="py-5 px-6 font-mono text-sm text-gray-400">4.5 MB</td>
+<td class="py-5 px-6">
+<div class="flex items-center gap-2">
+<div class="size-6 bg-yellow-900/50 rounded-full flex items-center justify-center text-[10px] font-bold text-yellow-200">A</div>
+<span class="text-sm font-medium text-gray-300">User-A11</span>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider border border-primary/20">
+<span class="material-symbols-outlined text-[14px] animate-spin-slow">hourglass_top</span>
+                                Pending
+                            </span>
+</td>
+<td class="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">2023-10-24 13:45</td>
+</tr>
+<!-- Row 3: Failed -->
+<tr class="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+<span class="material-symbols-outlined">grid_on</span>
+</div>
+<span class="font-bold text-white group-hover:text-primary transition-colors">budget_forecast_Q4.xlsx</span>
+</div>
+</td>
+<td class="py-5 px-6 font-mono text-sm text-gray-400">120 KB</td>
+<td class="py-5 px-6">
+<div class="flex items-center gap-2">
+<div class="size-6 bg-red-900/50 rounded-full flex items-center justify-center text-[10px] font-bold text-red-200">B</div>
+<span class="text-sm font-medium text-gray-300">User-B22</span>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-status-red/10 text-status-red text-[10px] font-black uppercase tracking-wider border border-status-red/20">
+<span class="material-symbols-outlined text-[14px]">error</span>
+                                Failed
+                            </span>
+</td>
+<td class="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">2023-10-23 09:30</td>
+</tr>
+<!-- Row 4: Completed -->
+<tr class="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+<span class="material-symbols-outlined">movie</span>
+</div>
+<span class="font-bold text-white group-hover:text-primary transition-colors">demo_recording_raw.mp4</span>
+</div>
+</td>
+<td class="py-5 px-6 font-mono text-sm text-gray-400">850 MB</td>
+<td class="py-5 px-6">
+<div class="flex items-center gap-2">
+<div class="size-6 bg-green-900/50 rounded-full flex items-center justify-center text-[10px] font-bold text-green-200">C</div>
+<span class="text-sm font-medium text-gray-300">User-C33</span>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-status-blue/10 text-status-blue text-[10px] font-black uppercase tracking-wider border border-status-blue/20">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                Completed
+                            </span>
+</td>
+<td class="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">2023-10-22 16:20</td>
+</tr>
+<!-- Row 5: Completed -->
+<tr class="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer">
+<td class="py-5 px-6">
+<div class="flex items-center gap-3">
+<div class="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+<span class="material-symbols-outlined">description</span>
+</div>
+<span class="font-bold text-white group-hover:text-primary transition-colors">contract_signed_final.docx</span>
+</div>
+</td>
+<td class="py-5 px-6 font-mono text-sm text-gray-400">2.1 MB</td>
+<td class="py-5 px-6">
+<div class="flex items-center gap-2">
+<div class="size-6 bg-purple-900/50 rounded-full flex items-center justify-center text-[10px] font-bold text-purple-200">D</div>
+<span class="text-sm font-medium text-gray-300">User-D44</span>
+</div>
+</td>
+<td class="py-5 px-6">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-status-blue/10 text-status-blue text-[10px] font-black uppercase tracking-wider border border-status-blue/20">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                Completed
+                            </span>
+</td>
+<td class="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">2023-10-21 11:15</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="mt-8 flex justify-center">
+<div class="flex items-center gap-2">
+<a class="size-10 flex items-center justify-center rounded-sm bg-surface-dark border border-gray-700 text-gray-400 hover:border-primary hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</a>
+<a class="size-10 flex items-center justify-center rounded-sm bg-primary text-black font-bold text-sm shadow-[0_0_15px_rgba(255,229,0,0.3)]" href="#">
+                    1
+                </a>
+<a class="size-10 flex items-center justify-center rounded-sm bg-surface-dark border border-gray-700 text-gray-400 hover:border-primary hover:text-white transition-colors text-sm font-bold" href="#">
+                    2
+                </a>
+<a class="size-10 flex items-center justify-center rounded-sm bg-surface-dark border border-gray-700 text-gray-400 hover:border-primary hover:text-white transition-colors text-sm font-bold" href="#">
+                    3
+                </a>
+<span class="size-10 flex items-center justify-center text-gray-600 font-bold">...</span>
+<a class="size-10 flex items-center justify-center rounded-sm bg-surface-dark border border-gray-700 text-gray-400 hover:border-primary hover:text-white transition-colors text-sm font-bold" href="#">
+                    12
+                </a>
+<a class="size-10 flex items-center justify-center rounded-sm bg-surface-dark border border-gray-700 text-gray-400 hover:border-primary hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</a>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="border-t border-border-gold/20 py-8 text-center mt-auto">
+<p class="text-xs text-gray-600 uppercase tracking-widest">Encrypted. Decentralized. Direct.</p>
+</footer>
+</body></html>

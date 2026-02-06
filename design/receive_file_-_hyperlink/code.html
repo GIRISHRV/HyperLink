@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HyperLink - Receive File</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#ffe500",
+              "background-light": "#f8f8f5",
+              "background-dark": "#23210f",
+              "bauhaus-red": "#D03030",
+              "surface-dark": "#2d2b1f",
+              "border-dark": "#3a3827",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"],
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "9999px", "sm": "2px"},
+          },
+        },
+      }
+    </script>
+<style>
+        /* Custom Utilities for Bauhaus decorative elements */
+        .bauhaus-grid-bg {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, #3a3827 1px, transparent 1px),
+                linear-gradient(to bottom, #3a3827 1px, transparent 1px);
+            mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-background-dark">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between border-b border-solid border-border-dark px-6 py-4 bg-background-dark z-20">
+<div class="flex items-center gap-3 text-white">
+<div class="size-8 bg-white text-background-dark flex items-center justify-center rounded-sm">
+<span class="material-symbols-outlined text-2xl font-bold">hub</span>
+</div>
+<h2 class="text-white text-xl font-bold tracking-tight">HyperLink</h2>
+</div>
+<div class="flex items-center gap-8">
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-[#bcb89a] hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider" href="#">Send</a>
+<a class="text-white text-sm font-bold uppercase tracking-wider border-b-2 border-primary pb-0.5" href="#">Receive</a>
+<a class="text-[#bcb89a] hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider" href="#">History</a>
+</nav>
+<div class="flex gap-3">
+<button class="flex items-center justify-center h-10 px-4 bg-surface-dark border border-border-dark hover:border-primary text-white text-sm font-bold tracking-wide rounded hover:bg-background-dark transition-all group">
+<span class="material-symbols-outlined mr-2 text-[18px] group-hover:text-primary">account_balance_wallet</span>
+<span class="truncate">Connect</span>
+</button>
+<button class="flex items-center justify-center size-10 bg-surface-dark border border-border-dark hover:border-white text-white rounded transition-all">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col relative w-full max-w-[1200px] mx-auto px-6 py-8 gap-8">
+<!-- Header Text -->
+<div class="flex flex-col gap-2 relative z-10">
+<h1 class="text-white text-5xl md:text-6xl font-black tracking-tighter uppercase leading-none">
+                Receive <span class="text-primary">Files</span>
+</h1>
+<p class="text-[#bcb89a] text-lg font-medium max-w-md">
+                Securely receive encrypted files directly to your device via WebRTC.
+            </p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
+<!-- Left Column: Peer ID Configuration -->
+<div class="lg:col-span-5 flex flex-col gap-6">
+<!-- Peer ID Card -->
+<div class="bg-surface-dark border border-border-dark p-1 rounded-lg shadow-2xl shadow-black/50">
+<div class="bg-background-dark border border-border-dark/50 rounded p-6 flex flex-col gap-6 relative overflow-hidden group">
+<!-- Bauhaus Decorative shape -->
+<div class="absolute -right-10 -top-10 size-32 bg-primary/5 rounded-full blur-2xl"></div>
+<div class="flex flex-col gap-2 z-10">
+<label class="text-[#bcb89a] text-xs font-bold uppercase tracking-[0.15em]">Your Peer ID</label>
+<div class="font-mono text-3xl md:text-4xl text-white font-bold tracking-tight break-all border-l-4 border-primary pl-4 py-2">
+                                HYP-8X92<br/>MN4P
+                            </div>
+</div>
+<div class="h-px w-full bg-border-dark"></div>
+<div class="flex gap-3 z-10">
+<button class="flex-1 h-12 bg-primary hover:bg-[#ffea2e] text-background-dark text-base font-bold tracking-wide uppercase rounded flex items-center justify-center gap-2 transition-colors">
+<span class="material-symbols-outlined">content_copy</span>
+                                Copy ID
+                            </button>
+<button class="size-12 bg-transparent border-2 border-border-dark hover:border-white text-white rounded flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">qr_code_2</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Instructions / Hints -->
+<div class="p-6 border border-dashed border-border-dark rounded-lg flex gap-4 items-start">
+<span class="material-symbols-outlined text-primary text-2xl">info</span>
+<div class="flex flex-col gap-1">
+<h4 class="text-white font-bold uppercase text-sm">How it works</h4>
+<p class="text-[#bcb89a] text-sm leading-relaxed">
+                            Share your Peer ID with the sender. Keep this tab open. The transfer will start automatically once connected.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Right Column: Radar Visualizer & Incoming Files -->
+<div class="lg:col-span-7 relative flex flex-col rounded-lg overflow-hidden border border-border-dark bg-[#181810]">
+<!-- Grid Background -->
+<div class="absolute inset-0 bauhaus-grid-bg opacity-20 pointer-events-none"></div>
+<!-- Radar Container -->
+<div class="flex-1 flex flex-col items-center justify-center relative min-h-[400px] p-8">
+<!-- Static Radar Visuals -->
+<div class="absolute flex items-center justify-center">
+<!-- Outer Ring -->
+<div class="size-[300px] sm:size-[400px] border border-white/5 rounded-full flex items-center justify-center">
+<!-- Mid Ring -->
+<div class="size-[200px] sm:size-[260px] border border-white/10 rounded-full flex items-center justify-center">
+<!-- Inner Ring -->
+<div class="size-[100px] sm:size-[140px] border border-white/20 rounded-full bg-white/5 backdrop-blur-sm flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.05)]">
+<div class="size-3 bg-primary rounded-full shadow-[0_0_15px_#ffe500]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Radar Status Text -->
+<div class="absolute top-8 left-0 right-0 text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-dark border border-border-dark">
+<span class="block size-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+<span class="text-xs font-mono text-[#bcb89a] uppercase">Radar Active</span>
+</div>
+</div>
+<p class="mt-48 text-[#bcb89a] font-mono text-sm tracking-widest uppercase animate-pulse">Waiting for connection...</p>
+<!-- Incoming File Card (Absolute positioned to simulate "pop up") -->
+<div class="absolute bottom-6 w-full max-w-md px-4 z-20">
+<div class="bg-surface-dark border-l-[6px] border-bauhaus-red rounded-r shadow-2xl relative overflow-hidden">
+<!-- Progress Bar Background -->
+<div class="absolute bottom-0 left-0 h-1 bg-border-dark w-full">
+<div class="h-full bg-primary w-[45%]"></div>
+</div>
+<div class="p-4 flex items-center gap-4">
+<!-- File Icon -->
+<div class="size-12 bg-background-dark rounded flex items-center justify-center border border-border-dark shrink-0">
+<span class="material-symbols-outlined text-bauhaus-red text-2xl">description</span>
+</div>
+<!-- File Info -->
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="bg-bauhaus-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider">Incoming</span>
+<span class="text-white font-mono text-xs">45%</span>
+</div>
+<h3 class="text-white font-bold text-sm truncate pr-2">project_blueprint_v2.pdf</h3>
+<p class="text-[#bcb89a] text-xs font-mono mt-0.5">15.4 MB • PDF</p>
+</div>
+<!-- Action -->
+<button class="size-8 rounded-full hover:bg-background-dark text-white hover:text-bauhaus-red flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- History/Recent Strip -->
+<div class="w-full border-t border-border-dark pt-6">
+<h3 class="text-[#bcb89a] text-xs font-bold uppercase tracking-wider mb-4 pl-1">Recent Transfers</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- History Item 1 -->
+<div class="flex items-center gap-3 p-3 rounded hover:bg-surface-dark transition-colors cursor-pointer group border border-transparent hover:border-border-dark">
+<span class="material-symbols-outlined text-[#bcb89a] group-hover:text-white">check_circle</span>
+<div class="flex flex-col overflow-hidden">
+<span class="text-white text-sm font-bold truncate">contract_signed.pdf</span>
+<span class="text-[#bcb89a] text-xs font-mono">2.1 MB • Yesterday</span>
+</div>
+</div>
+<!-- History Item 2 -->
+<div class="flex items-center gap-3 p-3 rounded hover:bg-surface-dark transition-colors cursor-pointer group border border-transparent hover:border-border-dark">
+<span class="material-symbols-outlined text-[#bcb89a] group-hover:text-white">check_circle</span>
+<div class="flex flex-col overflow-hidden">
+<span class="text-white text-sm font-bold truncate">assets_pack_04.zip</span>
+<span class="text-[#bcb89a] text-xs font-mono">154 MB • 2 days ago</span>
+</div>
+</div>
+<!-- History Item 3 -->
+<div class="flex items-center gap-3 p-3 rounded hover:bg-surface-dark transition-colors cursor-pointer group border border-transparent hover:border-border-dark">
+<span class="material-symbols-outlined text-[#bcb89a] group-hover:text-white">check_circle</span>
+<div class="flex flex-col overflow-hidden">
+<span class="text-white text-sm font-bold truncate">meeting_notes.docx</span>
+<span class="text-[#bcb89a] text-xs font-mono">24 KB • 2 days ago</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
