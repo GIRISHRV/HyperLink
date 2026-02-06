@@ -16,12 +16,11 @@ export default function HistoryPage() {
   const [_user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
-  const [_confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showClearAll, setShowClearAll] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
   const [avatarIcon, setAvatarIcon] = useState("person");
   const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
-  const { transfers, loading: transfersLoading, removeTransfer, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
+  const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
   useEffect(() => {
     checkUser();
@@ -70,11 +69,6 @@ export default function HistoryPage() {
     (t) => t.status === "complete" || t.status === "failed" || t.status === "cancelled"
   );
 
-  async function _handleDelete(transferId: string) {
-    await removeTransfer(transferId);
-    setConfirmDeleteId(null);
-  }
-
   async function handleClearAll() {
     const ids = deletableTransfers.map((t) => t.id);
     if (ids.length === 0) {
@@ -116,11 +110,7 @@ export default function HistoryPage() {
     return iconMap[ext || ""] || "insert_drive_file";
   };
 
-  const _stats = {
-    total: transfers.length,
-    complete: transfers.filter((t) => t.status === "complete").length,
-    failed: transfers.filter((t) => t.status === "failed").length,
-  };
+
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-[#0a0a0a] text-white relative overflow-x-hidden">
