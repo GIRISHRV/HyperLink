@@ -23,9 +23,28 @@ export class PeerManager {
           debug: this.config.debug ?? 0,
           config: {
             iceServers: [
+              // Google's public STUN servers
               { urls: "stun:stun.l.google.com:19302" },
               { urls: "stun:stun1.l.google.com:19302" },
+              // Free TURN servers from OpenRelay (no signup required)
+              {
+                urls: "turn:openrelay.metered.ca:80",
+                username: "openrelayproject",
+                credential: "openrelayproject",
+              },
+              {
+                urls: "turn:openrelay.metered.ca:443",
+                username: "openrelayproject",
+                credential: "openrelayproject",
+              },
+              {
+                urls: "turn:openrelay.metered.ca:443?transport=tcp",
+                username: "openrelayproject",
+                credential: "openrelayproject",
+              },
             ],
+            iceTransportPolicy: "all", // Try all connection types (relay, srflx, host)
+            iceCandidatePoolSize: 10, // Pre-gather candidates for faster connections
           },
         };
 
@@ -114,6 +133,50 @@ export class PeerManager {
     conn.on("error", (error) => {
       this.emit("connection-error", { connection: conn, error });
     });
+
+    // Monitor ICE connection state for debugging
+    const pc = (conn as any).peerConnection;
+    if (pc) {
+      // Log ICE candidates as they're gathered
+      pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
+        if (event.candidate) {
+          const type = event.candidate.type; // 'host', 'srflx' (STUN), or 'relay' (TURN)
+          console.log(
+            `[ICE] Candidate gathered - Type: ${type}, Protocol: ${event.candidate.protocol}`
+          );
+        } else {
+          console.log("[ICE] All candidates gathered");
+        }
+      });
+
+      // Monitor ICE connection state changes
+      pc.addEventListener("iceconnectionstatechange", () => {
+        const state = pc.iceConnectionState;
+        console.log(`[ICE] Connection state: ${state}`);
+
+        if (state === "failed") {
+          console.error(
+            "[ICE] Connection failed - may need TURN server or network issue"
+          );
+        } else if (state === "connected" || state === "completed") {
+          // Log the selected candidate pair to see if TURN was used
+          pc.getStats(null).then((stats: RTCStatsReport) => {
+            stats.forEach((report: any) => {
+              if (report.type === "candidate-pair" && report.state === "succeeded") {
+                console.log(
+                  `[ICE] Connected using candidate pair - Local: ${report.localCandidateId}, Remote: ${report.remoteCandidateId}`
+                );
+              }
+            });
+          });
+        }
+      });
+
+      // Monitor gathering state
+      pc.addEventListener("icegatheringstatechange", () => {
+        console.log(`[ICE] Gathering state: ${pc.iceGatheringState}`);
+      });
+    }
   }
 
   /**
