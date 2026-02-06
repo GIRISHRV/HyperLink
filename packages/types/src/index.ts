@@ -5,6 +5,7 @@ export type TransferStatus =
   | "pending"
   | "connecting"
   | "transferring"
+  | "paused"
   | "complete"
   | "failed"
   | "cancelled";
@@ -71,7 +72,11 @@ export type PeerMessageType =
   | "chunk"
   | "chunk-ack"
   | "transfer-complete"
-  | "transfer-error";
+  | "transfer-error"
+  | "transfer-cancel"
+  | "transfer-pause"
+  | "transfer-resume"
+  | "receiver-busy";
 
 /**
  * Peer message structure
@@ -91,6 +96,8 @@ export interface FileOfferPayload {
   fileSize: number;
   fileType: string;
   totalChunks: number;
+  /** The Supabase DB transfer ID so the receiver can reference the same record */
+  dbTransferId?: string;
 }
 
 /**
@@ -100,3 +107,4 @@ export interface ChunkPayload {
   chunkIndex: number;
   data: ArrayBuffer;
 }
+

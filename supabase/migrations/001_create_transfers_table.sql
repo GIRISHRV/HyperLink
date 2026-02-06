@@ -45,6 +45,15 @@ CREATE POLICY "Users can update own transfers"
     auth.uid() = receiver_id
   );
 
+-- Policy: Users can delete their own transfers
+CREATE POLICY "Users can delete own transfers"
+  ON public.transfers
+  FOR DELETE
+  USING (
+    auth.uid() = sender_id OR 
+    auth.uid() = receiver_id
+  );
+
 -- Grant permissions
 GRANT ALL ON public.transfers TO authenticated;
 GRANT SELECT ON public.transfers TO anon;

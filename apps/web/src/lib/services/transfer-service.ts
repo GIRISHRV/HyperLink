@@ -59,6 +59,32 @@ export async function updateTransferStatus(
 }
 
 /**
+ * Claim an existing transfer as the receiver (set receiver_id)
+ */
+export async function claimTransferAsReceiver(transferId: string): Promise<Transfer | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  // Use RPC to bypass RLS — the receiver can't satisfy the UPDATE policy
+  // because receiver_id is still NULL when they try to claim the record.
+  const { data, error } = await supabase.rpc("claim_transfer", {
+    p_transfer_id: transferId,
+    p_receiver_id: user.id,
+  });
+
+  if (error) {
+    console.error("Error claiming transfer:", error);
+    return null;
+  }
+
+  // RPC returns the updated row; normalise to Transfer shape
+  return (data as Transfer) ?? null;
+}
+
+/**
  * Get user's transfer history
  */
 export async function getUserTransfers(): Promise<Transfer[]> {
@@ -111,5 +137,39 @@ export async function deleteTransfer(transferId: string): Promise<boolean> {
     return false;
   }
 
+  return true;
+}
+
+/**
+ * Delete multiple transfers at once
+ */
+export async function deleteMultipleTransfers(transferIds: string[]): Promise<boolean> {
+  if (transferIds.length === 0) return true;
+
+  console.log("[TRANSFER-SERVICE] Deleting transfers:", transferIds);
+  
+  // First check what we can actually see
+  const { data: user } = await supabase.auth.getUser();
+  console.log("[TRANSFER-SERVICE] Current user ID:", user?.user?.id);
+  
+  const { data: checkData } = await supabase
+    .from("transfers")
+    .select("id, sender_id, receiver_id")
+    .in("id", transferIds);
+  console.log("[TRANSFER-SERVICE] Transfers we can SELECT:", checkData);
+  
+  // Use .select() to get rows that were deleted (requires RLS access)
+  const { data, error } = await supabase
+    .from("transfers")
+    .delete()
+    .in("id", transferIds)
+    .select("id");
+
+  if (error) {
+    console.error("[TRANSFER-SERVICE] Error deleting transfers:", error);
+    return false;
+  }
+
+  console.log("[TRANSFER-SERVICE] Actually deleted:", data);
   return true;
 }

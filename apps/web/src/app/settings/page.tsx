@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { getCurrentUser, signOut } from "@/lib/services/auth-service";
 import { getUserProfile, updateUserProfile } from "@/lib/services/profile-service";
 import type { User } from "@supabase/supabase-js";
-import SimpleHeader from "@/components/simple-header";
 import Link from "next/link";
 
 const AVATAR_ICONS = [
@@ -101,7 +100,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background-dark flex items-center justify-center">
+      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
         <span className="material-symbols-outlined text-primary animate-spin text-4xl">
           progress_activity
         </span>
@@ -110,84 +109,132 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="bg-background-dark font-display text-white min-h-screen flex flex-col">
-      <SimpleHeader userEmail={user?.email} />
+    <div className="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
+      {/* Geometric Background Decorations */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
+        <div className="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-[#242424]/20"></div>
+      </div>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto p-6 md:p-8 lg:p-12 flex flex-col gap-8">
-        {/* Header */}
-        <header className="pb-6 border-b-4 border-[#4b4520]">
-          <div className="w-12 h-1 bg-primary mb-4"></div>
-          <h1 className="text-5xl md:text-6xl font-black text-white leading-[0.85] tracking-tighter uppercase mb-4">
-            Settings
+      {/* Navigation */}
+      <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="size-8 bg-primary flex items-center justify-center rounded-sm text-black">
+            <span className="material-symbols-outlined text-[24px]">link</span>
+          </div>
+          <h1 className="font-black text-xl tracking-wider text-white uppercase">HyperLink</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+              <span className="material-symbols-outlined">dashboard</span>
+            </button>
+          </Link>
+          <div
+            className={`size-10 rounded-full ${selectedColor.value} flex items-center justify-center border border-white/10 shadow-lg`}
+          >
+            <span className={`material-symbols-outlined text-xl ${selectedColor.text}`}>
+              {selectedIcon}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">
+        {/* Page Header */}
+        <div className="mb-12">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-1 w-12 bg-bauhaus-red"></div>
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Configuration</span>
+          </div>
+          <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter uppercase mb-4 text-white">
+            Settings<span className="text-bauhaus-blue">.</span>
           </h1>
-          <p className="text-gray-400 text-lg">Customize your HyperLink experience.</p>
-        </header>
+          <p className="text-lg md:text-xl font-medium text-gray-400 max-w-2xl leading-relaxed">
+            Customize your profile and manage your HyperLink account.
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Preview */}
-          <div className="lg:col-span-1">
-            <div className="bg-[#2a2614] border border-[#4b4520] p-8 sticky top-24">
-              <h3 className="text-sm uppercase tracking-widest text-gray-400 mb-4">Preview</h3>
-              <div className="flex flex-col items-center gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left Column: Preview */}
+          <div className="lg:col-span-4">
+            <div className="bg-[#242424] p-8 rounded-sm border-l-4 border-primary sticky top-24">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Live Preview</h3>
+              <div className="flex flex-col items-center gap-6">
                 <div
-                  className={`size-24 ${selectedColor.value} rounded-full flex items-center justify-center border-4 border-white/10`}
+                  className={`size-32 ${selectedColor.value} rounded-full flex items-center justify-center border-4 border-white/10 shadow-lg`}
                 >
-                  <span className={`material-symbols-outlined text-5xl ${selectedColor.text}`}>
+                  <span className={`material-symbols-outlined text-6xl ${selectedColor.text}`}>
                     {selectedIcon}
                   </span>
                 </div>
                 <div className="text-center">
-                  <p className="font-bold text-lg">
+                  <p className="font-black text-2xl uppercase tracking-tight text-white">
                     {displayName || user?.email?.split("@")[0] || "User"}
                   </p>
-                  <p className="text-xs text-gray-400">{user?.email}</p>
+                  <p className="text-sm text-gray-400 mt-2 font-mono">{user?.email}</p>
+                </div>
+                <div className="w-full h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <div className="grid grid-cols-3 gap-3 w-full">
+                  <div className="bg-bauhaus-blue/20 p-3 rounded-sm text-center">
+                    <span className="material-symbols-outlined text-bauhaus-blue text-2xl">upload</span>
+                  </div>
+                  <div className="bg-bauhaus-red/20 p-3 rounded-sm text-center">
+                    <span className="material-symbols-outlined text-bauhaus-red text-2xl">download</span>
+                  </div>
+                  <div className="bg-primary/20 p-3 rounded-sm text-center">
+                    <span className="material-symbols-outlined text-primary text-2xl">link</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Settings */}
-          <div className="lg:col-span-2 space-y-6">
+          {/* Right Column: Settings Forms */}
+          <div className="lg:col-span-8 space-y-6">
             {/* Profile Section */}
-            <section className="bg-[#2a2614] border border-[#4b4520] p-6">
-              <h2 className="text-2xl font-bold uppercase mb-6 flex items-center gap-2">
-                <span className="size-2 bg-primary"></span>
+            <section className="bg-[#242424] border-l-4 border-bauhaus-blue p-8 rounded-r-sm">
+              <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
+                <span className="material-symbols-outlined text-bauhaus-blue text-3xl">person</span>
                 Profile
               </h2>
 
-              {/* Display Name */}
-              <div className="mb-6">
-                <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder={user?.email?.split("@")[0] || "Enter your name"}
-                  className="w-full bg-black/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors"
-                />
-              </div>
+              <div className="space-y-6">
+                {/* Display Name */}
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder={user?.email?.split("@")[0] || "Enter your name"}
+                    className="w-full bg-black/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors rounded-sm"
+                  />
+                </div>
 
-              {/* Email (read-only) */}
-              <div className="mb-6">
-                <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="w-full bg-black/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-600 mt-1">Email cannot be changed from settings</p>
+                {/* Email (read-only) */}
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={user?.email || ""}
+                    disabled
+                    className="w-full bg-black/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed rounded-sm"
+                  />
+                  <p className="text-xs text-gray-600 mt-2">Email cannot be changed from settings</p>
+                </div>
               </div>
             </section>
 
             {/* Avatar Icon Section */}
-            <section className="bg-[#2a2614] border border-[#4b4520] p-6">
-              <h2 className="text-2xl font-bold uppercase mb-6 flex items-center gap-2">
-                <span className="size-2 bg-primary"></span>
+            <section className="bg-[#242424] border-l-4 border-primary p-8 rounded-r-sm">
+              <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
+                <span className="material-symbols-outlined text-primary text-3xl">emoji_emotions</span>
                 Avatar Icon
               </h2>
               <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
@@ -195,22 +242,21 @@ export default function SettingsPage() {
                   <button
                     key={icon}
                     onClick={() => setSelectedIcon(icon)}
-                    className={`size-14 flex items-center justify-center border-2 transition-all hover:scale-110 ${
-                      selectedIcon === icon
-                        ? "border-primary bg-primary/20"
-                        : "border-white/10 hover:border-white/30 bg-black/20"
-                    }`}
+                    className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 rounded-sm text-white ${selectedIcon === icon
+                      ? "border-primary bg-primary/20"
+                      : "border-white/10 hover:border-white/30 bg-black/20"
+                      }`}
                   >
-                    <span className="material-symbols-outlined text-2xl">{icon}</span>
+                    <span className="material-symbols-outlined text-3xl">{icon}</span>
                   </button>
                 ))}
               </div>
             </section>
 
             {/* Avatar Color Section */}
-            <section className="bg-[#2a2614] border border-[#4b4520] p-6">
-              <h2 className="text-2xl font-bold uppercase mb-6 flex items-center gap-2">
-                <span className="size-2 bg-primary"></span>
+            <section className="bg-[#242424] border-l-4 border-bauhaus-red p-8 rounded-r-sm">
+              <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
+                <span className="material-symbols-outlined text-bauhaus-red text-3xl">palette</span>
                 Avatar Color
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -218,38 +264,37 @@ export default function SettingsPage() {
                   <button
                     key={color.value}
                     onClick={() => setSelectedColor(color)}
-                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 ${
-                      selectedColor.value === color.value
-                        ? "border-white bg-white/5"
-                        : "border-white/10 hover:border-white/30"
-                    }`}
+                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 rounded-sm ${selectedColor.value === color.value
+                      ? "border-white bg-white/5"
+                      : "border-white/10 hover:border-white/30"
+                      }`}
                   >
                     <div
-                      className={`size-8 ${color.value} rounded-full border-2 border-white/20`}
+                      className={`size-10 ${color.value} rounded-full border-2 border-white/20 shadow-lg`}
                     ></div>
-                    <span className="text-sm font-medium">{color.name}</span>
+                    <span className="text-sm font-bold uppercase tracking-wide text-white">{color.name}</span>
                   </button>
                 ))}
               </div>
             </section>
 
             {/* Account Actions */}
-            <section className="bg-[#2a2614] border border-[#4b4520] p-6">
-              <h2 className="text-2xl font-bold uppercase mb-6 flex items-center gap-2">
-                <span className="size-2 bg-bauhaus-red"></span>
+            <section className="bg-[#242424] border-l-4 border-white p-8 rounded-r-sm">
+              <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
+                <span className="material-symbols-outlined text-white text-3xl">admin_panel_settings</span>
                 Account
               </h2>
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Link
                   href="/status"
-                  className="w-full bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-primary text-white font-bold py-3 px-6 transition-all flex items-center justify-center gap-2"
+                  className="bg-gray-800/50 hover:bg-gray-800 border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
                 >
                   <span className="material-symbols-outlined">radar</span>
                   Network Status
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="w-full bg-red-900/30 hover:bg-red-900/50 border border-red-900/50 hover:border-red-500 text-red-400 font-bold py-3 px-6 transition-all flex items-center justify-center gap-2"
+                  className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
                 >
                   <span className="material-symbols-outlined">logout</span>
                   Sign Out
@@ -258,13 +303,13 @@ export default function SettingsPage() {
             </section>
 
             {/* Save Button */}
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-primary hover:bg-white text-black font-bold py-3 px-8 uppercase tracking-wider transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg"
               >
-                <span className="material-symbols-outlined">save</span>
+                <span className="material-symbols-outlined text-xl">save</span>
                 {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
               </button>
             </div>
@@ -272,12 +317,14 @@ export default function SettingsPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <div className="mt-auto w-full h-2 flex">
-        <div className="w-1/3 bg-bauhaus-blue"></div>
-        <div className="w-1/3 bg-bauhaus-red"></div>
-        <div className="w-1/3 bg-primary"></div>
-      </div>
+      {/* Footer: Tri-Color Strip */}
+      <footer className="mt-auto relative z-20">
+        <div className="flex h-2 w-full">
+          <div className="flex-1 bg-bauhaus-blue"></div>
+          <div className="flex-1 bg-bauhaus-red"></div>
+          <div className="flex-1 bg-primary"></div>
+        </div>
+      </footer>
     </div>
   );
 }

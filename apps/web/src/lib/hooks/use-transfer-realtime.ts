@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { Transfer } from "@repo/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { deleteTransfer as deleteTransferFromDB, deleteMultipleTransfers as deleteMultipleFromDB } from "@/lib/services/transfer-service";
 
 /**
  * Subscribe to real-time updates for a specific transfer
@@ -29,7 +30,7 @@ export function useTransferRealtime(transferId: string | null) {
       }
       setLoading(false);
 
-      // Subscribe to changes
+      // Subscribe to changes (UPDATE + DELETE)
       channel = supabase
         .channel(`transfer:${transferId}`)
         .on(
@@ -42,6 +43,18 @@ export function useTransferRealtime(transferId: string | null) {
           },
           (payload) => {
             setTransfer(payload.new as Transfer);
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "transfers",
+            filter: `id=eq.${transferId}`,
+          },
+          () => {
+            setTransfer(null);
           }
         )
         .subscribe();
@@ -65,9 +78,23 @@ export function useTransferRealtime(transferId: string | null) {
 export function useUserTransfersRealtime() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const userIdRef = useRef<string | null>(null);
+
+  const fetchTransfers = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from("transfers")
+      .select("*")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setTransfers(data);
+    }
+  }, []);
 
   useEffect(() => {
-    let channel: RealtimeChannel;
+    const instanceId = Math.random().toString(36).slice(2, 8);
 
     async function setupRealtimeSubscription() {
       const {
@@ -79,21 +106,15 @@ export function useUserTransfersRealtime() {
         return;
       }
 
-      // Fetch initial transfers
-      const { data } = await supabase
-        .from("transfers")
-        .select("*")
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order("created_at", { ascending: false });
+      userIdRef.current = user.id;
 
-      if (data) {
-        setTransfers(data);
-      }
+      // Fetch initial transfers
+      await fetchTransfers(user.id);
       setLoading(false);
 
-      // Subscribe to INSERT events (new transfers)
-      channel = supabase
-        .channel("user-transfers")
+      // Subscribe with a unique channel name to avoid collisions across page navigations
+      channelRef.current = supabase
+        .channel(`user-transfers-${instanceId}`)
         .on(
           "postgres_changes",
           {
@@ -149,14 +170,53 @@ export function useUserTransfersRealtime() {
 
     setupRealtimeSubscription();
 
+    // Refetch when tab/page becomes visible again (covers navigation + tab switching)
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && userIdRef.current) {
+        fetchTransfers(userIdRef.current);
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
       }
     };
+  }, [fetchTransfers]);
+
+  /**
+   * Optimistically remove a single transfer from local state and delete from DB
+   */
+  const removeTransfer = useCallback(async (transferId: string) => {
+    // Optimistic: remove from state immediately
+    setTransfers((prev) => prev.filter((t) => t.id !== transferId));
+    // Then delete from DB (realtime will also fire, but we already removed it)
+    await deleteTransferFromDB(transferId);
   }, []);
 
-  return { transfers, loading };
+  /**
+   * Optimistically remove multiple transfers and delete from DB
+   */
+  const removeMultipleTransfers = useCallback(async (transferIds: string[]) => {
+    console.log("[REALTIME] Removing multiple transfers:", transferIds);
+    setTransfers((prev) => prev.filter((t) => !transferIds.includes(t.id)));
+    const result = await deleteMultipleFromDB(transferIds);
+    console.log("[REALTIME] Delete result:", result);
+    return result;
+  }, []);
+
+  /**
+   * Manually refresh transfers from the database
+   */
+  const refresh = useCallback(async () => {
+    if (userIdRef.current) {
+      await fetchTransfers(userIdRef.current);
+    }
+  }, [fetchTransfers]);
+
+  return { transfers, loading, removeTransfer, removeMultipleTransfers, refresh };
 }
 
 /**

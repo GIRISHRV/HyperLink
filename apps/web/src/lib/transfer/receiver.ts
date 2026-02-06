@@ -13,8 +13,12 @@ export class FileReceiver {
   private bytesReceived: number = 0;
   private startTime: number = 0;
   private connection: DataConnection | null = null;
+  private isCancelled: boolean = false;
+  private isPaused: boolean = false;
   private progressCallback?: (progress: TransferProgress) => void;
   private completeCallback?: (blob: Blob, filename: string) => void;
+  private cancelCallback?: () => void;
+  private pauseCallback?: (paused: boolean) => void;
 
   /**
    * Set the connection to send ACKs back
@@ -42,6 +46,8 @@ export class FileReceiver {
    * Handle incoming chunk - store it and send ACK
    */
   async handleChunk(message: PeerMessage<ChunkPayload>): Promise<void> {
+    if (this.isCancelled) return;
+
     const { chunkIndex, data } = message.payload;
 
     // Store chunk to IndexedDB
@@ -157,5 +163,156 @@ export class FileReceiver {
    */
   onComplete(callback: (blob: Blob, filename: string) => void): void {
     this.completeCallback = callback;
+  }
+
+  /**
+   * Register cancel callback
+   */
+  onCancel(callback: () => void): void {
+    this.cancelCallback = callback;
+  }
+
+  /**
+   * Register pause state change callback
+   */
+  onPauseChange(callback: (paused: boolean) => void): void {
+    this.pauseCallback = callback;
+  }
+
+  /**
+   * Handle control messages from sender (cancel, pause, resume)
+   */
+  handleControlMessage(message: PeerMessage): boolean {
+    if (message.transferId !== this.transferId) return false;
+
+    if (message.type === "transfer-cancel") {
+      console.log("[RECEIVER] Sender cancelled transfer");
+      this.isCancelled = true;
+      this.cancelCallback?.();
+      // Clean up partial chunks from IndexedDB
+      clearTransfer(this.transferId).catch(console.error);
+      return true;
+    }
+
+    if (message.type === "transfer-pause") {
+      console.log("[RECEIVER] Sender paused transfer");
+      this.isPaused = true;
+      this.pauseCallback?.(true);
+      return true;
+    }
+
+    if (message.type === "transfer-resume") {
+      console.log("[RECEIVER] Sender resumed transfer");
+      this.isPaused = false;
+      this.pauseCallback?.(false);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Cancel transfer from receiver side - notify sender and clean up
+   */
+  cancel(): void {
+    this.isCancelled = true;
+    const cancelMessage: PeerMessage = {
+      type: "transfer-cancel",
+      transferId: this.transferId,
+      payload: null,
+      timestamp: Date.now(),
+    };
+    try {
+      this.connection?.send(cancelMessage);
+    } catch (e) {
+      console.warn("[RECEIVER] Failed to send cancel message:", e);
+    }
+    // Clean up partial chunks from IndexedDB
+    clearTransfer(this.transferId).catch(console.error);
+    console.log("[RECEIVER] Transfer cancelled");
+  }
+
+  /**
+   * Pause transfer - notify sender to stop sending chunks
+   */
+  pause(): void {
+    if (this.isPaused) return;
+    this.isPaused = true;
+    const pauseMessage: PeerMessage = {
+      type: "transfer-pause",
+      transferId: this.transferId,
+      payload: null,
+      timestamp: Date.now(),
+    };
+    try {
+      this.connection?.send(pauseMessage);
+    } catch (e) {
+      console.warn("[RECEIVER] Failed to send pause message:", e);
+    }
+    this.pauseCallback?.(true);
+    console.log("[RECEIVER] Transfer paused by receiver");
+  }
+
+  /**
+   * Resume transfer - notify sender to continue sending chunks
+   */
+  resume(): void {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    const resumeMessage: PeerMessage = {
+      type: "transfer-resume",
+      transferId: this.transferId,
+      payload: null,
+      timestamp: Date.now(),
+    };
+    try {
+      this.connection?.send(resumeMessage);
+    } catch (e) {
+      console.warn("[RECEIVER] Failed to send resume message:", e);
+    }
+    this.pauseCallback?.(false);
+    console.log("[RECEIVER] Transfer resumed by receiver");
+  }
+
+  /**
+   * Check if cancelled
+   */
+  getIsCancelled(): boolean {
+    return this.isCancelled;
+  }
+
+  /**
+   * Check if paused
+   */
+  getIsPaused(): boolean {
+    return this.isPaused;
+  }
+
+  /**
+   * Get transfer ID
+   */
+  getTransferId(): string {
+    return this.transferId;
+  }
+
+  /**
+   * Get total chunks
+   */
+  getTotalChunks(): number {
+    return this.totalChunks;
+  }
+
+  /**
+   * Get filename
+   */
+  getFilename(): string {
+    return this.filename;
+  }
+
+  /**
+   * Get file size
+   */
+  getFileSize(): number {
+    return this.fileSize;
   }
 }

@@ -21,4 +21,14 @@
     background-image: radial-gradient(#333 1px, transparent 1px);
     background-size: 20px 20px;
   }
+
+  /* Custom Shapes for Bauhaus Theme */
+  .shape-triangle {
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  }
+  
+  .shape-quarter-circle {
+    border-radius: 100% 0 0 0;
+  }
 }
+

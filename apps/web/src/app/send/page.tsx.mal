@@ -1,0 +1,433 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/services/auth-service";
+import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
+import { PeerManager } from "@/lib/webrtc/peer-manager";
+import { FileSender } from "@/lib/transfer/sender";
+import type { PeerConfig, TransferProgress } from "@repo/types";
+import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
+import SimpleHeader from "@/components/simple-header";
+
+export default function SendPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [receiverPeerId, setReceiverPeerId] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "connecting" | "transferring" | "complete" | "error"
+  >("idle");
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState<TransferProgress | null>(null);
+  const [transferId, setTransferId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<{ text: string; type: "info" | "success" | "error" }[]>([]);
+
+  const peerManagerRef = useRef<PeerManager | null>(null);
+  const fileSenderRef = useRef<FileSender | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    checkAuthAndInitPeer();
+    return () => {
+      if (peerManagerRef.current) {
+        peerManagerRef.current.destroy();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  const addLog = (text: string, type: "info" | "success" | "error" = "info") => {
+    setLogs(prev => [...prev, { text, type }]);
+  };
+
+  async function checkAuthAndInitPeer() {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        router.push("/auth");
+        return;
+      }
+      setUser(currentUser);
+    } catch (e) {
+      console.error("Auth check failed:", e);
+      // Optional: Redirect to auth or show error state? 
+      // For now, redirecting to auth seems safest as we can't verify identity
+      router.push("/auth");
+      return;
+    }
+
+    const config: PeerConfig = {
+      host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
+      port: parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!),
+      path: process.env.NEXT_PUBLIC_PEER_SERVER_PATH!,
+      secure: window.location.protocol === "https:",
+      debug: 0,
+    };
+
+    peerManagerRef.current = new PeerManager(config);
+
+    try {
+      addLog("Initializing WebRTC handshake...", "info");
+      await peerManagerRef.current.initialize();
+      addLog("Peer connection established.", "success");
+    } catch (err: any) {
+      setError(`Failed to connect to signaling server: ${err.message}`);
+      addLog(`Connection error: ${err.message}`, "error");
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    const validation = validateFileSize(selectedFile.size);
+    if (!validation.valid) {
+      setError(validation.error!);
+      return;
+    }
+
+    setFile(selectedFile);
+    setError("");
+    addLog(`File selected: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`, "success");
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files[0];
+    if (!droppedFile) return;
+
+    const validation = validateFileSize(droppedFile.size);
+    if (!validation.valid) {
+      setError(validation.error!);
+      return;
+    }
+
+    setFile(droppedFile);
+    setError("");
+    addLog(`File dropped: ${droppedFile.name} (${formatFileSize(droppedFile.size)})`, "success");
+  }
+
+  async function handleSend() {
+    console.log("[SEND PAGE] handleSend called", { file: !!file, receiverPeerId, peerManager: !!peerManagerRef.current });
+    if (!file || !receiverPeerId || !peerManagerRef.current) return;
+
+    setStatus("connecting");
+    setError("");
+    console.log("[SEND PAGE] Starting transfer...");
+    addLog("Starting transfer...", "info");
+
+    try {
+      const transfer = await createTransfer({
+        filename: file.name,
+        fileSize: file.size,
+      });
+
+      if (!transfer) {
+        throw new Error("Failed to create transfer record");
+      }
+
+      setTransferId(transfer.id);
+
+      const connection = peerManagerRef.current.connectToPeer(receiverPeerId);
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Connection timeout")), 30000);
+
+        connection.on("open", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+
+        connection.on("error", (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+
+      await updateTransferStatus(transfer.id, "transferring");
+      setStatus("transferring");
+
+      fileSenderRef.current = new FileSender(file, connection);
+      await fileSenderRef.current.sendOffer();
+
+      // Give connection time to stabilize
+      await new Promise(r => setTimeout(r, 1000));
+
+      await fileSenderRef.current.startTransfer((progressData) => {
+        setProgress(progressData);
+      });
+
+      await updateTransferStatus(transfer.id, "complete");
+      setStatus("complete");
+      addLog("Transfer completed successfully!", "success");
+    } catch (err: any) {
+      setError(err.message || "Transfer failed");
+      setStatus("error");
+      addLog(`Transfer failed: ${err.message || "Unknown error"}`, "error");
+
+      if (transferId) {
+        await updateTransferStatus(transferId, "failed");
+      }
+    }
+  }
+
+  function resetTransfer() {
+    setFile(null);
+    setReceiverPeerId("");
+    setStatus("idle");
+    setError("");
+    setProgress(null);
+    setTransferId(null);
+    fileSenderRef.current = null;
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
+      {/* Geometric Background Decorations */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
+        <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full border border-primary/10"></div>
+        <div className="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-[#242424]/20"></div>
+      </div>
+
+      <SimpleHeader userEmail={user?.email} isTransferActive={status === "connecting" || status === "transferring"} />
+
+      {/* Main Content Grid */}
+      <main className="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+
+          {/* LEFT COLUMN (Control) - Spans 8 cols */}
+          <div className="lg:col-span-8">
+            <div className="bg-[#242424] border-l-[8px] border-primary p-8 md:p-10 rounded-r-sm shadow-2xl relative overflow-hidden group">
+              {/* Card Decoration */}
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="material-symbols-outlined text-[120px]">send</span>
+              </div>
+
+              {/* Header */}
+              <div className="relative z-10 mb-8 border-b border-white/5 pb-6">
+                <h2 className="font-black text-3xl md:text-4xl text-white mb-2 uppercase tracking-tight">
+                  Initiate Transfer
+                </h2>
+                <p className="text-gray-400 max-w-md">
+                  Establish a secure P2P tunnel. Drag payload to the staging area below.
+                </p>
+              </div>
+
+              {/* Transfer Area */}
+              <div className="relative z-10">
+                {status === "idle" && (
+                  <div className="flex flex-col gap-8">
+                    {/* Drop Zone */}
+                    <div
+                      className="relative w-full aspect-[16/7] min-h-[300px] bg-[#1a1a1a] border-2 border-dashed border-white/10 hover:border-primary/50 hover:bg-[#1a1a1a]/80 transition-all cursor-pointer flex flex-col items-center justify-center gap-6 overflow-hidden rounded-sm"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+
+                      {/* Geometric Upload Icon */}
+                      <div className="relative w-20 h-20 flex items-center justify-center transition-transform duration-500 group-hover/zone:scale-110">
+                        <div className="absolute inset-0 border-4 border-white/20 rotate-45"></div>
+                        <div className="absolute inset-3 border-4 border-primary/40 rounded-full opacity-50"></div>
+                        <span className="material-symbols-outlined text-4xl text-white relative z-10">
+                          upload_file
+                        </span>
+                      </div>
+
+                      {file ? (
+                        <div className="text-center z-10 space-y-2">
+                          <p className="text-xl font-bold uppercase tracking-widest text-primary">
+                            {file.name}
+                          </p>
+                          <p className="text-sm font-mono text-white/50">{formatFileSize(file.size)}</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFile(null);
+                            }}
+                            className="mt-2 text-xs text-bauhaus-red hover:text-red-400 bg-black/50 px-3 py-1 rounded-sm uppercase tracking-wide"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-center z-10 space-y-2">
+                          <p className="text-xl font-bold uppercase tracking-widest text-white">
+                            Drag Files Here
+                          </p>
+                          <p className="text-sm font-mono text-white/40">OR CLICK TO BROWSE</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Inputs */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                      <div className="md:col-span-2 space-y-3">
+                        <label className="text-xs font-bold tracking-[0.1em] text-primary uppercase flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">hub</span>
+                          Destination Hash
+                        </label>
+                        <div className="relative">
+                          <input
+                            className="w-full bg-[#1a1a1a] border border-white/10 focus:border-primary px-4 py-4 text-lg font-mono text-white placeholder-white/20 outline-none transition-colors rounded-sm"
+                            placeholder="Paste Receiver ID..."
+                            type="text"
+                            value={receiverPeerId}
+                            onChange={(e) => setReceiverPeerId(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleSend}
+                        disabled={!file || !receiverPeerId}
+                        className="w-full h-[60px] bg-primary hover:bg-white text-black font-black text-lg tracking-widest uppercase transition-all flex items-center justify-center gap-2 group/btn disabled:opacity-50 disabled:cursor-not-allowed rounded-sm"
+                      >
+                        <span>Transmit</span>
+                        <span className="material-symbols-outlined group-hover/btn:translate-x-1 transition-transform">
+                          arrow_forward
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Views */}
+                {status !== "idle" && (
+                  <div className="bg-[#1a1a1a] border border-white/10 rounded-sm p-8 min-h-[400px] flex flex-col items-center justify-center relative overflow-hidden">
+                    {status === "connecting" && (
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-primary/20 text-primary rounded-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-4xl animate-spin">sync</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2 uppercase">Handshake</h3>
+                        <p className="text-gray-500 mb-8 max-w-xs mx-auto">Negotiating encryption keys with peer...</p>
+                        <button onClick={resetTransfer} className="text-xs text-red-500 hover:text-white uppercase tracking-widest font-bold">cancel connection</button>
+                      </div>
+                    )}
+
+                    {status === "transferring" && file && progress && (
+                      <div className="w-full max-w-md space-y-8">
+                        <div className="flex items-center gap-6">
+                          <div className="w-16 h-16 bg-[#242424] border border-white/10 flex items-center justify-center flex-shrink-0">
+                            <span className="font-bold text-sm text-primary">{file.name.split('.').pop()?.toUpperCase()}</span>
+                          </div>
+                          <div className="overflow-hidden">
+                            <h3 className="text-lg font-bold text-white truncate">{file.name}</h3>
+                            <p className="text-sm font-mono text-white/40">{formatFileSize(file.size)}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-end">
+                            <span className="text-xs font-bold text-primary uppercase tracking-widest">Uploading</span>
+                            <span className="text-4xl font-black text-white">{progress.percentage.toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-[#242424] overflow-hidden">
+                            <div className="h-full bg-primary transition-all duration-200" style={{ width: `${progress.percentage}%` }}></div>
+                          </div>
+                          <div className="flex justify-between text-xs font-mono text-white/30">
+                            <span>{formatFileSize(progress.speed)}/s</span>
+                            <span>ETA: {formatTime(progress.timeRemaining)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {status === "complete" && (
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-green-500 text-black rounded-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-4xl">check</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2 uppercase">Transmitted</h3>
+                        <p className="text-gray-500 mb-8">Data package delivery confirmed.</p>
+                        <button onClick={resetTransfer} className="bg-[#242424] hover:bg-white hover:text-black border border-white/10 text-white px-8 py-3 uppercase font-bold tracking-widest text-sm transition-colors rounded-sm">
+                          New Transfer
+                        </button>
+                      </div>
+                    )}
+
+                    {status === "error" && (
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-red-500 text-white rounded-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-4xl">warning</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2 uppercase">Failed</h3>
+                        <p className="text-red-400 mb-8 max-w-sm mx-auto">{error}</p>
+                        <button onClick={resetTransfer} className="bg-white text-black px-8 py-3 uppercase font-bold tracking-widest text-sm hover:bg-gray-200 transition-colors rounded-sm">
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {error && status === "idle" && (
+                  <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-mono flex items-center gap-3">
+                    <span className="material-symbols-outlined text-lg">error</span>
+                    {error}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN (Console) - Spans 4 cols */}
+          <div className="lg:col-span-4 flex flex-col gap-6">
+            <div className="bg-[#242424] p-6 rounded-sm border-t-4 border-bauhaus-blue relative overflow-hidden flex flex-col h-[600px]">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Network Terminal</h3>
+                  <p className="text-xs text-white/20 font-mono mt-1">REAL-TIME LOGGING</p>
+                </div>
+                <span className="material-symbols-outlined text-bauhaus-blue animate-pulse">terminal</span>
+              </div>
+
+              {/* Terminal Window */}
+              <div className="flex-1 bg-black rounded-sm border border-white/10 p-4 font-mono text-xs overflow-hidden relative">
+                <div className="absolute inset-0 overflow-y-auto p-4 custom-scrollbar">
+                  {logs.length === 0 ? (
+                    <div className="text-white/30 space-y-1">
+                      <p>&gt; System initialized</p>
+                      <p>&gt; Waiting for user input...</p>
+                    </div>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="mb-2 break-all">
+                        <span className="mr-2 opacity-50 text-[10px]">{new Date().toLocaleTimeString()}</span>
+                        <span className={log.type === "error" ? "text-red-400" : log.type === "success" ? "text-green-400" : "text-bauhaus-blue"}>
+                          {log.type === "error" ? "ERR" : log.type === "success" ? "OK" : "INF"}
+                        </span>
+                        <span className="mx-2 text-white/30">&gt;</span>
+                        <span className="text-white/80">{log.text}</span>
+                      </div>
+                    ))
+                  )}
+                  <div ref={logsEndRef} />
+                  <div className="mt-2 w-2 h-4 bg-primary animate-pulse inline-block"></div>
+                </div>
+              </div>
+
+              {/* Deco */}
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-bauhaus-blue/5 rounded-full blur-2xl"></div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  );
+}

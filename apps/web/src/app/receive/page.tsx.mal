@@ -1,0 +1,763 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/services/auth-service";
+import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
+import { PeerManager } from "@/lib/webrtc/peer-manager";
+import { FileReceiver } from "@/lib/transfer/receiver";
+import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
+import type { PeerConfig, PeerMessage, TransferProgress } from "@repo/types";
+import { formatFileSize, formatTime } from "@repo/utils";
+import SimpleHeader from "@/components/simple-header";
+import ConfirmLeaveModal from "@/components/confirm-leave-modal";
+import ConfirmCancelModal from "@/components/confirm-cancel-modal";
+import FileOfferPrompt from "@/components/file-offer-prompt";
+import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
+
+export default function ReceivePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [myPeerId, setMyPeerId] = useState("");
+  const [status, setStatus] = useState<"idle" | "connecting" | "prompted" | "receiving" | "paused" | "complete" | "error" | "cancelled">(
+    "idle"
+  );
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState<TransferProgress | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [receivedFile, setReceivedFile] = useState<{
+    name: string;
+    size: number;
+    blob?: Blob;
+  } | null>(null);
+  const [transferId, setTransferId] = useState<string | null>(null);
+  const [pendingOffer, setPendingOffer] = useState<{
+    filename: string;
+    fileSize: number;
+    fileType: string;
+    connection: any;
+    message: any;
+    dbTransferId?: string;
+  } | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [logs, setLogs] = useState<{ text: string; type: "info" | "success" | "error" }[]>([]);
+
+  const peerManagerRef = useRef<PeerManager | null>(null);
+  const fileReceiverRef = useRef<FileReceiver | null>(null);
+  const activeConnectionRef = useRef<any>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef(status); // Track status for event handler closures
+
+  // Keep refs in sync
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  const addLog = (text: string, type: "info" | "success" | "error" = "info") => {
+    setLogs(prev => [...prev, { text, type }]);
+  };
+
+  const isTransferActive = status === "connecting" || status === "prompted" || status === "receiving" || status === "paused";
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(transferId, isTransferActive);
+
+  useEffect(() => {
+
+    let isMounted = true;
+
+    checkAuthAndInitPeer(() => isMounted);
+    requestNotificationPermission();
+
+    return () => {
+
+      isMounted = false;
+      if (peerManagerRef.current) {
+        peerManagerRef.current.destroy();
+        peerManagerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function checkAuthAndInitPeer(isMountedCheck: () => boolean) {
+    try {
+      const currentUser = await getCurrentUser();
+
+      if (!isMountedCheck()) return;
+
+      if (!currentUser) {
+        router.push("/auth");
+        return;
+      }
+      setUser(currentUser);
+    } catch (e) {
+      console.error("Auth check failed:", e);
+      router.push("/auth");
+      return;
+    }
+
+
+
+    const config: PeerConfig = {
+      host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
+      port: parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!),
+      path: process.env.NEXT_PUBLIC_PEER_SERVER_PATH!,
+      secure: window.location.protocol === "https:",
+      debug: 0,
+    };
+
+    peerManagerRef.current = new PeerManager(config);
+
+    try {
+      addLog("Initializing WebRTC handshake...", "info");
+      const peerId = await peerManagerRef.current.initialize();
+
+      if (!isMountedCheck()) return;
+
+      setMyPeerId(peerId);
+      addLog(`Peer ID generated: ${peerId.slice(0, 8)}...`, "success");
+      addLog("Waiting for incoming connection...", "info");
+
+      peerManagerRef.current.on("incoming-connection", async (connection: any) => {
+
+        // Check if receiver is busy with another transfer (use ref for current value)
+        const currentStatus = statusRef.current;
+        const isBusy = currentStatus === "connecting" || currentStatus === "prompted" ||
+          currentStatus === "receiving" || currentStatus === "paused";
+
+        // If busy, reject the new sender
+        if (isBusy) {
+          addLog("Rejected new connection (busy with active transfer)", "error");
+          connection.on("open", () => {
+            connection.send({
+              type: "receiver-busy",
+              transferId: "",
+              payload: null,
+              timestamp: Date.now(),
+            });
+            // Give time for message to be sent before closing
+            setTimeout(() => connection.close(), 100);
+          });
+          return;
+        }
+
+        // Normal new connection - reset state
+        if (activeConnectionRef.current && activeConnectionRef.current !== connection && activeConnectionRef.current.open) {
+          console.warn("[RECEIVE PAGE] Closing existing connection for new one");
+          activeConnectionRef.current.close();
+        }
+
+        activeConnectionRef.current = connection;
+        // Only reset receiver if we are truly starting fresh
+        if (statusRef.current === 'idle') {
+          fileReceiverRef.current = null;
+        }
+
+        setStatus("connecting");
+        setError("");
+        setProgress(null);
+        setIsPaused(false);
+        addLog("Incoming connection detected...", "info");
+
+        connection.on("open", () => {
+          if (activeConnectionRef.current !== connection) return;
+          addLog("Connection established with sender", "success");
+        });
+
+        connection.on("close", () => {
+          // Only handle if this is still the active connection
+          if (activeConnectionRef.current !== connection) return;
+          console.log("[RECEIVE PAGE] Connection closed");
+
+          // Reset to idle on connection close
+          if (statusRef.current !== 'complete' && statusRef.current !== 'cancelled') {
+            setStatus("idle");
+          }
+        });
+
+        connection.on("error", (err: any) => {
+          if (activeConnectionRef.current !== connection) return;
+          console.error("[RECEIVE PAGE] Connection ERROR:", err);
+          setError(`Connection error: ${err}`);
+          setStatus("error");
+          addLog(`Connection error: ${err}`, "error");
+        });
+
+        connection.on("data", async (data: any) => {
+          if (activeConnectionRef.current !== connection) return;
+          const message = data as PeerMessage;
+
+          // console.log("[RECEIVE PAGE] Received data:", message.type);
+
+          if (message.type === "file-offer") {
+            const transferData = message.payload as any;
+            addLog(`File offer received: ${transferData.filename} (${formatFileSize(transferData.fileSize)})`, "info");
+
+            // Store the offer details and show the acceptance prompt
+            setPendingOffer({
+              filename: transferData.filename,
+              fileSize: transferData.fileSize,
+              fileType: transferData.fileType,
+              connection,
+              message,
+              dbTransferId: transferData.dbTransferId,
+            });
+            setReceivedFile({ name: transferData.filename, size: transferData.fileSize });
+            setStatus("prompted");
+          } else if (message.type === "chunk") {
+
+            if (fileReceiverRef.current) {
+              await fileReceiverRef.current.handleChunk(message as any);
+            } else {
+              console.warn("[RECEIVE PAGE] FileReceiver not initialized! Status:", statusRef.current, "Ref:", !!fileReceiverRef.current);
+              // Attempt to recover if we have a pending offer that was just accepted
+              // This handles the race condition where chunk arrives immediately after accept
+            }
+          } else if (message.type === "transfer-cancel" || message.type === "transfer-pause" || message.type === "transfer-resume") {
+            // Handle cancel during prompted state (before FileReceiver exists)
+            // Note: We check !fileReceiverRef.current to detect prompted state since
+            // the status variable in this closure may be stale
+            if (message.type === "transfer-cancel" && !fileReceiverRef.current) {
+              setPendingOffer(null);
+              setReceivedFile(null);
+              setStatus("cancelled");
+              return;
+            }
+            if (fileReceiverRef.current) {
+              fileReceiverRef.current.handleControlMessage(message as any);
+            }
+          } else {
+
+          }
+        });
+      });
+    } catch (err: any) {
+      setError(`Failed to initialize: ${err.message}`);
+      addLog(`Initialization failed: ${err.message}`, "error");
+    }
+  }
+
+  async function handleAcceptOffer() {
+    if (!pendingOffer) return;
+
+    const { connection, message, dbTransferId: senderDbId } = pendingOffer;
+    addLog("Accepting file transfer...", "info");
+
+    // CRITICAL: Create FileReceiver BEFORE sending file-accept so it's
+    // ready to handle chunks that arrive immediately after the sender
+    // receives acceptance.
+    const receiver = new FileReceiver();
+    fileReceiverRef.current = receiver;
+    receiver.setConnection(connection);
+
+    let dbTransferId: string | null = null;
+
+    receiver.onProgress((progressData) => {
+      setProgress(progressData);
+    });
+
+    receiver.onComplete((blob) => {
+      addLog("Transfer completed successfully!", "success");
+      setReceivedFile({ name: pendingOffer.filename, size: pendingOffer.fileSize, blob });
+      setStatus("complete");
+      notifyTransferComplete("received", pendingOffer.filename);
+      if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
+    });
+
+    receiver.onCancel(() => {
+      addLog("Transfer cancelled", "error");
+      setStatus("cancelled");
+      if (dbTransferId) updateTransferStatus(dbTransferId, "cancelled");
+    });
+
+    receiver.onPauseChange((paused) => {
+      setIsPaused(paused);
+      if (paused) {
+        setStatus("paused");
+        addLog("Transfer paused", "info");
+      } else {
+        setStatus("receiving");
+        addLog("Transfer resumed", "info");
+      }
+    });
+
+    // Initialize receiver state with the stored offer message
+    receiver.handleOffer(message as any);
+    setStatus("receiving");
+    setPendingOffer(null);
+    addLog("Encryption enabled: AES-256-GCM", "success");
+
+    // Send acceptance AFTER the receiver is fully wired up
+    const acceptMessage: PeerMessage = {
+      type: "file-accept",
+      transferId: message.transferId,
+      payload: null,
+      timestamp: Date.now(),
+    };
+    connection.send(acceptMessage);
+
+    // Claim the existing transfer record created by the sender
+    if (senderDbId) {
+      const claimed = await claimTransferAsReceiver(senderDbId);
+      if (claimed) {
+        dbTransferId = claimed.id;
+        setTransferId(claimed.id);
+        await updateTransferStatus(claimed.id, "transferring");
+        addLog(`Transfer claimed: ${claimed.id.slice(0, 8)}...`, "success");
+      }
+    }
+  }
+
+  function handleRejectOffer() {
+    if (!pendingOffer) return;
+    addLog("File transfer rejected", "info");
+
+    const { connection, message, dbTransferId: senderDbId } = pendingOffer;
+
+    // Send rejection message back to sender
+    const rejectMessage: PeerMessage = {
+      type: "file-reject",
+      transferId: message.transferId,
+      payload: null,
+      timestamp: Date.now(),
+    };
+    connection.send(rejectMessage);
+
+    // Update DB status to cancelled if we have an ID
+    if (senderDbId) {
+      updateTransferStatus(senderDbId, "cancelled");
+    }
+
+    // Reset state
+    setPendingOffer(null);
+    setReceivedFile(null);
+    setStatus("idle");
+  }
+
+  function handleDownload() {
+    if (!receivedFile || !receivedFile.blob) return;
+
+    const url = URL.createObjectURL(receivedFile.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = receivedFile.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addLog(`File downloaded: ${receivedFile.name}`, "success");
+  }
+
+  function handleCancelClick() {
+    setShowCancelModal(true);
+  }
+
+  async function confirmCancel() {
+    setShowCancelModal(false);
+    if (fileReceiverRef.current) {
+      fileReceiverRef.current.cancel();
+    }
+    setStatus("cancelled");
+    if (transferId) {
+      await updateTransferStatus(transferId, "cancelled");
+    }
+  }
+
+  function handlePauseResume() {
+    if (!fileReceiverRef.current) return;
+    if (isPaused) {
+      fileReceiverRef.current.resume();
+      setIsPaused(false);
+    } else {
+      fileReceiverRef.current.pause();
+      setIsPaused(true);
+    }
+  }
+
+  function resetReceive() {
+    setStatus("idle");
+    setError("");
+    setProgress(null);
+    setReceivedFile(null);
+    setTransferId(null);
+    setIsPaused(false);
+    setPendingOffer(null);
+    fileReceiverRef.current = null;
+    activeConnectionRef.current = null;
+    addLog("System reset. Ready for new transfer.", "info");
+  }
+
+  function copyPeerId() {
+    navigator.clipboard.writeText(myPeerId);
+    addLog("Peer ID copied to clipboard", "success");
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col font-display bg-[#1a1a1a] relative overflow-x-hidden selection:bg-primary selection:text-black">
+      {/* Geometric Background Decorations */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full border border-white/5"></div>
+        <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full border border-primary/10"></div>
+        <div className="absolute bottom-0 left-0 w-0 h-0 border-b-[300px] border-l-[300px] border-b-transparent border-l-[#242424]/20"></div>
+      </div>
+
+      <SimpleHeader userEmail={user?.email} isTransferActive={isTransferActive} />
+
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start relative z-10 transition-all duration-500 ease-in-out">
+        {/* Left Column: ID & Status */}
+        <section className="lg:col-span-5 flex flex-col gap-8">
+          {/* Receive Header */}
+          <div className="space-y-2">
+            <div className="w-12 h-1 bg-primary mb-4"></div>
+            <h2 className="text-5xl md:text-6xl font-bold uppercase tracking-tighter leading-[0.9]">
+              Receive
+              <br />
+              Mode
+            </h2>
+            <p className="text-white/60 text-lg max-w-md">
+              Share your unique Peer ID to establish a secure P2P connection.
+            </p>
+          </div>
+
+          {/* Peer ID Card */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-bauhaus-red opacity-20 group-hover:opacity-40 blur transition duration-500"></div>
+            <div className="relative bg-[#1a1a1a] border border-white/10 p-6 rounded-sm flex flex-col gap-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-primary">
+                Your Peer ID
+              </label>
+              <div className="flex items-stretch gap-3">
+                <div className="flex-1 bg-black border border-white/20 px-4 py-3 flex items-center">
+                  <span className="font-mono text-lg md:text-xl tracking-widest text-white break-all">
+                    {myPeerId ? myPeerId : "Loading..."}
+                  </span>
+                </div>
+                <button
+                  onClick={copyPeerId}
+                  className="bg-primary hover:bg-white text-black w-[54px] flex items-center justify-center transition-colors rounded-sm"
+                  title="Copy ID"
+                >
+                  <span className="material-symbols-outlined !text-[24px]">content_copy</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active / Recent Transfers List */}
+          <div className="flex flex-col gap-4 mt-8">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white/50 border-b border-white/10 pb-2">
+              Incoming Queue
+            </h3>
+
+            {status === "prompted" && pendingOffer && (
+              <div className="bg-[#1a1a1a] p-4 border-l-4 border-bauhaus-blue flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2 rounded-sm">
+                      <span className="material-symbols-outlined text-bauhaus-blue">help</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{pendingOffer.filename}</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {formatFileSize(pendingOffer.fileSize)} • Awaiting your response
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-bauhaus-blue animate-pulse">
+                    PENDING
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {(status === "receiving" || status === "paused") && receivedFile && progress && (
+              <div className={`bg-[#1a1a1a] p-4 border-l-4 ${isPaused ? "border-orange-400" : "border-bauhaus-red"} flex flex-col gap-3`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2 rounded-sm">
+                      <span className={`material-symbols-outlined ${isPaused ? "text-orange-400" : "text-bauhaus-red"}`}>folder_zip</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{receivedFile.name}</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {formatFileSize(receivedFile.size)} • {isPaused ? "Paused" : "Peer: connected"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-bold ${isPaused ? "text-orange-400" : "text-bauhaus-red animate-pulse"}`}>
+                    {isPaused ? "PAUSED" : "RECEIVING"}
+                  </span>
+                </div>
+
+                {/* Bauhaus Progress Bar */}
+                <div className="w-full h-3 bg-black border border-white/10 relative overflow-hidden">
+                  <div
+                    className={`absolute top-0 left-0 h-full transition-[width] duration-300 ease-out ${isPaused ? "bg-orange-400" : "bg-bauhaus-red"}`}
+                    style={{ width: `${progress.percentage}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-[10px] font-mono uppercase text-white/40">
+                  <span>
+                    {formatFileSize(progress.bytesTransferred)} /{" "}
+                    {formatFileSize(receivedFile.size)}
+                  </span>
+                  <span>{progress.percentage.toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-mono text-white/40">
+                  <span>{formatFileSize(progress.speed)}/s</span>
+                  <span>{isPaused ? "Waiting to resume" : `ETA: ${formatTime(progress.timeRemaining)}`}</span>
+                </div>
+
+                {/* Pause/Resume and Cancel Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePauseResume}
+                    className={`flex-1 h-9 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors rounded-sm ${isPaused
+                      ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                      : "bg-orange-400/20 text-orange-400 border border-orange-400/40 hover:bg-orange-400/30"
+                      }`}
+                  >
+                    <span className="material-symbols-outlined !text-[16px]">
+                      {isPaused ? "play_arrow" : "pause"}
+                    </span>
+                    {isPaused ? "Resume" : "Pause"}
+                  </button>
+                  <button
+                    onClick={handleCancelClick}
+                    className="flex-1 h-9 bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors rounded-sm"
+                  >
+                    <span className="material-symbols-outlined !text-[16px]">close</span>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {status === "cancelled" && (
+              <div className="bg-[#1a1a1a] p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2 rounded-sm">
+                      <span className="material-symbols-outlined text-gray-400">cancel</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-300">Transfer Cancelled</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {receivedFile ? formatFileSize(receivedFile.size) : "—"} • Cancelled
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={resetReceive}
+                  className="w-full h-9 bg-primary text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors rounded-sm hover:bg-white"
+                >
+                  Ready for New Transfer
+                </button>
+              </div>
+            )}
+
+            {status === "complete" && receivedFile && (
+              <div className="bg-[#1a1a1a] p-4 border-l-4 border-primary flex flex-col gap-4 group">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2 rounded-sm">
+                      <span className="material-symbols-outlined text-primary">movie</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{receivedFile.name}</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {formatFileSize(receivedFile.size)} • Completed
+                      </p>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-primary">check_circle</span>
+                </div>
+                <button
+                  onClick={handleDownload}
+                  className="w-full h-10 bg-primary hover:bg-white text-black text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all rounded-sm"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">download</span>
+                  Download to Disk
+                </button>
+              </div>
+            )}
+
+            {status === "idle" && (
+              <div className="text-center py-8 text-gray-500">
+                <span className="material-symbols-outlined text-5xl opacity-20">download</span>
+                <p className="mt-4 text-sm">Waiting for incoming connection...</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 p-4 rounded-sm">
+                <p className="text-bauhaus-red text-sm">{error}</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Right Column: Visualizer */}
+        <section className="lg:col-span-7 flex flex-col h-full min-h-[500px] relative">
+          {/* Main Visual Container */}
+          <div className="bg-[#0a0a0a] border border-white/5 w-full h-full flex flex-col items-center justify-center relative overflow-hidden rounded-sm p-10">
+            {/* Background Grid */}
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage:
+                  "linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)",
+                backgroundSize: "40px 40px",
+              }}
+            ></div>
+
+            {/* Geometric Composition / Animation */}
+            <div className="relative z-10 size-[300px] md:size-[400px] flex items-center justify-center">
+              {/* Outer Ring */}
+              <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_20s_linear_infinite]"></div>
+
+              {/* Bauhaus Shapes Animation */}
+              <div className="absolute inset-4 border-[20px] border-t-bauhaus-red border-r-primary border-b-transparent border-l-transparent rounded-full animate-spin-slow opacity-80"></div>
+
+              {/* Middle Pulse */}
+              <div className="absolute size-48 bg-white/5 rounded-full animate-pulse-slow backdrop-blur-sm border border-white/10"></div>
+
+              {/* Center Core */}
+              <div className="absolute size-24 bg-primary rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(255,217,0,0.3)]">
+                <span className="material-symbols-outlined text-black !text-[40px] animate-pulse">
+                  leak_add
+                </span>
+              </div>
+
+              {/* Floating Orbiting Square */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 size-4 bg-bauhaus-blue animate-bounce"></div>
+            </div>
+
+            {/* Status Text */}
+            <div className="mt-12 text-center z-20 space-y-2">
+              {status === "idle" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest animate-pulse text-white">
+                    Waiting for connection...
+                  </p>
+                  <p className="text-sm font-mono text-white/40">
+                    Port 8080 open • Listening on local network
+                  </p>
+                </>
+              )}
+
+              {status === "prompted" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest text-bauhaus-blue">
+                    Incoming File Offer
+                  </p>
+                  <p className="text-sm font-mono text-white/40">
+                    Accept or decline the file transfer
+                  </p>
+                </>
+              )}
+
+              {status === "receiving" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest text-bauhaus-red">
+                    Receiving Data...
+                  </p>
+                  <p className="text-sm font-mono text-white/40">
+                    {progress?.percentage.toFixed(0)}% complete
+                  </p>
+                </>
+              )}
+
+              {status === "paused" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest text-orange-400">
+                    Transfer Paused
+                  </p>
+                  <p className="text-sm font-mono text-white/40">
+                    {progress?.percentage.toFixed(0)}% • Waiting for sender to resume
+                  </p>
+                </>
+              )}
+
+              {status === "cancelled" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest text-gray-400">
+                    Transfer Cancelled
+                  </p>
+                  <p className="text-sm font-mono text-white/40">Connection terminated</p>
+                </>
+              )}
+
+              {status === "complete" && (
+                <>
+                  <p className="text-xl font-bold uppercase tracking-widest text-primary">
+                    Transfer Complete!
+                  </p>
+                  <p className="text-sm font-mono text-white/40">File ready for download</p>
+                </>
+              )}
+            </div>
+
+            {/* Decorative Corner Elements */}
+            <div className="absolute top-4 left-4 size-3 border-t-2 border-l-2 border-primary"></div>
+            <div className="absolute top-4 right-4 size-3 border-t-2 border-r-2 border-primary"></div>
+            <div className="absolute bottom-4 left-4 size-3 border-b-2 border-l-2 border-primary"></div>
+            <div className="absolute bottom-4 right-4 size-3 border-b-2 border-r-2 border-primary"></div>
+
+            {/* Console Terminal Log */}
+            <div className="absolute bottom-0 left-0 right-0 border-t-2 border-primary bg-black/90 backdrop-blur-sm z-30 max-h-[200px] flex flex-col">
+              <div className="p-4 overflow-y-auto font-mono text-xs text-[#bcb89a] flex-1">
+                {logs.length === 0 ? (
+                  <p className="mb-1">
+                    <span className="text-primary">&gt;</span> System ready. Listening for connections...
+                  </p>
+                ) : (
+                  logs.map((log, i) => (
+                    <p key={i} className="mb-1">
+                      <span className={log.type === "error" ? "text-red-400" : log.type === "success" ? "text-green-400" : "text-primary"}>&gt;</span> {log.text}
+                    </p>
+                  ))
+                )}
+                <div ref={logsEndRef} />
+                <span className="inline-block w-2 h-4 bg-primary animate-pulse align-middle"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer / Info */}
+      <footer className="max-w-[1400px] mx-auto w-full px-6 py-6 border-t border-white/5 text-white/30 text-xs font-mono flex justify-between uppercase">
+        <span>HyperLink v2.0 // Bauhaus Edition</span>
+        <span>Secure P2P Protocol</span>
+      </footer>
+
+      <FileOfferPrompt
+        isOpen={status === "prompted" && !!pendingOffer}
+        filename={pendingOffer?.filename ?? ""}
+        fileSize={pendingOffer?.fileSize ?? 0}
+        fileType={pendingOffer?.fileType ?? ""}
+        onAccept={handleAcceptOffer}
+        onReject={handleRejectOffer}
+      />
+
+      <ConfirmLeaveModal
+        isOpen={showBackModal}
+        onConfirm={confirmBackNavigation}
+        onCancel={cancelBackNavigation}
+      />
+
+      <ConfirmCancelModal
+        isOpen={showCancelModal}
+        onConfirm={confirmCancel}
+        onCancel={() => setShowCancelModal(false)}
+        transferType="receiving"
+      />
+    </div>
+  );
+}

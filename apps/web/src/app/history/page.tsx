@@ -3,17 +3,25 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
+import { getUserProfile } from "@/lib/services/profile-service";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 import type { User } from "@supabase/supabase-js";
 import { formatFileSize } from "@repo/utils";
-import SimpleHeader from "@/components/simple-header";
+import TransferDetailsModal from "@/components/transfer-details-modal";
+import type { Transfer } from "@repo/types";
+import Link from "next/link";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [_user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
-  const { transfers, loading: transfersLoading } = useUserTransfersRealtime();
+  const [_confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showClearAll, setShowClearAll] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
+  const [avatarIcon, setAvatarIcon] = useState("person");
+  const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
+  const { transfers, loading: transfersLoading, removeTransfer, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
   useEffect(() => {
     checkUser();
@@ -26,12 +34,28 @@ export default function HistoryPage() {
       return;
     }
     setUser(currentUser);
+
+    // Load user profile
+    const profile = await getUserProfile();
+    if (profile) {
+      setAvatarIcon(profile.avatar_icon || "person");
+      const colorMap: Record<string, { value: string; text: string }> = {
+        "bg-primary": { value: "bg-primary", text: "text-black" },
+        "bg-bauhaus-blue": { value: "bg-bauhaus-blue", text: "text-white" },
+        "bg-bauhaus-red": { value: "bg-bauhaus-red", text: "text-white" },
+        "bg-green-500": { value: "bg-green-500", text: "text-white" },
+        "bg-purple-500": { value: "bg-purple-500", text: "text-white" },
+        "bg-orange-500": { value: "bg-orange-500", text: "text-black" },
+      };
+      setAvatarColor(colorMap[profile.avatar_color || "bg-primary"] || { value: "bg-primary", text: "text-black" });
+    }
+
     setLoading(false);
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background-dark flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <span className="material-symbols-outlined text-primary animate-spin text-4xl">
           progress_activity
         </span>
@@ -42,209 +66,310 @@ export default function HistoryPage() {
   const filteredTransfers =
     filter === "all" ? transfers : transfers.filter((t) => t.status === filter);
 
-  const statusColors = {
-    pending: {
-      bg: "bg-yellow-900/30",
-      border: "border-yellow-900/50",
-      text: "text-primary",
-      icon: "folder",
-    },
-    connecting: {
-      bg: "bg-blue-900/30",
-      border: "border-blue-900/50",
-      text: "text-blue-400",
-      icon: "sync",
-    },
-    transferring: {
-      bg: "bg-blue-900/30",
-      border: "border-blue-900/50",
-      text: "text-blue-400",
-      icon: "sync",
-    },
-    complete: {
-      bg: "bg-green-900/30",
-      border: "border-green-900/50",
-      text: "text-green-400",
-      icon: "check_circle",
-    },
-    failed: {
-      bg: "bg-red-900/30",
-      border: "border-red-900/50",
-      text: "text-red-400",
-      icon: "error",
-    },
-    cancelled: {
-      bg: "bg-gray-900/30",
-      border: "border-gray-900/50",
-      text: "text-gray-400",
-      icon: "cancel",
-    },
+  const deletableTransfers = transfers.filter(
+    (t) => t.status === "complete" || t.status === "failed" || t.status === "cancelled"
+  );
+
+  async function _handleDelete(transferId: string) {
+    await removeTransfer(transferId);
+    setConfirmDeleteId(null);
+  }
+
+  async function handleClearAll() {
+    const ids = deletableTransfers.map((t) => t.id);
+    if (ids.length === 0) {
+      setShowClearAll(false);
+      return;
+    }
+    try {
+      await removeMultipleTransfers(ids);
+    } catch (err) {
+      console.error("[HISTORY] Clear all failed:", err);
+    }
+    setShowClearAll(false);
+  }
+
+  const getFileIcon = (filename: string) => {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    const iconMap: Record<string, string> = {
+      zip: "folder_zip",
+      rar: "folder_zip",
+      "7z": "folder_zip",
+      pdf: "picture_as_pdf",
+      doc: "description",
+      docx: "description",
+      txt: "description",
+      xlsx: "grid_on",
+      xls: "grid_on",
+      csv: "grid_on",
+      mp4: "movie",
+      avi: "movie",
+      mkv: "movie",
+      mov: "movie",
+      jpg: "image",
+      jpeg: "image",
+      png: "image",
+      gif: "image",
+      mp3: "audio_file",
+      wav: "audio_file",
+    };
+    return iconMap[ext || ""] || "insert_drive_file";
   };
 
-  const stats = {
+  const _stats = {
     total: transfers.length,
     complete: transfers.filter((t) => t.status === "complete").length,
     failed: transfers.filter((t) => t.status === "failed").length,
-    totalSize: transfers.reduce((acc, t) => acc + (t.file_size || 0), 0),
   };
 
   return (
-    <div className="bg-background-dark font-display text-white min-h-screen flex flex-col">
-      <SimpleHeader userEmail={user?.email} />
-
-      <main className="flex-1 w-full max-w-7xl mx-auto p-6 md:p-8 lg:p-12 flex flex-col gap-8">
-        {/* Header */}
-        <header className="pb-6 border-b-4 border-[#4b4520]">
-          <div className="w-12 h-1 bg-primary mb-4"></div>
-          <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.85] tracking-tighter uppercase mb-4">
-            Transfer
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-500">
-              History
+    <div className="min-h-screen flex flex-col font-display bg-[#0a0a0a] text-white relative overflow-x-hidden">
+      {/* Navigation */}
+      <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-[#6b6644]/30 bg-[#1a1a1a] sticky top-0">
+        <div className="flex items-center gap-3">
+          <div className="size-8 bg-primary flex items-center justify-center rounded-sm text-black">
+            <span className="material-symbols-outlined text-[24px]">link</span>
+          </div>
+          <h1 className="font-black text-xl tracking-wider text-white uppercase">HyperLink</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+              <span className="material-symbols-outlined">dashboard</span>
+            </button>
+          </Link>
+          <Link href="/settings">
+            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-colors text-white border border-white/5">
+              <span className="material-symbols-outlined">settings</span>
+            </button>
+          </Link>
+          <div className={`size-10 rounded-full ${avatarColor.value} flex items-center justify-center border border-white/10 shadow-lg`}>
+            <span className={`material-symbols-outlined text-xl ${avatarColor.text}`}>
+              {avatarIcon}
             </span>
-          </h1>
-          <p className="text-gray-400 text-lg max-w-2xl">
-            Complete archive of all your P2P file transfers.
-          </p>
-        </header>
-
-        {/* Stats Cards */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-[#2a2614] border border-[#4b4520] p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-primary">folder</span>
-              <span className="text-xs text-gray-400 uppercase">Total Transfers</span>
-            </div>
-            <p className="text-3xl font-bold">{stats.total}</p>
           </div>
+        </div>
+      </header>
 
-          <div className="bg-[#2a2614] border border-[#4b4520] p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-green-400">check_circle</span>
-              <span className="text-xs text-gray-400 uppercase">Completed</span>
-            </div>
-            <p className="text-3xl font-bold">{stats.complete}</p>
-          </div>
-
-          <div className="bg-[#2a2614] border border-[#4b4520] p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-red-400">error</span>
-              <span className="text-xs text-gray-400 uppercase">Failed</span>
-            </div>
-            <p className="text-3xl font-bold">{stats.failed}</p>
-          </div>
-
-          <div className="bg-[#2a2614] border border-[#4b4520] p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-bauhaus-blue">database</span>
-              <span className="text-xs text-gray-400 uppercase">Total Data</span>
-            </div>
-            <p className="text-3xl font-bold">
-              {(stats.totalSize / 1e9).toFixed(1)}
-              <span className="text-lg text-primary">GB</span>
+      {/* Main Content */}
+      <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-10">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h2 className="text-4xl md:text-5xl font-black uppercase tracking-[-0.05em] leading-tight mb-2 text-white">
+              Transfer History
+            </h2>
+            <p className="text-gray-400 max-w-lg font-normal">
+              View and manage your past peer-to-peer file transfer logs. Secure, encrypted, and direct.
             </p>
           </div>
-        </section>
 
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-2">
-          {["all", "complete", "transferring", "failed"].map((status) => (
+          {/* Filter Actions */}
+          <div className="flex flex-wrap gap-2">
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-4 py-2 uppercase text-sm font-bold border transition-colors ${
-                filter === status
-                  ? "bg-primary text-black border-primary"
-                  : "bg-transparent text-gray-400 border-white/10 hover:border-primary hover:text-white"
-              }`}
+              onClick={() => setFilter("all")}
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-opacity ${filter === "all"
+                ? "bg-primary text-black"
+                : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
+                }`}
             >
-              {status}
+              All Transfers
             </button>
-          ))}
+            <button
+              onClick={() => setFilter("complete")}
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${filter === "complete"
+                ? "bg-primary text-black"
+                : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
+                }`}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setFilter("failed")}
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-colors ${filter === "failed"
+                ? "bg-primary text-black"
+                : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
+                }`}
+            >
+              Failed
+            </button>
+
+            {/* Clear All Button */}
+            {deletableTransfers.length > 0 && (
+              <div className="ml-auto">
+                {showClearAll ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">Clear {deletableTransfers.length} finished transfers?</span>
+                    <button
+                      onClick={handleClearAll}
+                      className="px-3 py-1.5 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/40 transition-colors rounded-sm"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setShowClearAll(false)}
+                      className="px-3 py-1.5 text-xs font-bold uppercase text-gray-400 border border-white/10 hover:border-white/30 transition-colors rounded-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowClearAll(true)}
+                    className="px-4 py-2 uppercase text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-1.5 rounded-sm"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                    Clear All
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Transfer List */}
-        <section className="flex flex-col gap-4">
-          {transfersLoading ? (
-            <div className="text-center py-12">
-              <span className="material-symbols-outlined text-4xl animate-spin">
-                progress_activity
-              </span>
-            </div>
-          ) : filteredTransfers.length === 0 ? (
-            <div className="text-center py-12 bg-[#2a2614] border border-[#4b4520]">
-              <span className="material-symbols-outlined text-6xl opacity-20">history</span>
-              <p className="mt-4 text-gray-500">No transfers found for this filter.</p>
-            </div>
-          ) : (
-            filteredTransfers.map((transfer) => {
-              const style =
-                statusColors[transfer.status as keyof typeof statusColors] || statusColors.pending;
+        {/* Table Container */}
+        <div className="w-full overflow-x-auto border border-[#6b6644]/20 rounded-sm bg-[#1a1a1a] shadow-2xl">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-[#6b6644] bg-[#121212]">
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-1/4">
+                  File
+                </th>
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px]">
+                  Size
+                </th>
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[180px]">
+                  Peer
+                </th>
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[140px]">
+                  Status
+                </th>
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">
+                  Date
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#6b6644]/20">
+              {transfersLoading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center">
+                    <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+                  </td>
+                </tr>
+              ) : filteredTransfers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center">
+                    <span className="material-symbols-outlined text-6xl opacity-20">history</span>
+                    <p className="mt-4 text-gray-500">No transfers found for this filter.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredTransfers.map((transfer, index) => {
+                  const peerLetter = transfer.id.charAt(0).toUpperCase();
+                  const peerColors = [
+                    { bg: "bg-blue-900/50", text: "text-blue-200" },
+                    { bg: "bg-yellow-900/50", text: "text-yellow-200" },
+                    { bg: "bg-red-900/50", text: "text-red-200" },
+                    { bg: "bg-green-900/50", text: "text-green-200" },
+                    { bg: "bg-purple-900/50", text: "text-purple-200" },
+                  ];
+                  const peerColor = peerColors[index % peerColors.length];
 
-              return (
-                <div
-                  key={transfer.id}
-                  className="bg-[#2a2614] border border-[#4b4520] hover:border-primary/50 transition-colors p-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-center"
-                >
-                  {/* File Icon & Name */}
-                  <div className="col-span-12 md:col-span-5 flex items-center gap-4">
-                    <div className={`size-12 rounded flex items-center justify-center ${style.bg}`}>
-                      <span className={`material-symbols-outlined ${style.text}`}>
-                        {style.icon}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-white truncate">{transfer.filename}</p>
-                      <p className="text-xs text-gray-500 mt-1">ID: {transfer.id.slice(0, 8)}</p>
-                    </div>
-                  </div>
+                  const statusConfig = {
+                    complete: {
+                      bg: "bg-[#2E9AFE]/10",
+                      border: "border-[#2E9AFE]/20",
+                      text: "text-[#2E9AFE]",
+                      icon: "check_circle",
+                    },
+                    failed: {
+                      bg: "bg-[#FF4D4D]/10",
+                      border: "border-[#FF4D4D]/20",
+                      text: "text-[#FF4D4D]",
+                      icon: "error",
+                    },
+                    transferring: {
+                      bg: "bg-primary/10",
+                      border: "border-primary/20",
+                      text: "text-primary",
+                      icon: "hourglass_top",
+                    },
+                    pending: {
+                      bg: "bg-primary/10",
+                      border: "border-primary/20",
+                      text: "text-primary",
+                      icon: "hourglass_top",
+                    },
+                  };
 
-                  {/* Size */}
-                  <div className="col-span-6 md:col-span-2">
-                    <p className="text-xs text-gray-400 md:hidden">Size</p>
-                    <p className="text-white font-medium">{formatFileSize(transfer.file_size)}</p>
-                  </div>
+                  const style = statusConfig[transfer.status as keyof typeof statusConfig] || statusConfig.pending;
 
-                  {/* Date */}
-                  <div className="col-span-6 md:col-span-3">
-                    <p className="text-xs text-gray-400 md:hidden">Date</p>
-                    <p className="text-gray-300 text-sm">
-                      {new Date(transfer.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  <div className="col-span-12 md:col-span-2 flex justify-end">
-                    <span
-                      className={`flex items-center gap-2 ${style.bg} px-3 py-2 border ${style.border}`}
+                  return (
+                    <tr
+                      key={transfer.id}
+                      onClick={() => setSelectedTransfer(transfer)}
+                      className="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer"
                     >
-                      <span
-                        className={`size-2 rounded-full ${style.text.replace("text-", "bg-")} ${transfer.status === "transferring" ? "animate-pulse" : ""}`}
-                      ></span>
-                      <span className={`text-xs font-bold ${style.text} uppercase`}>
-                        {transfer.status}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </section>
+                      <td className="py-5 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 bg-gray-800 flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-black transition-colors">
+                            <span className="material-symbols-outlined">{getFileIcon(transfer.filename)}</span>
+                          </div>
+                          <span className="font-bold text-white group-hover:text-primary transition-colors truncate max-w-[300px]">
+                            {transfer.filename}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-5 px-6 font-mono text-sm text-gray-400">{formatFileSize(transfer.file_size)}</td>
+                      <td className="py-5 px-6">
+                        <div className="flex items-center gap-2">
+                          <div className={`size-6 ${peerColor.bg} rounded-full flex items-center justify-center text-[10px] font-bold ${peerColor.text}`}>
+                            {peerLetter}
+                          </div>
+                          <span className="text-sm font-medium text-gray-300">Peer-{transfer.id.slice(0, 3).toUpperCase()}</span>
+                        </div>
+                      </td>
+                      <td className="py-5 px-6">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${style.bg} ${style.text} text-[10px] font-black uppercase tracking-wider border ${style.border}`}>
+                          <span className={`material-symbols-outlined text-[14px] ${transfer.status === "transferring" ? "animate-spin" : ""}`}>
+                            {style.icon}
+                          </span>
+                          {transfer.status}
+                        </span>
+                      </td>
+                      <td className="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">
+                        {new Date(transfer.created_at).toLocaleString("en-US", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        }).replace(",", "")}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </main>
 
       {/* Footer */}
-      <div className="mt-auto w-full h-2 flex">
-        <div className="w-1/3 bg-bauhaus-blue"></div>
-        <div className="w-1/3 bg-bauhaus-red"></div>
-        <div className="w-1/3 bg-primary"></div>
-      </div>
+      <footer className="border-t border-[#6b6644]/20 py-8 text-center mt-auto">
+        <p className="text-xs text-gray-600 uppercase tracking-widest">Encrypted. Decentralized. Direct.</p>
+      </footer>
+
+      {/* Transfer Details Modal */}
+      {selectedTransfer && (
+        <TransferDetailsModal
+          transfer={selectedTransfer}
+          isOpen={true}
+          onClose={() => setSelectedTransfer(null)}
+          onUpdate={() => refresh()}
+        />
+      )}
     </div>
   );
 }

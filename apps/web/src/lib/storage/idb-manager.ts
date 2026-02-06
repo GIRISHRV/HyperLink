@@ -85,6 +85,23 @@ export async function getChunkCount(transferId: string): Promise<number> {
 }
 
 /**
+ * Get the highest chunk index received for a transfer (for resumption)
+ * Returns -1 if no chunks exist
+ */
+export async function getLastReceivedChunkIndex(transferId: string): Promise<number> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, "readonly");
+  const index = tx.store.index("transferId");
+  const chunks = await index.getAll(transferId);
+  await tx.done;
+
+  if (chunks.length === 0) return -1;
+
+  // Find the highest chunk index
+  return Math.max(...chunks.map((c) => c.chunkIndex));
+}
+
+/**
  * Check if a specific chunk exists
  */
 export async function hasChunk(transferId: string, chunkIndex: number): Promise<boolean> {
