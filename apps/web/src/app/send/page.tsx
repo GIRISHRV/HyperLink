@@ -406,6 +406,24 @@ export default function SendPage() {
   }
 
   function resetTransfer() {
+    // Cleanup if transfer is in progress
+    if (fileSenderRef.current) {
+      try {
+        fileSenderRef.current.cancel();
+      } catch (e) {
+        console.error("Error cancelling transfer:", e);
+      }
+    }
+
+    // Explicitly close connection
+    if (connectionRef.current) {
+      try {
+        connectionRef.current.close();
+      } catch (e) {
+        console.error("Error closing connection:", e);
+      }
+    }
+
     setFile(null);
     setReceiverPeerId("");
     setStatus("idle");
@@ -415,7 +433,7 @@ export default function SendPage() {
     setIsPaused(false);
     fileSenderRef.current = null;
     connectionRef.current = null;
-    setMessages([]); // Clear chat on reset? Or keep? Let's clear for now
+    setMessages([]);
     setLogs([
       "Initializing WebRTC handshake...",
       "Waiting for peer connection...",

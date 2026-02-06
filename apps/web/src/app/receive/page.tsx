@@ -222,7 +222,9 @@ export default function ReceivePage() {
 
         connection.on("close", () => {
           if (activeConnectionRef.current !== connection) return;
-          setStatus("idle");
+          addLog("[CONNECTION] Peer connection closed");
+          resetReceive();
+          activeConnectionRef.current = null;
         });
 
         connection.on("error", (err: any) => {
