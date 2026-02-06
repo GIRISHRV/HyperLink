@@ -82,6 +82,7 @@ export default function ReceivePage() {
   }
 
   const peerManagerRef = useRef<PeerManager | null>(null);
+  const initializingRef = useRef(false);
   const fileReceiverRef = useRef<FileReceiver | null>(null);
   const activeConnectionRef = useRef<any>(null);
   const statusRef = useRef(status);
@@ -154,6 +155,8 @@ export default function ReceivePage() {
   }, [isTransferActive]);
 
   async function checkAuthAndInitPeer(isMountedCheck: () => boolean) {
+    if (initializingRef.current || peerManagerRef.current) return;
+    initializingRef.current = true;
     try {
       const currentUser = await getCurrentUser();
 
@@ -282,6 +285,8 @@ export default function ReceivePage() {
       });
     } catch (err: any) {
       setError(`Failed to initialize: ${err.message}`);
+    } finally {
+      initializingRef.current = false;
     }
   }
 

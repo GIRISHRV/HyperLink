@@ -7,13 +7,19 @@ export class PeerManager {
   private connectionState: ConnectionState = "disconnected";
   private eventListeners: Map<string, Set<Function>> = new Map();
 
+  private isDestroyed: boolean = false;
+  private initializationPromise: Promise<string> | null = null;
+
   constructor(private config: PeerConfig) { }
 
   /**
    * Initialize PeerJS connection to signaling server
    */
   async initialize(peerId?: string): Promise<string> {
-    return new Promise((resolve, reject) => {
+    if (this.isDestroyed) return Promise.reject(new Error("PeerManager is destroyed"));
+    if (this.initializationPromise) return this.initializationPromise;
+
+    this.initializationPromise = new Promise((resolve, reject) => {
       try {
         const options = {
           host: this.config.host,
@@ -55,6 +61,10 @@ export class PeerManager {
         }
 
         this.peer.on("open", (id) => {
+          if (this.isDestroyed) {
+            this.peer?.destroy();
+            return;
+          }
           this.connectionState = "connected";
           this.emit("state-change", "connected");
           resolve(id);
@@ -84,6 +94,8 @@ export class PeerManager {
         reject(error);
       }
     });
+
+    return this.initializationPromise;
   }
 
   /**
@@ -246,10 +258,14 @@ export class PeerManager {
    * Destroy peer connection and cleanup
    */
   destroy(): void {
+    this.isDestroyed = true;
+    this.initializationPromise = null;
     this.connections.forEach((conn) => conn.close());
     this.connections.clear();
-    this.peer?.destroy();
-    this.peer = null;
+    if (this.peer) {
+      this.peer.destroy();
+      this.peer = null;
+    }
     this.connectionState = "closed";
     this.eventListeners.clear();
   }

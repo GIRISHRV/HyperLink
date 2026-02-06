@@ -36,6 +36,7 @@ export default function SendPage() {
   const [hasUnread, setHasUnread] = useState(false);
 
   const peerManagerRef = useRef<PeerManager | null>(null);
+  const initializingRef = useRef(false);
   const fileSenderRef = useRef<FileSender | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectionRef = useRef<any>(null); // Keep track of active connection
@@ -209,6 +210,8 @@ export default function SendPage() {
   }
 
   async function checkAuthAndInitPeer() {
+    if (initializingRef.current || peerManagerRef.current) return;
+    initializingRef.current = true;
     try {
       const currentUser = await getCurrentUser();
       if (!currentUser) {
@@ -263,6 +266,8 @@ export default function SendPage() {
     } catch (err: any) {
       setError(`Failed to connect to signaling server: ${err.message}`);
       addLog(`✗ Error: ${err.message}`);
+    } finally {
+      initializingRef.current = false;
     }
   }
 
