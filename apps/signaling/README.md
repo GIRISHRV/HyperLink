@@ -17,7 +17,7 @@ npm run dev
 The server will run on:
 
 - WebSocket: `ws://localhost:9000/myapp`
-- Health Check: `http://localhost:9001/health`
+- Health Check: `http://localhost:9000/health`
 
 ### Production Build
 
