@@ -13,7 +13,7 @@ import SimpleHeader from "@/components/simple-header";
 export default function SendPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [myPeerId, setMyPeerId] = useState("");
+
   const [file, setFile] = useState<File | null>(null);
   const [receiverPeerId, setReceiverPeerId] = useState("");
   const [status, setStatus] = useState<
@@ -56,8 +56,8 @@ export default function SendPage() {
     peerManagerRef.current = new PeerManager(config);
 
     try {
-      const peerId = await peerManagerRef.current.initialize();
-      setMyPeerId(peerId);
+      await peerManagerRef.current.initialize();
+
     } catch (err: any) {
       setError(`Failed to connect to signaling server: ${err.message}`);
     }

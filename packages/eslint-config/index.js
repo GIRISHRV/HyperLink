@@ -1,5 +1,6 @@
 module.exports = {
   extends: ["next/core-web-vitals", "prettier"],
+  plugins: ["@typescript-eslint"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     ecmaVersion: 2022,

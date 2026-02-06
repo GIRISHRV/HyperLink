@@ -46,6 +46,22 @@ docker run -p 9000:9000 -p 9001:9001 \
   hyperlink-signaling
 ```
 
+## ☁️ Render Deployment (Free)
+
+1. **New Web Service**
+   - Connect GitHub repo
+   - Root Directory: `apps/signaling`
+
+2. **Settings**
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm start`
+
+3. **Environment Variables**
+   - `PORT`: `10000`
+   - `ALLOWED_ORIGINS`: `https://your-frontend.vercel.app`
+
+*Note: Free tier spins down after inactivity.*
+
 ## 🚂 Railway Deployment
 
 1. **Create New Project** in Railway dashboard

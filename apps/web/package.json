@@ -9,27 +9,28 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "^14.2.15",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.45.0",
+    "@repo/types": "*",
+    "@repo/utils": "*",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "peerjs": "^1.5.4",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.45.0",
     "idb": "^8.0.0",
     "lucide-react": "^0.446.0",
-    "@repo/types": "*",
-    "@repo/utils": "*"
+    "next": "^14.2.15",
+    "peerjs": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
     "@types/node": "^20.11.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@repo/eslint-config": "*",
-    "@repo/typescript-config": "*",
-    "typescript": "^5.3.3",
-    "tailwindcss": "^3.4.0",
-    "postcss": "^8.4.33",
     "autoprefixer": "^10.4.17",
-    "eslint": "^8.57.0"
+    "eslint": "^8.57.0",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3"
   }
 }

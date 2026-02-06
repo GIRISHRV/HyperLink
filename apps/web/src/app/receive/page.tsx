@@ -68,7 +68,7 @@ export default function ReceivePage() {
         connection.on("data", async (data: any) => {
           const message = data as PeerMessage;
 
-          if (message.type === "offer") {
+          if (message.type === "file-offer") {
             const transferData = message.payload as any;
 
             const transfer = await createTransfer({

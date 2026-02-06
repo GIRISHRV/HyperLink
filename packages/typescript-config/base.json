@@ -11,7 +11,10 @@
     "moduleDetection": "force",
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022"
+    ],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -19,5 +22,9 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "exclude": ["node_modules", "dist", "build"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
 }

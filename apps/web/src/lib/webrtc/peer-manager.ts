@@ -7,7 +7,7 @@ export class PeerManager {
   private connectionState: ConnectionState = "disconnected";
   private eventListeners: Map<string, Set<Function>> = new Map();
 
-  constructor(private config: PeerConfig) {}
+  constructor(private config: PeerConfig) { }
 
   /**
    * Initialize PeerJS connection to signaling server
@@ -15,13 +15,19 @@ export class PeerManager {
   async initialize(peerId?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
-        this.peer = new Peer(peerId, {
+        const options = {
           host: this.config.host,
           port: this.config.port,
           path: this.config.path,
           secure: this.config.secure ?? false,
           debug: this.config.debug ?? 0,
-        });
+        };
+
+        if (peerId) {
+          this.peer = new Peer(peerId, options);
+        } else {
+          this.peer = new Peer(options);
+        }
 
         this.peer.on("open", (id) => {
           this.connectionState = "connected";

@@ -1,0 +1,9 @@
+{
+    "root": true,
+    "extends": [
+        "@repo/eslint-config/library"
+    ],
+    "rules": {
+        "no-console": "off"
+    }
+}

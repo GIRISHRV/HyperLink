@@ -1,0 +1,6 @@
+{
+    "root": true,
+    "extends": [
+        "@repo/eslint-config"
+    ]
+}

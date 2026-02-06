@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "eslint ."
+    "lint": "eslint src/ --ext .ts"
   },
   "dependencies": {
     "peer": "^1.0.2",
