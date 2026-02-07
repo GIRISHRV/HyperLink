@@ -4,6 +4,16 @@ export const DEFAULT_ICE_SERVERS = [
     // Google's public STUN servers
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+
+    // Mozilla's STUN server
+    { urls: "stun:stun.services.mozilla.com" },
+
+    // Twilio's STUN server (Global)
+    { urls: "stun:global.stun.twilio.com:3478" },
+
     // Free TURN servers from OpenRelay (no signup required)
     {
         urls: "turn:openrelay.metered.ca:80",

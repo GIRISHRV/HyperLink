@@ -13,7 +13,7 @@ import { formatFileSize, formatTime } from "@repo/utils";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import FileOfferPrompt from "@/components/file-offer-prompt";
-import { requestNotificationPermission, notifyTransferComplete, playErrorSound } from "@/lib/utils/notification";
+import { requestNotificationPermission, notifyTransferComplete, playErrorSound, isSecureContext } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import ChatDrawer from "@/components/chat-drawer";
@@ -109,8 +109,16 @@ export default function ReceivePage() {
 
   // Robustness: Tab Title & Notifications
   useEffect(() => {
+    // 1. Request permission on load
     requestNotificationPermission();
 
+    // 2. Check for secure context
+    if (!isSecureContext() && window.location.hostname !== 'localhost') {
+      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
+    }
+  }, []);
+
+  useEffect(() => {
     const updateTitle = () => {
       if (status === "receiving" && progress) {
         document.title = `${progress.percentage.toFixed(0)}% - Downloading...`;
@@ -843,8 +851,28 @@ export default function ReceivePage() {
                     )}
 
                     {error && (
-                      <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 p-4">
-                        <p className="text-bauhaus-red text-sm">{error}</p>
+                      <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 p-4 space-y-4">
+                        <p className="text-bauhaus-red text-sm font-mono border-b border-bauhaus-red/20 pb-2">{error}</p>
+
+                        {/* Diagnostic Report */}
+                        <div className="text-left font-mono text-[9px] text-[#bcb89a] space-y-1 bg-black/40 p-3">
+                          <p className="text-primary font-bold uppercase mb-2">Diagnostic Data</p>
+                          <div className="grid grid-cols-2 gap-x-2">
+                            <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
+                            <p>NETWORK:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
+                            <p>PEER_STATUS:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState().toUpperCase() || "UNKNOWN"}</p>
+                          </div>
+                          <p className="mt-3 text-[8px] text-white/30 italic">
+                            Tip: Safari/iOS prevents WebRTC on HTTP. Ensure both sides are using HTTPS.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={resetReceive}
+                          className="w-full py-2 bg-bauhaus-red/20 hover:bg-bauhaus-red/40 text-bauhaus-red text-[10px] font-bold uppercase tracking-widest transition-colors"
+                        >
+                          Clear Error
+                        </button>
                       </div>
                     )}
                   </div>

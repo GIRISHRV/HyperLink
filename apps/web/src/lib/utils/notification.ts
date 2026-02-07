@@ -153,3 +153,12 @@ export function notifyTransferComplete(
   playSuccessSound();
   showTransferNotification(type, filename);
 }
+
+/**
+ * Check if the current context is secure (HTTPS or localhost)
+ * WebRTC and other sensitive APIs require a secure context.
+ */
+export function isSecureContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.isSecureContext === true;
+}

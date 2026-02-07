@@ -131,18 +131,24 @@ export class PeerManager {
     });
 
     // Monitor ICE connection state for debugging
-    const pc = (conn as any).peerConnection;
+    const pc = (conn as any).peerConnection as RTCPeerConnection | undefined;
     if (pc) {
-      // Log ICE candidates as they're gathered
       pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
           const type = event.candidate.type; // 'host', 'srflx' (STUN), or 'relay' (TURN)
+          const protocol = event.candidate.protocol;
+          const address = event.candidate.address || (event.candidate as any).ip;
           console.log(
-            `[ICE] Candidate gathered - Type: ${type}, Protocol: ${event.candidate.protocol}`
+            `[ICE] Candidate gathered - Type: ${type}, Protocol: ${protocol}, Address: ${address}`
           );
         } else {
-          console.log("[ICE] All candidates gathered");
+          console.log("[ICE] All local candidates gathered");
         }
+      });
+
+      // Monitor signaling state
+      pc.addEventListener("signalingstatechange", () => {
+        console.log(`[WEBRTC] Signaling state: ${pc.signalingState}`);
       });
 
       // Monitor ICE connection state changes
@@ -152,7 +158,14 @@ export class PeerManager {
 
         if (state === "failed") {
           console.error(
-            "[ICE] Connection failed - may need TURN server or network issue"
+            "[ICE] Connection failed - may need TURN server or network issue. Diagnostics:",
+            {
+              iceGatheringState: pc.iceGatheringState,
+              signalingState: pc.signalingState,
+              localDescription: pc.localDescription?.type,
+              remoteDescription: pc.remoteDescription?.type,
+              isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : 'unknown'
+            }
           );
         } else if (state === "connected" || state === "completed") {
           // Log the selected candidate pair to see if TURN was used
@@ -160,7 +173,8 @@ export class PeerManager {
             stats.forEach((report: any) => {
               if (report.type === "candidate-pair" && report.state === "succeeded") {
                 console.log(
-                  `[ICE] Connected using candidate pair - Local: ${report.localCandidateId}, Remote: ${report.remoteCandidateId}`
+                  `[ICE] Connected using candidate pair - Local: ${report.localCandidateId}, Remote: ${report.remoteCandidateId}`,
+                  "Report:", report
                 );
               }
             });
