@@ -8,10 +8,14 @@ import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileSender } from "@/lib/transfer/sender";
 import type { PeerConfig, TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
-import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
+import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playConnectionSound } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
+import { useHaptics } from "@/lib/hooks/use-haptics";
 import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
+import { ProgressBar } from "@/components/progress-bar";
+import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
+import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 
 export default function SendPage() {
   const router = useRouter();
@@ -52,19 +56,14 @@ export default function SendPage() {
       }
     };
   }, []);
+  const { vibrate } = useHaptics();
 
-  // Navigation warning for active transfers
-  useEffect(() => {
-    const isActive = status === "connecting" || status === "waiting" || status === "transferring";
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isActive) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [status]);
+  const isTransferActive = status === "connecting" || status === "waiting" || status === "transferring";
+  // Protect against accidental navigation (back button, etc.)
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(
+    transferId,
+    isTransferActive
+  );
 
   // Robustness: Tab Title & Notifications
   useEffect(() => {
@@ -335,6 +334,8 @@ export default function SendPage() {
         connection.on("open", () => {
           clearTimeout(timeout);
           addLog("✓ Peer connection established");
+          vibrate('medium');
+          playConnectionSound();
           resolve();
         });
 
@@ -368,6 +369,8 @@ export default function SendPage() {
         setStatus("error");
         setError("Receiver rejected the file offer");
         addLog("✗ Receiver rejected the file");
+        vibrate('error');
+        playErrorSound();
       });
 
       // Track if we've already switched to transferring state
@@ -401,10 +404,14 @@ export default function SendPage() {
       await updateTransferStatus(transfer.id, "complete");
       setStatus("complete");
       addLog("✓ Transfer completed successfully");
+      vibrate('success');
+      notifyTransferComplete("sent", file.name);
     } catch (err: any) {
       setError(err.message || "Transfer failed");
       setStatus("error");
       addLog(`✗ Transfer failed: ${err.message}`);
+      vibrate('error');
+      playErrorSound();
 
       if (transferId) {
         await updateTransferStatus(transferId, "failed");
@@ -472,6 +479,13 @@ export default function SendPage() {
 
   return (
     <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
+      {/* Modal for Back Navigation Confirmation */}
+      <ConfirmLeaveModal
+        isOpen={showBackModal}
+        onConfirm={confirmBackNavigation}
+        onCancel={cancelBackNavigation}
+      />
+
       {/* Navbar: Split Header Design */}
       <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
         {/* Left: Logo Block */}
@@ -745,18 +759,15 @@ export default function SendPage() {
                       </div>
                     </div>
 
-                    {/* Industrial Progress Bar */}
-                    <div className="relative z-10 py-4">
-                      <div className="flex justify-between text-[10px] font-mono text-[#bcb89a] mb-2 uppercase tracking-widest">
-                        <span>Transmission Speed: {formatFileSize(progress.speed)}/s</span>
-                        <span>ETA: {formatTime(progress.timeRemaining)}</span>
-                      </div>
-                      <div className="h-4 w-full bg-[#1a1a1a] border border-[#3a3827] p-[2px]">
-                        <div className={`h-full ${isPaused ? "bg-orange-400" : "bg-primary"} relative overflow-hidden transition-all duration-300`} style={{ width: `${progress.percentage}%` }}>
-                          {!isPaused && <div className="absolute inset-0 bg-[linear-gradient(-45deg,rgba(0,0,0,0.2)_25%,transparent_25%,transparent_50%,rgba(0,0,0,0.2)_50%,rgba(0,0,0,0.2)_75%,transparent_75%,transparent)] bg-[length:10px_10px] animate-[progress-stripes_1s_linear_infinite]" />}
-                        </div>
-                      </div>
-                    </div>
+                    {/* Enhanced Progress Bar */}
+                    <ProgressBar
+                      percentage={progress.percentage}
+                      isPaused={isPaused}
+                      speed={progress.speed}
+                      formatFileSize={formatFileSize}
+                      formatTime={formatTime}
+                      timeRemaining={progress.timeRemaining}
+                    />
 
                     {/* Controls */}
                     <div className="grid grid-cols-2 gap-3 mt-auto z-10">

@@ -12,10 +12,13 @@ import { formatFileSize, formatTime } from "@repo/utils";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import FileOfferPrompt from "@/components/file-offer-prompt";
-import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
+import { requestNotificationPermission, notifyTransferComplete, playErrorSound } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
+import { useHaptics } from "@/lib/hooks/use-haptics";
 import ChatDrawer from "@/components/chat-drawer";
 import QRCodeModal from "@/components/qr-code-modal";
+import { ProgressBar } from "@/components/progress-bar";
+
 
 export default function ReceivePage() {
   const router = useRouter();
@@ -89,7 +92,9 @@ export default function ReceivePage() {
   const activeConnectionRef = useRef<any>(null);
   const statusRef = useRef(status);
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
+  const { vibrate } = useHaptics();
 
+  // Initialize refs
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -367,6 +372,7 @@ export default function ReceivePage() {
     receiver.onComplete((blob) => {
       setReceivedFile({ name: pendingOffer.filename, size: pendingOffer.fileSize, blob });
       setStatus("complete");
+      vibrate('success');
       notifyTransferComplete("received", pendingOffer.filename);
       if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
     });
@@ -374,6 +380,8 @@ export default function ReceivePage() {
     receiver.onCancel(() => {
       setStatus("cancelled");
       addLog("[CANCEL] Transfer cancelled by sender");
+      vibrate('error');
+      playErrorSound();
       if (dbTransferId) updateTransferStatus(dbTransferId, "cancelled");
     });
 
@@ -588,18 +596,15 @@ export default function ReceivePage() {
                         </div>
                       </div>
 
-                      {/* Industrial Progress Bar */}
-                      <div className="relative z-10 py-4">
-                        <div className="flex justify-between text-[10px] font-mono text-[#bcb89a] mb-2 uppercase tracking-widest">
-                          <span>Rate: {formatFileSize(progress.speed)}/s</span>
-                          <span>Time: {formatTime(progress.timeRemaining)}</span>
-                        </div>
-                        <div className="h-4 w-full bg-[#1a1a1a] border border-[#3a3827] p-[2px]">
-                          <div className={`h-full ${isPaused ? "bg-orange-500" : "bg-primary"} relative overflow-hidden transition-all duration-300`} style={{ width: `${progress.percentage}%` }}>
-                            {!isPaused && <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(0,0,0,0.2)_25%,transparent_25%,transparent_50%,rgba(0,0,0,0.2)_50%,rgba(0,0,0,0.2)_75%,transparent_75%,transparent)] bg-[length:10px_10px] animate-[progress-stripes_1s_linear_infinite]" />}
-                          </div>
-                        </div>
-                      </div>
+                      {/* Enhanced Progress Bar */}
+                      <ProgressBar
+                        percentage={progress.percentage}
+                        isPaused={isPaused}
+                        speed={progress.speed}
+                        formatFileSize={formatFileSize}
+                        formatTime={formatTime}
+                        timeRemaining={progress.timeRemaining}
+                      />
 
                       {/* Controls */}
                       <div className="grid grid-cols-2 gap-3 mt-auto z-10">
@@ -643,7 +648,7 @@ export default function ReceivePage() {
                       <div className="absolute w-[100px] h-[100px] bg-primary/10 rounded-full blur-xl animate-pulse" />
 
                       {/* Core */}
-                      <div className="w-16 h-16 bg-[#1a1a1a] border border-primary rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,77,77,0.5)] z-20">
+                      <div className="w-16 h-16 bg-[#1a1a1a] border border-primary rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,217,0,0.5)] z-20">
                         <span className={`material-symbols-outlined text-primary text-3xl ${!isPaused && "animate-pulse"}`}>download</span>
                       </div>
 

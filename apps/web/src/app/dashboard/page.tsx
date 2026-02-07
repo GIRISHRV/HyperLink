@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { getUserProfile } from "@/lib/services/profile-service";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
+import { EmptyState } from "@/components/empty-state";
+import { Ripple } from "@/components/ripple";
 import type { User } from "@supabase/supabase-js";
 import { formatFileSize } from "@repo/utils";
 import Link from "next/link";
@@ -63,10 +65,64 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <span className="material-symbols-outlined text-primary animate-spin text-4xl">
-          progress_activity
-        </span>
+      <div className="min-h-screen p-6 md:p-8 lg:p-12 animate-reveal relative overflow-hidden">
+        {/* Skeleton Background Graph */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
+        </div>
+
+        <div className="max-w-[1600px] mx-auto relative z-10">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between mb-8 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="size-8 bg-white/10 backdrop-blur-sm rounded-sm" />
+              <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-32" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 bg-white/10 backdrop-blur-sm rounded w-40" />
+              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-full" />
+            </div>
+          </div>
+
+          {/* Dashboard Content Skeleton */}
+          <div className="space-y-6 animate-pulse">
+            {/* Action Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 space-y-6">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-[8px] border-l-bauhaus-blue p-10 rounded-r-sm h-52 mask-container" />
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-[8px] border-l-bauhaus-red p-8 rounded-r-sm h-32" />
+              </div>
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white/5 backdrop-blur-md p-6 rounded-sm border border-white/10 border-t-4 border-t-primary h-48" />
+                <div className="bg-white/5 backdrop-blur-md p-6 rounded-sm border border-white/10 border-t-4 border-t-bauhaus-blue h-48" />
+              </div>
+            </div>
+
+            {/* Recent Activity Skeleton */}
+            <div className="bg-white/5 backdrop-blur-md rounded-sm p-6 border border-white/10">
+              <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-48 mb-6" />
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="grid grid-cols-12 gap-4 py-4 border-b border-white/5">
+                    <div className="col-span-4 flex items-center gap-3">
+                      <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
+                      <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-32" />
+                    </div>
+                    <div className="col-span-2">
+                      <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-16" />
+                    </div>
+                    <div className="col-span-3">
+                      <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-24" />
+                    </div>
+                    <div className="col-span-3 flex justify-end">
+                      <div className="h-6 bg-white/10 backdrop-blur-sm rounded-full w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -92,7 +148,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
+    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black animate-reveal">
 
 
       {/* Navigation */}
@@ -111,8 +167,9 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link href="/settings">
-              <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
-                <span className="material-symbols-outlined">settings</span>
+              <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5 relative overflow-hidden">
+                <span className="material-symbols-outlined relative z-10">settings</span>
+                <Ripple />
               </button>
             </Link>
             <div className={`size-10 rounded-full ${avatarColor.value} flex items-center justify-center border border-white/10 shadow-lg`}>
@@ -131,7 +188,7 @@ export default function DashboardPage() {
           {/* LEFT COLUMN (Actions) - Spans 8 cols */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             {/* Send File Card */}
-            <div className="group relative bg-[#242424] border-l-[8px] border-bauhaus-blue p-8 md:p-10 rounded-r-sm overflow-hidden hover:bg-[#2f2f2f] transition-all duration-300">
+            <div className="group relative bg-[#242424] border-l-[8px] border-bauhaus-blue p-8 md:p-10 rounded-r-sm overflow-hidden hover:bg-[#2f2f2f] interactive-card">
               {/* Card Decoration */}
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <span className="material-symbols-outlined text-[120px]">upload_file</span>
@@ -147,9 +204,10 @@ export default function DashboardPage() {
                     <span className="text-sm">P2P encrypted transfer ready</span>
                   </div>
                   <Link href="/send">
-                    <button className="bg-primary hover:bg-yellow-400 text-black font-bold py-3 px-8 rounded-sm uppercase tracking-wider text-sm flex items-center gap-2 transition-transform active:scale-95">
-                      <span>Go to Send</span>
-                      <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                    <button className="bg-primary hover:bg-yellow-400 text-black font-bold py-3 px-8 rounded-sm uppercase tracking-wider text-sm flex items-center gap-2 btn-press relative overflow-hidden">
+                      <span className="relative z-10">Go to Send</span>
+                      <span className="material-symbols-outlined text-lg relative z-10">arrow_forward</span>
+                      <Ripple color="rgba(0,0,0,0.2)" />
                     </button>
                   </Link>
                 </div>
@@ -157,7 +215,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Receive File Card */}
-            <div className="bg-[#242424] border-l-[8px] border-bauhaus-red p-8 rounded-r-sm hover:bg-[#2f2f2f] transition-all duration-300">
+            <div className="bg-[#242424] border-l-[8px] border-bauhaus-red p-8 rounded-r-sm hover:bg-[#2f2f2f] interactive-card">
               <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
                 <div className="flex-1">
                   <h2 className="font-black text-2xl text-white mb-2 uppercase tracking-tight">Receive File</h2>
@@ -165,8 +223,9 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 w-full flex justify-end">
                   <Link href="/receive">
-                    <button className="bg-[#242424] border border-white/20 hover:border-white/60 text-white font-bold py-3 px-6 rounded-sm uppercase tracking-wider text-sm whitespace-nowrap transition-all active:scale-95">
-                      Go to Receive
+                    <button className="bg-[#242424] border border-white/20 hover:border-white/60 text-white font-bold py-3 px-6 rounded-sm uppercase tracking-wider text-sm whitespace-nowrap btn-press relative overflow-hidden">
+                      <span className="relative z-10">Go to Receive</span>
+                      <Ripple />
                     </button>
                   </Link>
                 </div>
@@ -216,9 +275,10 @@ export default function DashboardPage() {
             <div className="flex items-end justify-between mb-6 border-b border-white/10 pb-2">
               <h3 className="font-black text-xl text-white uppercase tracking-tight">Recent Activity</h3>
               <Link href="/history">
-                <button className="text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1">
-                  View All History
-                  <span className="material-symbols-outlined text-sm">arrow_right_alt</span>
+                <button className="text-xs font-bold text-gray-500 hover:text-white uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1 relative overflow-hidden px-2 py-1 rounded-sm">
+                  <span className="relative z-10">View All History</span>
+                  <span className="material-symbols-outlined text-sm relative z-10">arrow_right_alt</span>
+                  <Ripple />
                 </button>
               </Link>
             </div>
@@ -233,13 +293,34 @@ export default function DashboardPage() {
 
               {/* Transfer List */}
               {transfersLoading ? (
-                <div className="px-6 py-12 text-center text-gray-500">
-                  <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+                <div>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/5 animate-pulse">
+                      <div className="col-span-4 flex items-center gap-3">
+                        <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
+                        <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-32" />
+                      </div>
+                      <div className="col-span-2">
+                        <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-16" />
+                      </div>
+                      <div className="col-span-3">
+                        <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-24" />
+                      </div>
+                      <div className="col-span-3 flex justify-end">
+                        <div className="h-6 bg-white/10 backdrop-blur-sm rounded-full w-24" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : transfers.length === 0 ? (
-                <div className="px-6 py-12 text-center text-gray-500">
-                  <span className="material-symbols-outlined text-6xl opacity-20">upload</span>
-                  <p className="mt-4">No transfers yet. Start by sending or receiving a file!</p>
+                <div className="py-12 flex justify-center">
+                  <EmptyState
+                    title="No Transfers Yet"
+                    description="Your transfer history is empty. Send a file to a peer or receive one to get started."
+                    actionLabel="Send File"
+                    actionLink="/send"
+                    icon="swap_horiz"
+                  />
                 </div>
               ) : (
                 transfers.slice(0, 5).map((transfer, idx) => {
@@ -314,3 +395,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+
+

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCurrentUser, signOut } from "@/lib/services/auth-service";
 import { getUserProfile, updateUserProfile } from "@/lib/services/profile-service";
 import type { User } from "@supabase/supabase-js";
+import { Ripple } from "@/components/ripple";
 import Link from "next/link";
 
 const AVATAR_ICONS = [
@@ -100,16 +101,56 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <span className="material-symbols-outlined text-primary animate-spin text-4xl">
-          progress_activity
-        </span>
+      <div className="min-h-screen p-6 md:p-8 lg:p-12 animate-reveal relative overflow-hidden">
+        {/* Skeleton Background Graph */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
+        </div>
+
+        <div className="max-w-[1600px] mx-auto relative z-10">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between mb-8 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="size-8 bg-white/10 backdrop-blur-sm rounded-sm" />
+              <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-32" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
+              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-full" />
+            </div>
+          </div>
+
+          {/* Page Header Skeleton */}
+          <div className="mb-12 animate-pulse">
+            <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-32 mb-4" />
+            <div className="h-16 bg-white/10 backdrop-blur-sm rounded w-96 mb-4" />
+            <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-full max-w-2xl" />
+          </div>
+
+          {/* Settings Content Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-pulse">
+            <div className="lg:col-span-4">
+              <div className="bg-white/5 backdrop-blur-md p-8 rounded-sm border border-white/10 border-l-4 border-l-primary h-96 mask-container" />
+            </div>
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-4 border-l-bauhaus-blue p-8 rounded-r-sm h-64" />
+              <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-4 border-l-primary p-8 rounded-r-sm h-48" />
+              <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-4 border-l-bauhaus-red p-8 rounded-r-sm h-32" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
+    <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black animate-reveal">
+      {/* Background Grid */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-bauhaus-blue/5 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+      </div>
 
 
       {/* Navigation */}
@@ -155,7 +196,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Preview */}
           <div className="lg:col-span-4">
-            <div className="bg-[#242424] p-8 rounded-sm border-l-4 border-primary sticky top-24">
+            <div className="bg-[#1a1a1a]/60 backdrop-blur-xl p-8 rounded-sm border-l-4 border-primary border-y border-r border-white/5 sticky top-24 shadow-2xl">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Live Preview</h3>
               <div className="flex flex-col items-center gap-6">
                 <div
@@ -190,7 +231,7 @@ export default function SettingsPage() {
           {/* Right Column: Settings Forms */}
           <div className="lg:col-span-8 space-y-6">
             {/* Profile Section */}
-            <section className="bg-[#242424] border-l-4 border-bauhaus-blue p-8 rounded-r-sm">
+            <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
               <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                 <span className="material-symbols-outlined text-bauhaus-blue text-3xl">person</span>
                 Profile
@@ -207,7 +248,7 @@ export default function SettingsPage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder={user?.email?.split("@")[0] || "Enter your name"}
-                    className="w-full bg-black/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors rounded-sm"
+                    className="w-full bg-white/10 backdrop-blur-sm/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors rounded-sm"
                   />
                 </div>
 
@@ -220,7 +261,7 @@ export default function SettingsPage() {
                     type="email"
                     value={user?.email || ""}
                     disabled
-                    className="w-full bg-black/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed rounded-sm"
+                    className="w-full bg-white/10 backdrop-blur-sm/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed rounded-sm"
                   />
                   <p className="text-xs text-gray-600 mt-2">Email cannot be changed from settings</p>
                 </div>
@@ -228,7 +269,7 @@ export default function SettingsPage() {
             </section>
 
             {/* Avatar Icon Section */}
-            <section className="bg-[#242424] border-l-4 border-primary p-8 rounded-r-sm">
+            <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-primary border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
               <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                 <span className="material-symbols-outlined text-primary text-3xl">emoji_emotions</span>
                 Avatar Icon
@@ -238,19 +279,20 @@ export default function SettingsPage() {
                   <button
                     key={icon}
                     onClick={() => setSelectedIcon(icon)}
-                    className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 active:scale-95 rounded-sm text-white ${selectedIcon === icon
+                    className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 active:scale-95 rounded-sm text-white relative overflow-hidden ${selectedIcon === icon
                       ? "border-primary bg-primary/20"
-                      : "border-white/10 hover:border-white/30 bg-black/20"
+                      : "border-white/10 hover:border-white/30 bg-white/10 backdrop-blur-sm/20"
                       }`}
                   >
-                    <span className="material-symbols-outlined text-3xl">{icon}</span>
+                    <span className="material-symbols-outlined text-3xl relative z-10">{icon}</span>
+                    <Ripple color={selectedIcon === icon ? "rgba(255,217,0,0.3)" : "rgba(255,255,255,0.2)"} />
                   </button>
                 ))}
               </div>
             </section>
 
             {/* Avatar Color Section */}
-            <section className="bg-[#242424] border-l-4 border-bauhaus-red p-8 rounded-r-sm">
+            <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-bauhaus-red border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
               <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                 <span className="material-symbols-outlined text-bauhaus-red text-3xl">palette</span>
                 Avatar Color
@@ -260,22 +302,23 @@ export default function SettingsPage() {
                   <button
                     key={color.value}
                     onClick={() => setSelectedColor(color)}
-                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 active:scale-[0.98] rounded-sm ${selectedColor.value === color.value
+                    className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 active:scale-[0.98] rounded-sm relative overflow-hidden ${selectedColor.value === color.value
                       ? "border-white bg-white/5"
                       : "border-white/10 hover:border-white/30"
                       }`}
                   >
                     <div
-                      className={`size-10 ${color.value} rounded-full border-2 border-white/20 shadow-lg`}
+                      className={`size-10 ${color.value} rounded-full border-2 border-white/20 shadow-lg relative z-10`}
                     ></div>
-                    <span className="text-sm font-bold uppercase tracking-wide text-white">{color.name}</span>
+                    <span className="text-sm font-bold uppercase tracking-wide text-white relative z-10">{color.name}</span>
+                    <Ripple />
                   </button>
                 ))}
               </div>
             </section>
 
             {/* Account Actions */}
-            <section className="bg-[#242424] border-l-4 border-white p-8 rounded-r-sm">
+            <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-white border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
               <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                 <span className="material-symbols-outlined text-white text-3xl">admin_panel_settings</span>
                 Account
@@ -283,17 +326,18 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Link
                   href="/status"
-                  className="bg-gray-800/50 hover:bg-gray-800 border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
+                  className="bg-white/10 backdrop-blur-sm/50 hover:bg-white/10 backdrop-blur-sm border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
                 >
                   <span className="material-symbols-outlined">radar</span>
                   Network Status
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
+                  className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm relative overflow-hidden"
                 >
-                  <span className="material-symbols-outlined">logout</span>
-                  Sign Out
+                  <span className="material-symbols-outlined relative z-10">logout</span>
+                  <span className="relative z-10">Sign Out</span>
+                  <Ripple color="rgba(239, 68, 68, 0.3)" />
                 </button>
               </div>
             </section>
@@ -303,10 +347,11 @@ export default function SettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg"
+                className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg relative overflow-hidden"
               >
-                <span className="material-symbols-outlined text-xl">save</span>
-                {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
+                <span className="material-symbols-outlined text-xl relative z-10">save</span>
+                <span className="relative z-10">{saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}</span>
+                <Ripple color="rgba(0,0,0,0.2)" />
               </button>
             </div>
           </div>
@@ -324,3 +369,7 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
+
+
