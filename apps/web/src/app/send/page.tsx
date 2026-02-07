@@ -11,6 +11,7 @@ import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
 import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import ChatDrawer from "@/components/chat-drawer";
+import QRScannerModal from "@/components/qr-scanner-modal";
 
 export default function SendPage() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function SendPage() {
   const [progress, setProgress] = useState<TransferProgress | null>(null);
   const [transferId, setTransferId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false); // Global drag state
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
@@ -629,14 +631,23 @@ export default function SendPage() {
                           <span className="material-symbols-outlined text-sm">hub</span>
                           Destination Peer ID
                         </label>
-                        <input
-                          className="w-full bg-transparent border-b-2 border-white/20 focus:border-primary px-0 py-3 text-lg font-mono text-white placeholder-white/20 outline-none transition-colors"
-                          placeholder="Enter hash..."
-                          type="text"
-                          autoFocus
-                          value={receiverPeerId}
-                          onChange={(e) => setReceiverPeerId(e.target.value)}
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            className="flex-1 bg-transparent border-b-2 border-white/20 focus:border-primary px-0 py-3 text-lg font-mono text-white placeholder-white/20 outline-none transition-colors"
+                            placeholder="Enter hash..."
+                            type="text"
+                            autoFocus
+                            value={receiverPeerId}
+                            onChange={(e) => setReceiverPeerId(e.target.value)}
+                          />
+                          <button
+                            onClick={() => setShowQRScanner(true)}
+                            className="h-12 px-4 bg-transparent border-2 border-primary hover:bg-primary/10 text-primary flex items-center justify-center gap-2 transition-colors self-end"
+                            title="Scan QR Code"
+                          >
+                            <span className="material-symbols-outlined">qr_code_scanner</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Main Action Button */}
@@ -955,6 +966,24 @@ export default function SendPage() {
           <p className="text-primary font-mono mt-4">Initiating Transfer Sequence</p>
         </div>
       )}
+
+      <ChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        currentUserId={user?.id || "sender"}
+        peerId={connectionRef.current?.peer || "receiver"}
+      />
+
+      <QRScannerModal
+        isOpen={showQRScanner}
+        onScan={(scannedPeerId) => {
+          setReceiverPeerId(scannedPeerId);
+          addLog(`✓ Scanned Peer ID: ${scannedPeerId.slice(0, 8)}...`);
+        }}
+        onClose={() => setShowQRScanner(false)}
+      />
     </div>
   );
 }

@@ -30,6 +30,9 @@ export default function LandingPage() {
         <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
           <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
           <div className="flex gap-4 md:gap-8 items-center">
+            <Link href="/about" className="text-sm font-bold uppercase tracking-wide text-[#121212] dark:text-white hover:text-primary dark:hover:text-primary transition-colors">
+              About
+            </Link>
             {!loading && (
               <Link href={user ? "/dashboard" : "/auth"}>
                 <button className="h-12 px-6 bg-primary text-black text-sm font-bold uppercase tracking-wide hover:bg-yellow-400 transition-colors">

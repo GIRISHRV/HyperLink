@@ -15,6 +15,7 @@ import FileOfferPrompt from "@/components/file-offer-prompt";
 import { requestNotificationPermission, notifyTransferComplete } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import ChatDrawer from "@/components/chat-drawer";
+import QRCodeModal from "@/components/qr-code-modal";
 
 export default function ReceivePage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function ReceivePage() {
     dbTransferId?: string;
   } | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [logs, setLogs] = useState<string[]>(["[RADAR] Initializing P2P receiver...", "[RADAR] Waiting for incoming connections..."]);
 
   // Chat State
@@ -128,16 +130,22 @@ export default function ReceivePage() {
 
   // Initialization Effect
   useEffect(() => {
+    console.log("[RECEIVE] Effect running, current state:", {
+      hasPeerManager: !!peerManagerRef.current,
+      isInitializing: initializingRef.current,
+      currentPeerId: peerManagerRef.current?.getPeerId()
+    });
+
     let isMounted = true;
 
     checkAuthAndInitPeer(() => isMounted);
 
     return () => {
+      console.log("[RECEIVE] Effect cleanup running");
       isMounted = false;
-      if (peerManagerRef.current) {
-        peerManagerRef.current.destroy();
-        peerManagerRef.current = null;
-      }
+      // Don't destroy on cleanup in dev mode - let it persist
+      // Only reset the initializing flag
+      initializingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -155,20 +163,46 @@ export default function ReceivePage() {
   }, [isTransferActive]);
 
   async function checkAuthAndInitPeer(isMountedCheck: () => boolean) {
-    if (initializingRef.current || peerManagerRef.current) return;
+    console.log("[RECEIVE] checkAuthAndInitPeer called", {
+      hasPeerManager: !!peerManagerRef.current,
+      isInitializing: initializingRef.current
+    });
+
+    // If already initialized, just set the peer ID
+    if (peerManagerRef.current) {
+      const peerId = peerManagerRef.current.getPeerId();
+      console.log("[RECEIVE] Peer already exists, ID:", peerId);
+      if (peerId) {
+        setMyPeerId(peerId);
+        console.log("[RECEIVE] Set peer ID:", peerId);
+      }
+      return;
+    }
+
+    if (initializingRef.current) {
+      console.log("[RECEIVE] Already initializing, skipping");
+      return;
+    }
+
+    console.log("[RECEIVE] Starting initialization...");
     initializingRef.current = true;
     try {
       const currentUser = await getCurrentUser();
 
-      if (!isMountedCheck()) return;
+      if (!isMountedCheck()) {
+        console.log("[RECEIVE] Component unmounted during auth check");
+        return;
+      }
 
       if (!currentUser) {
+        console.log("[RECEIVE] No user, redirecting to auth");
         router.push("/auth");
         return;
       }
       setUser(currentUser);
+      console.log("[RECEIVE] User authenticated:", currentUser.id);
     } catch (e) {
-      console.error("Auth check failed:", e);
+      console.error("[RECEIVE] Auth check failed:", e);
       router.push("/auth");
       return;
     }
@@ -181,13 +215,19 @@ export default function ReceivePage() {
       debug: 0,
     };
 
+    console.log("[RECEIVE] Creating PeerManager with config:", config);
     peerManagerRef.current = new PeerManager(config);
 
     try {
+      console.log("[RECEIVE] Initializing PeerManager...");
       const peerId = await peerManagerRef.current.initialize();
 
-      if (!isMountedCheck()) return;
+      if (!isMountedCheck()) {
+        console.log("[RECEIVE] Component unmounted during peer init");
+        return;
+      }
 
+      console.log("[RECEIVE] PeerManager initialized with ID:", peerId);
       setMyPeerId(peerId);
 
       peerManagerRef.current.on("incoming-connection", async (connection: any) => {
@@ -245,18 +285,34 @@ export default function ReceivePage() {
           const message = data as PeerMessage;
 
           if (message.type === "file-offer") {
+            console.log("[RECEIVE] 🎯 FILE-OFFER received:", message);
             const transferData = message.payload as any;
+            console.log("[RECEIVE] Transfer data:", {
+              filename: transferData.filename,
+              fileSize: transferData.fileSize,
+              fileType: transferData.fileType,
+              dbTransferId: transferData.dbTransferId
+            });
 
-            setPendingOffer({
+            const offerData = {
               filename: transferData.filename,
               fileSize: transferData.fileSize,
               fileType: transferData.fileType,
               connection,
               message,
               dbTransferId: transferData.dbTransferId,
-            });
+            };
+
+            console.log("[RECEIVE] Setting pending offer:", offerData);
+            setPendingOffer(offerData);
+
+            console.log("[RECEIVE] Setting received file info");
             setReceivedFile({ name: transferData.filename, size: transferData.fileSize });
+
+            console.log("[RECEIVE] Changing status to 'prompted'");
             setStatus("prompted");
+
+            console.log("[RECEIVE] ✅ All state updates dispatched for file prompt");
           } else if (message.type === "chunk") {
             console.log("[RECEIVE PAGE] Chunk received, fileReceiverRef.current:", !!fileReceiverRef.current, "status:", statusRef.current);
             if (fileReceiverRef.current) {
@@ -673,6 +729,14 @@ export default function ReceivePage() {
                           <span className="material-symbols-outlined">content_copy</span>
                           Copy ID
                         </button>
+                        <button
+                          onClick={() => setShowQRModal(true)}
+                          disabled={!myPeerId}
+                          className="flex-1 h-12 bg-transparent border-2 border-primary hover:bg-primary/10 text-primary text-base font-bold tracking-wide uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined">qr_code_2</span>
+                          Show QR
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -958,6 +1022,11 @@ export default function ReceivePage() {
           </button>
         )
       }
+      <QRCodeModal
+        isOpen={showQRModal}
+        peerId={myPeerId}
+        onClose={() => setShowQRModal(false)}
+      />
     </div >
   );
 }

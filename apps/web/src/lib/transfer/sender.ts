@@ -51,7 +51,9 @@ export class FileSender {
       timestamp: Date.now(),
     };
 
+    console.log("[SENDER] 📤 Sending FILE-OFFER to receiver:", offerMessage);
     this.connection.send(offerMessage);
+    console.log("[SENDER] ✅ FILE-OFFER sent successfully");
     return this.transferId;
   }
   /**
