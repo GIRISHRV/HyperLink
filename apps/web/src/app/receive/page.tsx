@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
@@ -8,7 +8,7 @@ import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileReceiver } from "@/lib/transfer/receiver";
 import { getPeerConfig } from "@/lib/config/webrtc";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
-import type { PeerConfig, PeerMessage, TransferProgress } from "@repo/types";
+import type { PeerMessage, TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime } from "@repo/utils";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import ConfirmCancelModal from "@/components/confirm-cancel-modal";
@@ -134,27 +134,6 @@ export default function ReceivePage() {
     }
   }, [status, progress, receivedFile, requestWakeLock, releaseWakeLock]);
 
-  // Initialization Effect
-  useEffect(() => {
-    console.log("[RECEIVE] Effect running, current state:", {
-      hasPeerManager: !!peerManagerRef.current,
-      isInitializing: initializingRef.current,
-      currentPeerId: peerManagerRef.current?.getPeerId()
-    });
-
-    let isMounted = true;
-
-    checkAuthAndInitPeer(() => isMounted);
-
-    return () => {
-      console.log("[RECEIVE] Effect cleanup running");
-      isMounted = false;
-      // Don't destroy on cleanup in dev mode - let it persist
-      // Only reset the initializing flag
-      initializingRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Navigation warning for active transfers
   useEffect(() => {
@@ -168,7 +147,7 @@ export default function ReceivePage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isTransferActive]);
 
-  async function checkAuthAndInitPeer(isMountedCheck: () => boolean) {
+  const checkAuthAndInitPeer = useCallback(async (isMountedCheck: () => boolean) => {
     console.log("[RECEIVE] checkAuthAndInitPeer called", {
       hasPeerManager: !!peerManagerRef.current,
       isInitializing: initializingRef.current
@@ -207,18 +186,11 @@ export default function ReceivePage() {
       }
       setUser(currentUser);
       console.log("[RECEIVE] User authenticated:", currentUser.id);
-    } catch (e) {
-      console.error("[RECEIVE] Auth check failed:", e);
-      router.push("/auth");
-      return;
-    }
 
-    const config = getPeerConfig();
+      const config = getPeerConfig();
+      console.log("[RECEIVE] Creating PeerManager with config:", config);
+      peerManagerRef.current = new PeerManager(config);
 
-    console.log("[RECEIVE] Creating PeerManager with config:", config);
-    peerManagerRef.current = new PeerManager(config);
-
-    try {
       console.log("[RECEIVE] Initializing PeerManager...");
       const peerId = await peerManagerRef.current.initialize();
 
@@ -260,9 +232,6 @@ export default function ReceivePage() {
           if (activeConnectionRef.current !== connection) return;
         });
 
-        if (connection.open) {
-        }
-
         connection.on("close", () => {
           if (activeConnectionRef.current !== connection) return;
           addLog("[CONNECTION] Peer connection closed");
@@ -279,21 +248,12 @@ export default function ReceivePage() {
 
         connection.on("data", async (data: any) => {
           if (activeConnectionRef.current !== connection) return;
-
           handleData(data); // Process chat messages
-
           const message = data as PeerMessage;
 
           if (message.type === "file-offer") {
             console.log("[RECEIVE] 🎯 FILE-OFFER received:", message);
             const transferData = message.payload as any;
-            console.log("[RECEIVE] Transfer data:", {
-              filename: transferData.filename,
-              fileSize: transferData.fileSize,
-              fileType: transferData.fileType,
-              dbTransferId: transferData.dbTransferId
-            });
-
             const offerData = {
               filename: transferData.filename,
               fileSize: transferData.fileSize,
@@ -302,28 +262,12 @@ export default function ReceivePage() {
               message,
               dbTransferId: transferData.dbTransferId,
             };
-
-            console.log("[RECEIVE] Setting pending offer:", offerData);
             setPendingOffer(offerData);
-
-            console.log("[RECEIVE] Setting received file info");
             setReceivedFile({ name: transferData.filename, size: transferData.fileSize });
-
-            console.log("[RECEIVE] Changing status to 'prompted'");
             setStatus("prompted");
-
-            console.log("[RECEIVE] ✅ All state updates dispatched for file prompt");
           } else if (message.type === "chunk") {
-            console.log("[RECEIVE PAGE] Chunk received, fileReceiverRef.current:", !!fileReceiverRef.current, "status:", statusRef.current);
             if (fileReceiverRef.current) {
               await fileReceiverRef.current.handleChunk(message as any);
-              const chunkIndex = (message.payload as any)?.chunkIndex;
-              if (chunkIndex !== undefined && chunkIndex % 100 === 0) {
-                addLog(`[RECEIVER] Processing chunk ${chunkIndex}`);
-              }
-            } else {
-              console.warn("[RECEIVE PAGE] FileReceiver not initialized! Chunk arrived but receiver is null. Status:", statusRef.current);
-              addLog("[ERROR] Chunk arrived before receiver ready");
             }
           } else if (message.type === "transfer-cancel" || message.type === "transfer-pause" || message.type === "transfer-resume") {
             if (message.type === "transfer-cancel" && !fileReceiverRef.current) {
@@ -335,16 +279,29 @@ export default function ReceivePage() {
             if (fileReceiverRef.current) {
               fileReceiverRef.current.handleControlMessage(message as any);
             }
-          } else {
           }
         });
       });
     } catch (err: any) {
-      setError(`Failed to initialize: ${err.message}`);
+      console.error("[RECEIVE] Initialization failed:", err);
+      if (isMountedCheck()) {
+        setError(`Failed to initialize: ${err.message}`);
+      }
     } finally {
       initializingRef.current = false;
     }
-  }
+  }, [router]);
+
+  // Initialization Effect
+  useEffect(() => {
+    let isMounted = true;
+    checkAuthAndInitPeer(() => isMounted);
+    return () => {
+      isMounted = false;
+      initializingRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkAuthAndInitPeer]);
 
   async function handleAcceptOffer() {
     console.log("[RECEIVE PAGE] handleAcceptOffer called");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
@@ -49,14 +49,6 @@ export default function SendPage() {
   const connectionRef = useRef<any>(null); // Keep track of active connection
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
 
-  useEffect(() => {
-    checkAuthAndInitPeer();
-    return () => {
-      if (peerManagerRef.current) {
-        peerManagerRef.current.destroy();
-      }
-    };
-  }, []);
   const { vibrate } = useHaptics();
 
   const isTransferActive = status === "connecting" || status === "waiting" || status === "transferring";
@@ -211,7 +203,8 @@ export default function SendPage() {
     setMessages((prev) => [...prev, msg]);
   }
 
-  async function checkAuthAndInitPeer() {
+  const checkAuthAndInitPeer = useCallback(async () => {
+    // ... existing implementation ...
     if (initializingRef.current || peerManagerRef.current) return;
     initializingRef.current = true;
     try {
@@ -239,7 +232,16 @@ export default function SendPage() {
     } finally {
       initializingRef.current = false;
     }
-  }
+  }, [router]);
+
+  useEffect(() => {
+    checkAuthAndInitPeer();
+    return () => {
+      if (peerManagerRef.current) {
+        peerManagerRef.current.destroy();
+      }
+    };
+  }, [checkAuthAndInitPeer]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0];
