@@ -34,7 +34,7 @@ export class FileSender {
   }
 
   /**
-   * Send file offer to receiver
+   * Send file offer to receiver with defensive check
    */
   async sendOffer(): Promise<string> {
     const offerMessage: PeerMessage<FileOfferPayload> = {
@@ -51,7 +51,7 @@ export class FileSender {
     };
 
     console.log("[SENDER] 📤 Sending FILE-OFFER to receiver:", offerMessage);
-    this.connection.send(offerMessage);
+    await this.safeSend(offerMessage);
     console.log("[SENDER] ✅ FILE-OFFER sent successfully");
     return this.transferId;
   }
@@ -100,7 +100,7 @@ export class FileSender {
       // Sanity check
       if (this.totalChunks <= 0) {
         cleanup();
-        this.sendComplete();
+        this.sendComplete().catch(console.error);
         resolve();
         return;
       }
@@ -129,8 +129,11 @@ export class FileSender {
           // If we finished sending everything and all ACKs are back
           if (this.currentChunk >= this.totalChunks && this.activeChunks <= 0) {
             cleanup();
-            this.sendComplete();
-            resolve();
+            this.sendComplete().catch(err => {
+              console.error("[SENDER] Final complete failed:", err);
+            }).finally(() => {
+              resolve();
+            });
             return;
           }
 
@@ -212,7 +215,7 @@ export class FileSender {
     };
 
     reader.onerror = () => {
-      this.sendError("File read error");
+      this.sendError("File read error").catch(console.error);
       this.rejectTransfer?.(new Error("File read error"));
     };
 
@@ -233,7 +236,11 @@ export class FileSender {
       timestamp: Date.now(),
     };
 
-    this.connection.send(chunkMessage);
+    this.safeSend(chunkMessage).catch(err => {
+      console.error("[SENDER] Failed to send chunk:", err);
+      this.sendError("Chunk transmission failed");
+      this.rejectTransfer?.(new Error("Chunk transmission failed"));
+    });
     this.bytesSent += data.byteLength;
 
     // Log progress periodically
@@ -259,7 +266,7 @@ export class FileSender {
   /**
    * Send transfer complete message
    */
-  private sendComplete(): void {
+  private async sendComplete(): Promise<void> {
     const completeMessage: PeerMessage = {
       type: "transfer-complete",
       transferId: this.transferId,
@@ -267,14 +274,14 @@ export class FileSender {
       timestamp: Date.now(),
     };
 
-    this.connection.send(completeMessage);
+    await this.safeSend(completeMessage);
     console.log("[SENDER] Transfer complete!");
   }
 
   /**
    * Send error message
    */
-  private sendError(error: string): void {
+  private async sendError(error: string): Promise<void> {
     const errorMessage: PeerMessage = {
       type: "transfer-error",
       transferId: this.transferId,
@@ -282,7 +289,52 @@ export class FileSender {
       timestamp: Date.now(),
     };
 
-    this.connection.send(errorMessage);
+    await this.safeSend(errorMessage);
+  }
+
+  /**
+   * Defensive message sending wrapper
+   */
+  private async safeSend(message: any): Promise<void> {
+    if (this.isCancelled) return;
+
+    // Wait for connection to be ready if it's not open yet
+    if (!this.connection.open) {
+      console.warn("[SENDER] Connection not open. Waiting for ready state...");
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Timeout waiting for connection to open")), 5000);
+
+        const onOpen = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+
+        this.connection.once("open", onOpen);
+
+        // If it was already closed, reject immediately
+        if ((this.connection as any)._disconnected || (this.connection as any)._closed) {
+          clearTimeout(timeout);
+          this.connection.off("open", onOpen);
+          reject(new Error("Connection is closed"));
+        }
+      });
+    }
+
+    try {
+      this.connection.send(message);
+    } catch (err: any) {
+      const dc = (this.connection as any).dataChannel;
+      console.error("[SENDER] Send failed. DataChannel state:", dc?.readyState, "Error:", err);
+
+      // If it's a "not open" error despite the check, wait a tick and retry once
+      if (err?.message?.includes("not open") || err?.toString().includes("not open")) {
+        console.log("[SENDER] Retrying send after tick...");
+        await new Promise(r => setTimeout(r, 100));
+        this.connection.send(message);
+      } else {
+        throw err;
+      }
+    }
   }
 
   /**
@@ -297,7 +349,7 @@ export class FileSender {
       timestamp: Date.now(),
     };
     try {
-      this.connection.send(cancelMessage);
+      this.safeSend(cancelMessage);
     } catch (e) {
       console.warn("[SENDER] Failed to send cancel message:", e);
     }
@@ -317,7 +369,7 @@ export class FileSender {
       timestamp: Date.now(),
     };
     try {
-      this.connection.send(pauseMessage);
+      this.safeSend(pauseMessage);
     } catch (e) {
       console.warn("[SENDER] Failed to send pause message:", e);
     }
@@ -337,7 +389,7 @@ export class FileSender {
       timestamp: Date.now(),
     };
     try {
-      this.connection.send(resumeMessage);
+      this.safeSend(resumeMessage);
     } catch (e) {
       console.warn("[SENDER] Failed to send resume message:", e);
     }
