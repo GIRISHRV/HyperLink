@@ -860,7 +860,7 @@ export default function ReceivePage() {
                           <div className="grid grid-cols-2 gap-x-2">
                             <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
                             <p>NETWORK:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
-                            <p>PEER_STATUS:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState().toUpperCase() || "UNKNOWN"}</p>
+                            <p>PEER_STATUS:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}</p>
                           </div>
                           <p className="mt-3 text-[8px] text-white/30 italic">
                             Tip: Safari/iOS prevents WebRTC on HTTP. Ensure both sides are using HTTPS.

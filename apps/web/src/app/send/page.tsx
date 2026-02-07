@@ -845,7 +845,7 @@ export default function SendPage() {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 opacity-70">
                     <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
                     <p>NETWORK_STATUS:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
-                    <p>SIGNALING_SERVER:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState().toUpperCase() || "UNKNOWN"}</p>
+                    <p>SIGNALING_SERVER:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}</p>
                   </div>
                   <p className="mt-4 text-[9px] text-white/30 italic">
                     Hint: If on mobile, ensure you are using HTTPS. &quot;Connection timeout&quot; often indicates NAT traversal issues—check if both devices are on the same network or if a VPN is interfering.
@@ -982,14 +982,7 @@ export default function SendPage() {
         </div>
       )}
 
-      <ChatDrawer
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        currentUserId={user?.id || "sender"}
-        peerId={connectionRef.current?.peer || "receiver"}
-      />
+
 
       <QRScannerModal
         isOpen={showQRScanner}
