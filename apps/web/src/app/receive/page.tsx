@@ -243,6 +243,13 @@ export default function ReceivePage() {
         connection.on("close", () => {
           if (activeConnectionRef.current !== connection) return;
           addLog("[CONNECTION] Peer connection closed");
+
+          // If transfer is complete, don't reset UI, just clear connection ref
+          if (statusRef.current === "complete") {
+            activeConnectionRef.current = null;
+            return;
+          }
+
           resetReceive();
           activeConnectionRef.current = null;
         });
@@ -261,6 +268,10 @@ export default function ReceivePage() {
 
           if (message.type === "file-offer") {
             console.log("[RECEIVE] 🎯 FILE-OFFER received:", message);
+            // Close any open modals that might interfere
+            setShowQRModal(false);
+            setShowCancelModal(false);
+
             const transferData = message.payload as any;
             const offerData = {
               filename: transferData.filename,
@@ -822,6 +833,14 @@ export default function ReceivePage() {
                         >
                           <span className="material-symbols-outlined !text-[20px]">download</span>
                           Save File
+                        </button>
+
+                        <button
+                          onClick={resetReceive}
+                          className="w-full h-12 bg-[#1a1a1a] border border-white/10 hover:bg-white/5 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors mt-2"
+                        >
+                          <span className="material-symbols-outlined !text-[18px]">refresh</span>
+                          Receive Another File
                         </button>
                       </div>
                     )}
