@@ -6,13 +6,13 @@ export default function AboutPage() {
     return (
         <div className="bg-[#121212] min-h-screen text-white">
             {/* Header/Nav */}
-            <nav className="w-full flex border-b border-[#333]">
-                <div className="bg-primary text-[#121212] px-8 py-6 flex items-center min-w-[200px]">
+            <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
+                <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
                     <Link href="/" className="font-black text-4xl tracking-tighter uppercase">
                         HYPER
                     </Link>
                 </div>
-                <div className="flex-1 bg-[#121212] flex items-center justify-between px-8 py-4">
+                <div className="flex-1 bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
                     <Link href="/" className="font-black text-4xl tracking-tighter uppercase text-white">
                         LINK
                     </Link>

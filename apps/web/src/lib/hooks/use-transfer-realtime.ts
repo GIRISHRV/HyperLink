@@ -89,7 +89,32 @@ export function useUserTransfersRealtime() {
       .order("created_at", { ascending: false });
 
     if (data) {
-      setTransfers(data);
+      // Filter to only show final statuses (completed, failed, cancelled)
+      const finalTransfers = data.filter((t) =>
+        t.status === "complete" || t.status === "failed" || t.status === "cancelled"
+      );
+
+      // Deduplicate transfers - if there are two entries with the same ID
+      // (one where user is sender, one where user is receiver),
+      // keep only one (prefer the one where user is sender for display)
+      const seen = new Map<string, Transfer>();
+      for (const transfer of finalTransfers) {
+        const existingTransfer = seen.get(transfer.id);
+
+        if (!existingTransfer) {
+          // First time seeing this transfer ID
+          seen.set(transfer.id, transfer);
+        } else {
+          // Already have a transfer with this ID
+          // Prefer the one where current user is the sender
+          if (transfer.sender_id === userId && existingTransfer.sender_id !== userId) {
+            seen.set(transfer.id, transfer);
+          }
+          // If both have user as sender or both have user as receiver, keep the first one
+        }
+      }
+
+      setTransfers(Array.from(seen.values()));
     }
   }, []);
 
