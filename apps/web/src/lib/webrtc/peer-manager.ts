@@ -27,32 +27,16 @@ export class PeerManager {
           path: this.config.path,
           secure: this.config.secure ?? false,
           debug: this.config.debug ?? 0,
-          config: {
-            iceServers: [
-              // Google's public STUN servers
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-              // Free TURN servers from OpenRelay (no signup required)
-              {
-                urls: "turn:openrelay.metered.ca:80",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-              {
-                urls: "turn:openrelay.metered.ca:443",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-              {
-                urls: "turn:openrelay.metered.ca:443?transport=tcp",
-                username: "openrelayproject",
-                credential: "openrelayproject",
-              },
-            ],
-            iceTransportPolicy: "all", // Try all connection types (relay, srflx, host)
-            iceCandidatePoolSize: 10, // Pre-gather candidates for faster connections
-          },
+          config: this.config.config, // Use the provided RTCPeerConnection configuration
         };
+
+        console.log("[PeerManager] Initializing with config:", {
+          ...options,
+          config: {
+            ...options.config,
+            iceServers: options.config?.iceServers?.map((s: any) => ({ ...s, credential: '***' }))
+          }
+        });
 
         if (peerId) {
           this.peer = new Peer(peerId, options);

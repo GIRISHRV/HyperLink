@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/services/auth-service";
 import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
 import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileReceiver } from "@/lib/transfer/receiver";
+import { getPeerConfig } from "@/lib/config/webrtc";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import type { PeerConfig, PeerMessage, TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime } from "@repo/utils";
@@ -212,13 +213,7 @@ export default function ReceivePage() {
       return;
     }
 
-    const config: PeerConfig = {
-      host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
-      port: parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!),
-      path: process.env.NEXT_PUBLIC_PEER_SERVER_PATH!,
-      secure: window.location.protocol === "https:",
-      debug: 0,
-    };
+    const config = getPeerConfig();
 
     console.log("[RECEIVE] Creating PeerManager with config:", config);
     peerManagerRef.current = new PeerManager(config);

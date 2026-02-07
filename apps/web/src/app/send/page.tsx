@@ -6,7 +6,8 @@ import { getCurrentUser } from "@/lib/services/auth-service";
 import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
 import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileSender } from "@/lib/transfer/sender";
-import type { PeerConfig, TransferProgress } from "@repo/types";
+import { getPeerConfig } from "@/lib/config/webrtc";
+import type { TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
 import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playConnectionSound } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
@@ -226,39 +227,7 @@ export default function SendPage() {
       return;
     }
 
-    const config: PeerConfig = {
-      host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
-      port: parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!),
-      path: process.env.NEXT_PUBLIC_PEER_SERVER_PATH!,
-      secure: window.location.protocol === "https:",
-      debug: 0,
-      config: {
-        iceServers: [
-          // Google's public STUN servers
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          // Free TURN servers from OpenRelay (no signup required)
-          {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-          },
-          {
-            urls: "turn:openrelay.metered.ca:443",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-          },
-          {
-            urls: "turn:openrelay.metered.ca:443?transport=tcp",
-            username: "openrelayproject",
-            credential: "openrelayproject",
-          },
-        ],
-        iceTransportPolicy: "all", // Try all connection types (relay, srflx, host)
-        iceCandidatePoolSize: 10, // Pre-gather candidates for faster connections
-      },
-    };
-
+    const config = getPeerConfig();
     peerManagerRef.current = new PeerManager(config);
 
     try {

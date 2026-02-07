@@ -20,7 +20,6 @@ export class FileSender {
   private dbTransferId?: string;
   private progressCallback?: (progress: TransferProgress) => void;
   private rejectTransfer?: (error: Error) => void;
-  private resolveTransfer?: () => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private rejectCallback?: () => void;
@@ -71,11 +70,40 @@ export class FileSender {
 
     return new Promise((resolve, reject) => {
       this.rejectTransfer = reject;
-      this.resolveTransfer = resolve;
 
       console.log("[SENDER] Setting up Turbo Mode (Sliding Window)...");
 
+      // Listen for connection events to detect failure during transfer
+      const onClose = () => {
+        console.error("[SENDER] Connection closed during transfer");
+        cleanup();
+        reject(new Error("Connection closed abruptly"));
+      };
+
+      const onError = (err: any) => {
+        console.error("[SENDER] Connection error during transfer:", err);
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+
+      const cleanup = () => {
+        this.connection.off("close", onClose);
+        this.connection.off("error", onError);
+        this.isTransferring = false;
+      };
+
+      this.connection.on("close", onClose);
+      this.connection.on("error", onError);
+
       let transferStarted = false;
+
+      // Sanity check
+      if (this.totalChunks <= 0) {
+        cleanup();
+        this.sendComplete();
+        resolve();
+        return;
+      }
 
       // Listen for ACKs and control messages from receiver
       this.connection.on("data", (data: any) => {
@@ -93,15 +121,16 @@ export class FileSender {
 
         if (message.type === "chunk-ack") {
           // Receiver confirmed chunk, slide window
-          this.activeChunks--;
+          this.activeChunks = Math.max(0, this.activeChunks - 1);
 
           if (this.isCancelled) return;
           if (this.isPaused) return;
 
           // If we finished sending everything and all ACKs are back
           if (this.currentChunk >= this.totalChunks && this.activeChunks <= 0) {
+            cleanup();
             this.sendComplete();
-            this.resolveTransfer?.();
+            resolve();
             return;
           }
 
@@ -112,11 +141,13 @@ export class FileSender {
           console.log("[SENDER] Receiver rejected the file offer");
           this.isCancelled = true;
           this.rejectCallback?.();
+          cleanup();
           reject(new Error("File offer rejected by receiver"));
         } else if (message.type === "transfer-cancel") {
           console.log("[SENDER] Receiver cancelled transfer");
           this.isCancelled = true;
           this.cancelCallback?.();
+          cleanup();
           reject(new Error("Transfer cancelled by receiver"));
         } else if (message.type === "transfer-pause") {
           console.log("[SENDER] Receiver requested pause");
