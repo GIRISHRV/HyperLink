@@ -3,28 +3,32 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import TransferHeader from "@/components/transfer-header";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
 import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileReceiver } from "@/lib/transfer/receiver";
 import { getPeerConfig } from "@/lib/config/webrtc";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
-import type { PeerMessage, TransferProgress } from "@repo/types";
+import type { PeerMessage, TransferProgress, ChunkPayload, FileOfferPayload, ChatMessage } from "@repo/types";
 import { formatFileSize, formatTime, logger } from "@repo/utils";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import FileOfferPrompt from "@/components/file-offer-prompt";
-import { requestNotificationPermission, notifyTransferComplete, playErrorSound, isSecureContext } from "@/lib/utils/notification";
+import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playSuccessSound, isSecureContext } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import ChatDrawer from "@/components/chat-drawer";
 import QRCodeModal from "@/components/qr-code-modal";
 import { ProgressBar } from "@/components/progress-bar";
+import PasswordModal from "@/components/password-modal";
+import type { DataConnection } from "peerjs";
+import type { User } from "@supabase/supabase-js";
 
 
 export default function ReceivePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [myPeerId, setMyPeerId] = useState("");
   const [status, setStatus] = useState<"idle" | "connecting" | "prompted" | "receiving" | "paused" | "complete" | "error" | "cancelled">(
     "idle"
@@ -42,9 +46,10 @@ export default function ReceivePage() {
     filename: string;
     fileSize: number;
     fileType: string;
-    connection: any;
-    message: any;
+    connection: DataConnection;
+    message: PeerMessage<FileOfferPayload>;
     dbTransferId?: string;
+    password?: string;
   } | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -52,14 +57,18 @@ export default function ReceivePage() {
 
   // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<import("@repo/types").ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
 
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+
   // Handle incoming chat messages
-  const handleData = useCallback((data: any) => {
-    if (data && data.type === "chat-message") {
-      const msg = data.payload as import("@repo/types").ChatMessage;
-      setMessages((prev) => [...prev, msg]);
+  const handleData = useCallback((data: unknown) => {
+    const msg = data as any;
+    // Check if it's a chat message (simple check based on type property or shape)
+    // Assuming ChatMessage has type 'chat-message'
+    if (msg && msg.type === "chat-message") {
+      setMessages((prev) => [...prev, msg as ChatMessage]);
       if (!isChatOpen) {
         setHasUnread(true);
       }
@@ -69,7 +78,7 @@ export default function ReceivePage() {
   function handleSendMessage(text: string) {
     if (!activeConnectionRef.current || !user) return;
 
-    const msg: import("@repo/types").ChatMessage = {
+    const msg: ChatMessage = {
       id: crypto.randomUUID(),
       senderId: user.id, // Current user ID
       text,
@@ -91,22 +100,21 @@ export default function ReceivePage() {
   const peerManagerRef = useRef<PeerManager | null>(null);
   const initializingRef = useRef(false);
   const fileReceiverRef = useRef<FileReceiver | null>(null);
-  const activeConnectionRef = useRef<any>(null);
+  const activeConnectionRef = useRef<DataConnection | null>(null);
   const statusRef = useRef(status);
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
   const { vibrate } = useHaptics();
 
-  // Initialize refs
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
 
   function addLog(message: string) {
-    setLogs((prev) => [...prev.slice(-10), message]); // Keep last 10 logs
+    setLogs((prev) => [...prev.slice(-10), message]);
   }
 
   const isTransferActive = status === "connecting" || status === "prompted" || status === "receiving" || status === "paused";
-  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(transferId, isTransferActive);
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(transferId || "", isTransferActive);
 
   // Robustness: Tab Title & Notifications
   useEffect(() => {
@@ -143,7 +151,6 @@ export default function ReceivePage() {
     }
   }, [status, progress, receivedFile, requestWakeLock, releaseWakeLock]);
 
-
   // Navigation warning for active transfers
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -162,7 +169,6 @@ export default function ReceivePage() {
       isInitializing: initializingRef.current
     }, "[RECEIVE] checkAuthAndInitPeer called");
 
-    // If already initialized, just set the peer ID
     if (peerManagerRef.current) {
       const peerId = peerManagerRef.current.getPeerId();
       logger.info({ peerId }, "[RECEIVE] Peer already exists");
@@ -211,7 +217,7 @@ export default function ReceivePage() {
       logger.info({ peerId }, "[RECEIVE] PeerManager initialized");
       setMyPeerId(peerId);
 
-      peerManagerRef.current.on("incoming-connection", async (connection: any) => {
+      peerManagerRef.current.on("incoming-connection", async (connection: DataConnection) => {
         const currentStatus = statusRef.current;
         const isBusy = currentStatus === "connecting" || currentStatus === "prompted" ||
           currentStatus === "receiving" || currentStatus === "paused";
@@ -245,7 +251,6 @@ export default function ReceivePage() {
           if (activeConnectionRef.current !== connection) return;
           addLog("[CONNECTION] Peer connection closed");
 
-          // If transfer is complete, don't reset UI, just clear connection ref
           if (statusRef.current === "complete") {
             activeConnectionRef.current = null;
             return;
@@ -255,17 +260,18 @@ export default function ReceivePage() {
           activeConnectionRef.current = null;
         });
 
-        connection.on("error", (err: any) => {
+        connection.on("error", (err: unknown) => {
           if (activeConnectionRef.current !== connection) return;
           logger.error({ err }, "[RECEIVE PAGE] Connection ERROR");
           setError(`Connection error: ${err}`);
           setStatus("error");
         });
 
-        connection.on("data", async (data: any) => {
+        connection.on("data", async (data: unknown) => {
           if (activeConnectionRef.current !== connection) return;
           handleData(data); // Process chat messages
           const message = data as PeerMessage;
+          // Note: message might be ChatMessage too, but we check type below
 
           if (message.type === "file-offer") {
             logger.info({ message }, "[RECEIVE] 🎯 FILE-OFFER received");
@@ -273,13 +279,14 @@ export default function ReceivePage() {
             setShowQRModal(false);
             setShowCancelModal(false);
 
-            const transferData = message.payload as any;
+            // We know the payload is FileOfferPayload based on message type
+            const transferData = message.payload as FileOfferPayload;
             const offerData = {
               filename: transferData.filename,
               fileSize: transferData.fileSize,
               fileType: transferData.fileType,
               connection,
-              message,
+              message: message as PeerMessage<FileOfferPayload>,
               dbTransferId: transferData.dbTransferId,
             };
             setPendingOffer(offerData);
@@ -287,7 +294,7 @@ export default function ReceivePage() {
             setStatus("prompted");
           } else if (message.type === "chunk") {
             if (fileReceiverRef.current) {
-              await fileReceiverRef.current.handleChunk(message as any);
+              await fileReceiverRef.current.handleChunk(message as PeerMessage<ChunkPayload>);
             }
           } else if (message.type === "transfer-cancel" || message.type === "transfer-pause" || message.type === "transfer-resume") {
             if (message.type === "transfer-cancel" && !fileReceiverRef.current) {
@@ -297,19 +304,21 @@ export default function ReceivePage() {
               return;
             }
             if (fileReceiverRef.current) {
-              fileReceiverRef.current.handleControlMessage(message as any);
+              fileReceiverRef.current.handleControlMessage(message);
             }
           }
         });
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[RECEIVE] Initialization failed:", err);
       if (isMountedCheck()) {
-        setError(`Failed to initialize: ${err.message}`);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setError(`Failed to initialize: ${errMsg}`);
       }
     } finally {
       initializingRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // Initialization Effect
@@ -325,6 +334,26 @@ export default function ReceivePage() {
 
   async function handleAcceptOffer() {
     logger.info("[RECEIVE PAGE] handleAcceptOffer called");
+    if (!pendingOffer) return;
+
+    // Check for encryption
+    if (pendingOffer.message.payload.isEncrypted && !pendingOffer.password) {
+      logger.info("[RECEIVE PAGE] File is encrypted, prompting for password...");
+      setShowPasswordModal(true);
+      return;
+    }
+
+    startTransferSequence(pendingOffer.password);
+  }
+
+  function handlePasswordSubmit(password: string) {
+    if (!pendingOffer) return;
+    setPendingOffer({ ...pendingOffer, password }); // Store password temporarily
+    setShowPasswordModal(false);
+    startTransferSequence(password);
+  }
+
+  async function startTransferSequence(password?: string) {
     if (!pendingOffer) return;
 
     const { connection, message, dbTransferId: senderDbId } = pendingOffer;
@@ -348,6 +377,7 @@ export default function ReceivePage() {
       setReceivedFile({ name: pendingOffer.filename, size: pendingOffer.fileSize, blob });
       setStatus("complete");
       vibrate('success');
+      playSuccessSound();
       notifyTransferComplete("received", pendingOffer.filename);
       if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
     });
@@ -371,15 +401,41 @@ export default function ReceivePage() {
       }
     });
 
+    receiver.onError((error) => {
+      if (error === "DECRYPTION_FAILED") {
+        setError("Incorrect password. The transfer was cancelled.");
+        setStatus("error");
+        // We don't need to manually cancel here because receiver.handleChunk calls cancel() internally on error
+      } else {
+        const msg = typeof error === 'string' ? error : error.message;
+        setError(`Transfer error: ${msg}`);
+        setStatus("error");
+      }
+    });
+
+    // Initialize Receiver
     logger.info("[RECEIVE PAGE] Calling handleOffer on receiver...");
-    receiver.handleOffer(message as any);
-    logger.info("[RECEIVE PAGE] handleOffer completed");
+    receiver.handleOffer(message);
+
+    if (password) {
+      logger.info("[RECEIVE PAGE] Processing password...");
+      try {
+        await receiver.processPassword(password);
+      } catch (e) {
+        logger.error({ e }, "[RECEIVE PAGE] Key derivation failed");
+        setError("Failed to verify password. Please try again.");
+        setStatus("error");
+        // Clean up
+        fileReceiverRef.current = null;
+        return;
+      }
+    }
+
+    logger.info("[RECEIVE PAGE] Receiver setup complete, ready for chunks");
     setStatus("receiving");
     setPendingOffer(null);
 
     // Give the receiver a moment to fully initialize before sending acceptance
-    // This prevents chunks from arriving before the receiver is ready
-    logger.info("[RECEIVE PAGE] Waiting 100ms before sending accept...");
     await new Promise(resolve => setTimeout(resolve, 100));
     logger.info("[RECEIVE PAGE] Sending file-accept message to sender...");
 
@@ -481,35 +537,16 @@ export default function ReceivePage() {
   return (
     <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
       {/* Navbar: Split Header Design */}
-      <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
-        <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
-          <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </div>
-        <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
-          <div className="flex gap-4 md:gap-8 items-center">
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-[#1a1a1a] border border-[#333]">
-              <div className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </div>
-              <span className="text-xs font-mono text-gray-400">Radar Active</span>
-              {user && <span className="text-xs font-mono text-white ml-2">• {user.email}</span>}
-            </div>
-            <button
-              onClick={() => {
-                if (isTransferActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
-                  return;
-                }
-                router.push("/dashboard");
-              }}
-              className="h-12 px-6 bg-[#333] hover:bg-[#555] text-white text-sm font-bold uppercase tracking-wide transition-colors"
-            >
-              ← Dashboard
-            </button>
-          </div>
-        </div>
-      </nav>
+      <TransferHeader
+        isPeerReady={!!myPeerId}
+        status={status}
+        onBackCheck={() => {
+          if (isTransferActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
+            return false;
+          }
+          return true;
+        }}
+      />
 
       {/* Main Content */}
       {/* Main Layout (Mirrored from Send Page) */}
@@ -881,18 +918,20 @@ export default function ReceivePage() {
                       <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 p-4 space-y-4">
                         <p className="text-bauhaus-red text-sm font-mono border-b border-bauhaus-red/20 pb-2">{error}</p>
 
-                        {/* Diagnostic Report */}
-                        <div className="text-left font-mono text-[9px] text-[#bcb89a] space-y-1 bg-black/40 p-3">
-                          <p className="text-primary font-bold uppercase mb-2">Diagnostic Data</p>
-                          <div className="grid grid-cols-2 gap-x-2">
-                            <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
-                            <p>NETWORK:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
-                            <p>PEER_STATUS:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}</p>
+                        {/* Diagnostic Report - Hide for simple incorrect password errors */}
+                        {error !== "Incorrect password. The transfer was cancelled." && (
+                          <div className="text-left font-mono text-[9px] text-[#bcb89a] space-y-1 bg-black/40 p-3">
+                            <p className="text-primary font-bold uppercase mb-2">Diagnostic Data</p>
+                            <div className="grid grid-cols-2 gap-x-2">
+                              <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
+                              <p>NETWORK:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
+                              <p>PEER_STATUS:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}</p>
+                            </div>
+                            <p className="mt-3 text-[8px] text-white/30 italic">
+                              Tip: Safari/iOS prevents WebRTC on HTTP. Ensure both sides are using HTTPS.
+                            </p>
                           </div>
-                          <p className="mt-3 text-[8px] text-white/30 italic">
-                            Tip: Safari/iOS prevents WebRTC on HTTP. Ensure both sides are using HTTPS.
-                          </p>
-                        </div>
+                        )}
 
                         <button
                           onClick={resetReceive}
@@ -985,12 +1024,21 @@ export default function ReceivePage() {
       </footer>
 
       <FileOfferPrompt
-        isOpen={status === "prompted" && !!pendingOffer}
+        isOpen={status === "prompted" && !!pendingOffer && !showPasswordModal}
         filename={pendingOffer?.filename ?? ""}
         fileSize={pendingOffer?.fileSize ?? 0}
         fileType={pendingOffer?.fileType ?? ""}
         onAccept={handleAcceptOffer}
         onReject={handleRejectOffer}
+      />
+
+      <PasswordModal
+        isOpen={showPasswordModal}
+        title="Encrypted File"
+        description={`"${pendingOffer?.filename}" is encrypted. Enter the password to accept the transfer.`}
+        onSubmit={handlePasswordSubmit}
+        onCancel={() => setShowPasswordModal(false)}
+        isCreation={false}
       />
 
       <ConfirmLeaveModal

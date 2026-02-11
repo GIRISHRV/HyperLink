@@ -35,21 +35,26 @@ export default function AuthPage() {
 
     try {
       if (showForgotPassword) {
-        await resetPassword(email);
+        const { error } = await resetPassword(email);
+        if (error) throw error;
         setSuccess("Password reset link sent to your email!");
         setShowForgotPassword(false);
       } else if (useMagicLink) {
-        await signInWithMagicLink(email);
+        const { error } = await signInWithMagicLink(email);
+        if (error) throw error;
         setSuccess("Check your email for the magic link!");
       } else if (isSignUp) {
-        await signUp(email, password);
+        const { error } = await signUp(email, password);
+        if (error) throw error;
         setSuccess("Account created! Redirecting...");
         router.push("/dashboard");
       } else {
-        await signIn(email, password);
+        const { error } = await signIn(email, password);
+        if (error) throw error;
         router.push("/dashboard");
       }
     } catch (err: any) {
+      console.error("Auth error:", err);
       setError(err.message || "Authentication failed");
     } finally {
       setLoading(false);
@@ -61,12 +66,12 @@ export default function AuthPage() {
       {/* Navbar: Split Header Design */}
       <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
         {/* Left: Logo Block */}
-        <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
+        <Link href="/" className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px] hover:bg-primary/90 transition-colors">
           <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </div>
+        </Link>
         {/* Right: Navigation & Secondary Logo Part */}
         <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
+          <Link href="/" className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white hover:opacity-80 transition-opacity">LINK</Link>
           <div className="flex gap-4 md:gap-8 items-center">
             <Link href="/status" className="hidden md:block text-sm font-bold uppercase hover:text-primary transition-colors">
               Network Status

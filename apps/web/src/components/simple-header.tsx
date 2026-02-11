@@ -59,7 +59,7 @@ export default function SimpleHeader({ userEmail, isTransferActive }: SimpleHead
     <>
       <header className="relative z-20 flex items-center justify-between px-6 py-4 lg:px-12 border-b border-gray-800 bg-background-dark/80 backdrop-blur-md">
         {/* Logo */}
-        <Link href="/dashboard" onClick={(e) => handleNav(e, "/dashboard")} className="flex items-center gap-3">
+        <Link href="/" onClick={(e) => handleNav(e, "/")} className="flex items-center gap-3">
           <div className="flex items-center justify-center size-8 bg-white text-black rounded-full">
             <span className="material-symbols-outlined text-xl">bolt</span>
           </div>

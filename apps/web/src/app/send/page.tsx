@@ -4,12 +4,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
+import TransferHeader from "@/components/transfer-header";
 import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileSender } from "@/lib/transfer/sender";
 import { getPeerConfig } from "@/lib/config/webrtc";
 import type { TransferProgress } from "@repo/types";
 import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
-import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playConnectionSound, isSecureContext } from "@/lib/utils/notification";
+import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playSuccessSound, playConnectionSound, isSecureContext } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import { useClipboardFile } from "@/lib/hooks/use-clipboard-file";
@@ -19,6 +20,7 @@ import QRScannerModal from "@/components/qr-scanner-modal";
 import { ProgressBar } from "@/components/progress-bar";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
+import PasswordModal from "@/components/password-modal";
 
 export default function SendPage() {
   const router = useRouter();
@@ -37,6 +39,8 @@ export default function SendPage() {
   const [isPeerReady, setIsPeerReady] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
+  const [password, setPassword] = useState(""); // Password state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
@@ -437,6 +441,11 @@ export default function SendPage() {
 
       fileSenderRef.current = new FileSender(file, connection, transfer.id);
 
+      if (password) {
+        addLog("> 🔒 Encrypting file with password...");
+        await fileSenderRef.current.setPassword(password);
+      }
+
       // Setup pause callback
       fileSenderRef.current.onPauseChange((paused) => {
         setIsPaused(paused);
@@ -487,6 +496,7 @@ export default function SendPage() {
       setStatus("complete");
       addLog("✓ Transfer completed successfully");
       vibrate('success');
+      playSuccessSound();
       notifyTransferComplete("sent", file.name);
     } catch (err: any) {
       console.error("Transfer failed:", err);
@@ -569,39 +579,31 @@ export default function SendPage() {
         onCancel={cancelBackNavigation}
       />
 
+      <PasswordModal
+        isOpen={showPasswordModal}
+        title="Set Encryption Password"
+        description="Create a password to encrypt this file. The receiver will need this password to decrypt the file."
+        onSubmit={(pw) => {
+          setPassword(pw);
+          setShowPasswordModal(false);
+          addLog("> Password set for encryption");
+        }}
+        onCancel={() => setShowPasswordModal(false)}
+        isCreation={true}
+      />
+
       {/* Navbar: Split Header Design */}
-      <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
-        {/* Left: Logo Block */}
-        <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
-          <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </div>
-        {/* Right: Navigation & Secondary Logo Part */}
-        <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
-          <div className="flex gap-4 md:gap-8 items-center">
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-[#1a1a1a] border border-[#333]">
-              <div className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </div>
-              <span className="text-xs font-mono text-gray-400">WebRTC Ready</span>
-              {user && <span className="text-xs font-mono text-white ml-2">• {user.email}</span>}
-            </div>
-            <button
-              onClick={() => {
-                const isActive = status === "connecting" || status === "waiting" || status === "transferring";
-                if (isActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
-                  return;
-                }
-                router.push("/dashboard");
-              }}
-              className="h-12 px-6 bg-[#333] hover:bg-[#555] text-white text-sm font-bold uppercase tracking-wide transition-colors"
-            >
-              ← Dashboard
-            </button>
-          </div>
-        </div>
-      </nav>
+      <TransferHeader
+        isPeerReady={isPeerReady}
+        status={status}
+        onBackCheck={() => {
+          const isActive = status === "connecting" || status === "waiting" || status === "transferring";
+          if (isActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
+            return false;
+          }
+          return true;
+        }}
+      />
 
       {/* Main Layout */}
       <main className="flex-grow flex flex-col relative">
@@ -727,6 +729,7 @@ export default function SendPage() {
 
                       {/* Peer ID Input */}
                       <div className="flex flex-col gap-3">
+                        {/* ... Peer ID Label and Input ... */}
                         <label className="text-xs font-bold tracking-[0.1em] text-primary uppercase flex items-center gap-2">
                           <span className="material-symbols-outlined text-sm">hub</span>
                           Destination Peer ID
@@ -749,6 +752,36 @@ export default function SendPage() {
                             <span className="material-symbols-outlined">qr_code_scanner</span>
                           </button>
                         </div>
+                      </div>
+
+                      {/* Password Protection Toggle */}
+                      <div className="flex flex-col gap-3">
+                        <label className="text-xs font-bold tracking-[0.1em] text-primary uppercase flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">enhanced_encryption</span>
+                          Security (Optional)
+                        </label>
+                        {password ? (
+                          <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 p-3 rounded-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-green-500">lock</span>
+                              <span className="text-sm font-bold text-green-400 uppercase tracking-wider">Encrypted</span>
+                            </div>
+                            <button
+                              onClick={() => setPassword("")}
+                              className="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowPasswordModal(true)}
+                            className="w-full h-12 border border-dashed border-white/20 hover:border-primary/50 hover:bg-white/5 text-gray-400 hover:text-primary flex items-center justify-center gap-2 transition-all uppercase text-xs font-bold tracking-widest"
+                          >
+                            <span className="material-symbols-outlined text-sm">add_moderator</span>
+                            Set Encryption Password
+                          </button>
+                        )}
                       </div>
 
                       {/* Main Action Button */}

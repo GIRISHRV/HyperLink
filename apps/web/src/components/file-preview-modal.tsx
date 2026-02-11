@@ -74,6 +74,7 @@ export default function FilePreviewModal({
                 {/* Content */}
                 <div className="flex-1 overflow-auto bg-[#0f0f0f] flex items-center justify-center p-4 min-h-[300px]">
                     {isImage && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                             src={objectUrl}
                             alt={filename}

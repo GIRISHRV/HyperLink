@@ -1,6 +1,7 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import { generateTransferId, calculateChunkCount, logger } from "@repo/utils";
+import { generateSalt, deriveKey, encryptChunk, arrayBufferToBase64 } from "@/lib/utils/crypto";
 
 const CHUNK_SIZE = 64 * 1024; // 64KB chunks for higher throughput
 const WINDOW_SIZE = 16; // reduced window size to prevent buffer overflow with larger chunks
@@ -25,12 +26,34 @@ export class FileSender {
   private rejectCallback?: () => void;
   private isTransferring: boolean = false;
 
+  // Encryption state
+  private password?: string;
+  private salt?: Uint8Array;
+  private cryptoKey?: CryptoKey;
+
   constructor(file: File, connection: DataConnection, dbTransferId?: string) {
     this.file = file;
     this.connection = connection;
     this.transferId = generateTransferId();
     this.totalChunks = calculateChunkCount(file.size, CHUNK_SIZE);
     this.dbTransferId = dbTransferId;
+    logger.info({ transferId: this.transferId, dbTransferId }, "[SENDER] Initialized FileSender");
+  }
+
+  /**
+   * Set password for E2E encryption
+   */
+  async setPassword(password: string): Promise<void> {
+    if (!password) return;
+    try {
+      this.password = password;
+      this.salt = generateSalt();
+      this.cryptoKey = await deriveKey(password, this.salt);
+      logger.info("[SENDER] 🔐 Encryption enabled and key derived");
+    } catch (e) {
+      logger.error({ e }, "[SENDER] Failed to setup encryption");
+      throw new Error("Encryption setup failed");
+    }
   }
 
   /**
@@ -46,6 +69,8 @@ export class FileSender {
         fileType: this.file.type,
         totalChunks: this.totalChunks,
         dbTransferId: this.dbTransferId,
+        isEncrypted: !!this.password,
+        salt: this.salt ? arrayBufferToBase64(this.salt) : undefined,
       },
       timestamp: Date.now(),
     };
@@ -55,6 +80,7 @@ export class FileSender {
     logger.info("[SENDER] ✅ FILE-OFFER sent successfully");
     return this.transferId;
   }
+
   /**
    * Start Sliding Window transfer
    */
@@ -80,7 +106,7 @@ export class FileSender {
         reject(new Error("Connection closed abruptly"));
       };
 
-      const onError = (err: any) => {
+      const onError = (err: unknown) => {
         logger.error({ err }, "[SENDER] Connection error during transfer");
         cleanup();
         reject(err instanceof Error ? err : new Error(String(err)));
@@ -106,7 +132,7 @@ export class FileSender {
       }
 
       // Listen for ACKs and control messages from receiver
-      this.connection.on("data", (data: any) => {
+      this.connection.on("data", (data: unknown) => {
         const message = data as PeerMessage;
 
         if (message.transferId !== this.transferId) return;
@@ -178,7 +204,8 @@ export class FileSender {
     while (this.currentChunk < this.totalChunks && this.activeChunks < WINDOW_SIZE) {
       // Check backpressure - if PeerJS buffer is too full, stop pushing
       // @ts-ignore - bufferedAmount exists on DataConnection but might be missing in types
-      const bufferedAmount = this.connection.dataChannel?.bufferedAmount || 0;
+      const conn = this.connection as unknown as { dataChannel: { bufferedAmount: number } };
+      const bufferedAmount = conn.dataChannel?.bufferedAmount || 0;
 
       if (bufferedAmount > MAX_BUFFERED_AMOUNT) {
         // Wait for buffer to drain (simple retry via timeout or just wait for next ACK)
@@ -207,10 +234,24 @@ export class FileSender {
     const blob = this.file.slice(start, end);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       if (!event.target?.result || this.isCancelled) return;
 
-      const arrayBuffer = event.target.result as ArrayBuffer;
+      let arrayBuffer = event.target.result as ArrayBuffer;
+
+      // Encrypt if key is present
+      if (this.cryptoKey) {
+        try {
+          // Encrypt the chunk (IV is prepended)
+          arrayBuffer = await encryptChunk(arrayBuffer, this.cryptoKey);
+        } catch (e) {
+          logger.error({ e }, "[SENDER] Encryption failed for chunk " + chunkIndex);
+          this.sendError("Encryption failed");
+          this.rejectTransfer?.(new Error("Encryption failed"));
+          return;
+        }
+      }
+
       this.sendChunk(arrayBuffer, chunkIndex);
     };
 
@@ -241,6 +282,12 @@ export class FileSender {
       this.sendError("Chunk transmission failed");
       this.rejectTransfer?.(new Error("Chunk transmission failed"));
     });
+
+    // Track bytes read from source file, or bytes sent?
+    // Using payload size (which might include IV/Tag overhead) gives 'network progress'.
+    // Using file slice size gives 'file progress'.
+    // `data.byteLength` includes Overhead.
+    // Let's us `data.byteLength` for now as it represents actual transfer.
     this.bytesSent += data.byteLength;
 
     // Log progress periodically
@@ -295,7 +342,7 @@ export class FileSender {
   /**
    * Defensive message sending wrapper
    */
-  private async safeSend(message: any): Promise<void> {
+  private async safeSend(message: unknown): Promise<void> {
     if (this.isCancelled) return;
 
     // Wait for connection to be ready if it's not open yet
@@ -312,7 +359,9 @@ export class FileSender {
         this.connection.once("open", onOpen);
 
         // If it was already closed, reject immediately
-        if ((this.connection as any)._disconnected || (this.connection as any)._closed) {
+        // Use type assertion to access internal properties
+        const conn = this.connection as unknown as { _disconnected: boolean; _closed: boolean };
+        if (conn._disconnected || conn._closed) {
           clearTimeout(timeout);
           this.connection.off("open", onOpen);
           reject(new Error("Connection is closed"));
@@ -322,12 +371,13 @@ export class FileSender {
 
     try {
       this.connection.send(message);
-    } catch (err: any) {
-      const dc = (this.connection as any).dataChannel;
-      logger.error({ readyState: dc?.readyState, err }, "[SENDER] Send failed");
+    } catch (err: unknown) {
+      const conn = this.connection as unknown as { dataChannel: { readyState: string } };
+      logger.error({ readyState: conn.dataChannel?.readyState, err }, "[SENDER] Send failed");
 
       // If it's a "not open" error despite the check, wait a tick and retry once
-      if (err?.message?.includes("not open") || err?.toString().includes("not open")) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes("not open")) {
         logger.info("[SENDER] Retrying send after tick...");
         await new Promise(r => setTimeout(r, 100));
         this.connection.send(message);

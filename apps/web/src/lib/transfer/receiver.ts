@@ -3,6 +3,7 @@ import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } fr
 import type { FileChunk } from "@repo/types";
 import { addChunk, getAllChunks, clearTransfer, addFile } from "@/lib/storage/idb-manager";
 import { logger } from "@repo/utils";
+import { deriveKey, decryptChunk, base64ToArrayBuffer } from "@/lib/utils/crypto";
 
 
 export class FileReceiver {
@@ -22,6 +23,12 @@ export class FileReceiver {
   private completeCallback?: (blob: Blob, filename: string) => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
+  private errorCallback?: (error: Error | string) => void;
+
+  // Encryption state
+  private isEncrypted: boolean = false;
+  private salt?: Uint8Array;
+  private cryptoKey?: CryptoKey;
 
   /**
    * Set the ID to use for storage (overriding the P2P transfer ID)
@@ -38,18 +45,59 @@ export class FileReceiver {
   }
 
   /**
+   * Register error callback
+   */
+  onError(callback: (error: Error | string) => void): void {
+    this.errorCallback = callback;
+  }
+
+  /**
    * Handle incoming file offer
    */
-  handleOffer(message: PeerMessage<FileOfferPayload>): void {
+  async handleOffer(message: PeerMessage<FileOfferPayload>): Promise<void> {
     this.transferId = message.transferId;
     this.filename = message.payload.filename;
     this.fileSize = message.payload.fileSize;
     this.fileType = message.payload.fileType;
     this.totalChunks = message.payload.totalChunks;
+
+    // Set storage ID from payload if present (for history/persistence)
+    if (message.payload.dbTransferId) {
+      this.storageId = message.payload.dbTransferId;
+    }
+
+    // Encryption metadata
+    this.isEncrypted = !!message.payload.isEncrypted;
+
+    if (this.isEncrypted && message.payload.salt) {
+      this.salt = base64ToArrayBuffer(message.payload.salt);
+      logger.info("[RECEIVER] 🔒 File is encrypted, salt received");
+    }
+
     this.startTime = Date.now();
     this.receivedChunks = 0;
     this.bytesReceived = 0;
-    logger.info({ transferId: this.transferId, filename: this.filename, totalChunks: this.totalChunks }, "[RECEIVER] handleOffer");
+    logger.info({
+      transferId: this.transferId,
+      storageId: this.storageId,
+      filename: this.filename,
+      totalChunks: this.totalChunks,
+      isEncrypted: this.isEncrypted
+    }, "[RECEIVER] handleOffer");
+  }
+
+  /**
+   * Compute/Derive the key. This should be called after user inputs password.
+   */
+  async processPassword(password: string): Promise<void> {
+    if (!this.isEncrypted || !this.salt) return;
+    try {
+      this.cryptoKey = await deriveKey(password, this.salt);
+      logger.info("[RECEIVER] 🔑 Key derived successfully");
+    } catch (e) {
+      logger.error({ e }, "[RECEIVER] Failed to derive key");
+      throw new Error("Failed to derive encryption key");
+    }
   }
 
   /**
@@ -59,12 +107,39 @@ export class FileReceiver {
     if (this.isCancelled) return;
 
     const { chunkIndex, data } = message.payload;
+    let chunkData = data;
+
+    // Decrypt if encrypted
+    if (this.isEncrypted) {
+      if (!this.cryptoKey) {
+        logger.error("[RECEIVER] Received chunk but no key available!");
+        // We could buffer or fail?
+        // Ideally we shouldn't have accepted the file (sent file-accept) until we had the key.
+        return;
+      }
+
+      try {
+        chunkData = await decryptChunk(data, this.cryptoKey);
+      } catch (e) {
+        logger.error({ chunkIndex, e }, "[RECEIVER] Decryption failed! Wrong password?");
+
+        // Notify UI about specific error
+        if (this.errorCallback) {
+          this.errorCallback("DECRYPTION_FAILED");
+        }
+
+        // Send error back?
+        // Or just fail locally.
+        this.cancel();
+        return;
+      }
+    }
 
     // Store chunk to IndexedDB
     const chunk: FileChunk = {
       transferId: this.transferId,
       chunkIndex,
-      data: new Blob([data]),
+      data: new Blob([chunkData]),
       timestamp: Date.now(),
     };
 
@@ -76,7 +151,7 @@ export class FileReceiver {
     }
 
     this.receivedChunks++;
-    this.bytesReceived += data.byteLength;
+    this.bytesReceived += chunkData.byteLength; // Track decrypted size
 
     // Log progress every 10%
     const percentage = (this.receivedChunks / this.totalChunks) * 100;
@@ -312,6 +387,13 @@ export class FileReceiver {
    */
   getTransferId(): string {
     return this.transferId;
+  }
+
+  /**
+   * Check if file is encrypted
+   */
+  getIsEncrypted(): boolean {
+    return this.isEncrypted;
   }
 
   /**

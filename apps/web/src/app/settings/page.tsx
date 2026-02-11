@@ -7,6 +7,7 @@ import { getUserProfile, updateUserProfile } from "@/lib/services/profile-servic
 import type { User } from "@supabase/supabase-js";
 import { Ripple } from "@/components/ripple";
 import Link from "next/link";
+import GlobalHeader from "@/components/global-header";
 
 const AVATAR_ICONS = [
   "person",
@@ -137,28 +138,7 @@ export default function SettingsPage() {
       ) : (
         <div className="flex-1 flex flex-col animate-reveal-simple relative z-10">
           {/* Navigation */}
-          <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <div className="size-8 bg-primary flex items-center justify-center rounded-sm text-black">
-                <span className="material-symbols-outlined text-[24px]">link</span>
-              </div>
-              <h1 className="font-black text-xl tracking-wider text-white uppercase">HyperLink</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5">
-                  <span className="material-symbols-outlined">dashboard</span>
-                </button>
-              </Link>
-              <div
-                className={`size-10 rounded-full ${selectedColor.value} flex items-center justify-center border border-white/10 shadow-lg`}
-              >
-                <span className={`material-symbols-outlined text-xl ${selectedColor.text}`}>
-                  {selectedIcon}
-                </span>
-              </div>
-            </div>
-          </header>
+          <GlobalHeader />
 
           {/* Main Content */}
           <main className="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">

@@ -23,12 +23,12 @@ export default function LandingPage() {
       {/* Navbar: Split Header Design */}
       <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
         {/* Left: Logo Block */}
-        <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
+        <Link href="/" className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px] hover:bg-primary/90 transition-colors">
           <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </div>
+        </Link>
         {/* Right: Navigation & Secondary Logo Part */}
         <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
+          <Link href="/" className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white hover:opacity-80 transition-opacity">LINK</Link>
           <div className="flex gap-4 md:gap-8 items-center">
             <Link href="/about" className="text-sm font-bold uppercase tracking-wide text-[#121212] dark:text-white hover:text-primary dark:hover:text-primary transition-colors">
               About

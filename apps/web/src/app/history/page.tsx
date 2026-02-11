@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
-import { getUserProfile } from "@/lib/services/profile-service";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 import type { User } from "@supabase/supabase-js";
 import { formatFileSize } from "@repo/utils";
@@ -12,20 +11,27 @@ import { DataMovedCard } from "@/components/stats/data-moved-card";
 import { EmptyState } from "@/components/empty-state";
 import { Ripple } from "@/components/ripple";
 import type { Transfer } from "@repo/types";
-import Link from "next/link";
 import FilePreviewModal from "@/components/file-preview-modal";
+import GlobalHeader from "@/components/global-header";
 import { getFile } from "@/lib/storage/idb-manager";
 import { toast } from "sonner";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [_user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [showClearAll, setShowClearAll] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
-  const [avatarIcon, setAvatarIcon] = useState("person");
-  const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
+
+  // Use profile directly without local state if possible, or keep local state if setting from profile
+  // Actually, the original code SETS these from profile. 
+  // But wait, the original code had them unused? No, they are likely used in the render.
+  // Lint said: 'avatarIcon' is declared but its value is never read.
+  // This means they are NOT used in the render.
+  // Let's check where they *should* be used. GlobalHeader handles the avatar now!
+  // So we can remove duplicate avatar logic from HistoryPage.
+
   const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
   // Preview State
@@ -40,22 +46,6 @@ export default function HistoryPage() {
       return;
     }
     setUser(currentUser);
-
-    // Load user profile
-    const profile = await getUserProfile();
-    if (profile) {
-      setAvatarIcon(profile.avatar_icon || "person");
-      const colorMap: Record<string, { value: string; text: string }> = {
-        "bg-primary": { value: "bg-primary", text: "text-black" },
-        "bg-bauhaus-blue": { value: "bg-bauhaus-blue", text: "text-white" },
-        "bg-bauhaus-red": { value: "bg-bauhaus-red", text: "text-white" },
-        "bg-green-500": { value: "bg-green-500", text: "text-white" },
-        "bg-purple-500": { value: "bg-purple-500", text: "text-white" },
-        "bg-orange-500": { value: "bg-orange-500", text: "text-black" },
-      };
-      setAvatarColor(colorMap[profile.avatar_color || "bg-primary"] || { value: "bg-primary", text: "text-black" });
-    }
-
     setLoading(false);
   }, [router]);
 
@@ -106,8 +96,12 @@ export default function HistoryPage() {
     );
   }
 
-  const filteredTransfers =
-    filter === "all" ? transfers : transfers.filter((t) => t.status === filter);
+  const filteredTransfers = transfers.filter((t) => {
+    if (filter === "all") return true;
+    if (filter === "sent") return user && t.sender_id === user.id;
+    if (filter === "received") return user && t.receiver_id === user.id;
+    return t.status === filter;
+  });
 
   const deletableTransfers = transfers.filter(
     (t) => t.status === "complete" || t.status === "failed" || t.status === "cancelled"
@@ -191,33 +185,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Navigation */}
-      <header className="relative z-20 flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#1a1a1a]/80 backdrop-blur-md sticky top-0">
-        <div className="flex items-center gap-3">
-          <div className="size-8 bg-primary flex items-center justify-center rounded-sm text-black">
-            <span className="material-symbols-outlined text-[24px]">link</span>
-          </div>
-          <h1 className="font-black text-xl tracking-wider text-white uppercase">HyperLink</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard">
-            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5 relative overflow-hidden">
-              <span className="material-symbols-outlined relative z-10">dashboard</span>
-              <Ripple />
-            </button>
-          </Link>
-          <Link href="/settings">
-            <button className="flex items-center justify-center size-10 rounded-sm bg-[#242424] hover:bg-[#2f2f2f] transition-all active:scale-95 text-white border border-white/5 relative overflow-hidden">
-              <span className="material-symbols-outlined relative z-10">settings</span>
-              <Ripple />
-            </button>
-          </Link>
-          <div className={`size-10 rounded-full ${avatarColor.value} flex items-center justify-center border border-white/10 shadow-lg`}>
-            <span className={`material-symbols-outlined text-xl ${avatarColor.text}`}>
-              {avatarIcon}
-            </span>
-          </div>
-        </div>
-      </header>
+      <GlobalHeader />
 
       {/* Main Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-10">
@@ -250,6 +218,28 @@ export default function HistoryPage() {
               <span className="relative z-10">All Transfers</span>
               <Ripple color={filter === "all" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"} />
             </button>
+
+            <button
+              onClick={() => setFilter("sent")}
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "sent"
+                ? "bg-primary text-black"
+                : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
+                }`}
+            >
+              <span className="relative z-10">Sent</span>
+              <Ripple color={filter === "sent" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"} />
+            </button>
+            <button
+              onClick={() => setFilter("received")}
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "received"
+                ? "bg-primary text-black"
+                : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
+                }`}
+            >
+              <span className="relative z-10">Received</span>
+              <Ripple color={filter === "received" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)"} />
+            </button>
+
             <button
               onClick={() => setFilter("complete")}
               className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "complete"

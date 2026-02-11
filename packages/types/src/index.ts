@@ -117,6 +117,10 @@ export interface FileOfferPayload {
   batchSize?: number;    // Total number of files
   batchIndex?: number;   // Current file index (0-based)
   totalBatchSize?: number; // Total bytes of all files (optional)
+
+  /** End-to-End Encryption */
+  isEncrypted?: boolean; // True if file is password protected
+  salt?: string;         // Base64 encoded salt for PBKDF2
 }
 
 /**

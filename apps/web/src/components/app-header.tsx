@@ -24,7 +24,7 @@ export default function AppHeader({ userEmail }: AppHeaderProps) {
     <nav className="w-full border-b border-[#4b4520] bg-[#24210f] px-6 py-4 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <div className="bg-primary text-[#23200f] p-1 rounded-sm">
             <span className="material-symbols-outlined text-3xl">hub</span>
           </div>
