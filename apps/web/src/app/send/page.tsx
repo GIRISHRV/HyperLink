@@ -131,12 +131,10 @@ function SendPageContent() {
     const url = searchParams?.get("url");
 
     if (shared === "middleware_bypass" || shared === "legacy_fallback" || shared === "failed_sw_bypass") {
-      addLog("⚠ PWA Service Worker not active. Files could not be captured.");
       setError("PWA background sync is not yet active. Please open the app first, then try sharing again.");
     }
 
     if (isShared) {
-      addLog("> Shared data detected via Service Worker interception...");
       (async () => {
         try {
           const db = await openDB(DB_NAME, 1);
@@ -164,12 +162,9 @@ function SendPageContent() {
 
             // Cleanup
             await db.delete(STORE_NAME, "latest");
-          } else {
-            addLog("✗ No shared data found in temporary storage");
           }
-        } catch (err) {
-          console.error("Failed to load shared data:", err);
-          addLog(`✗ Storage error: ${(err as Error).message}`);
+        } catch {
+          console.error("Failed to load shared data");
         }
       })();
     } else if (title || text || url) {
@@ -190,15 +185,12 @@ function SendPageContent() {
 
       navigator.serviceWorker.ready.then((reg) => {
         setSwStatus(reg.active ? "active" : "installing");
-        addLog(`[SW] Service Worker is ${reg.active ? 'active' : 'installing'}`);
-      }).catch(err => {
+      }).catch(() => {
         setSwStatus("error");
-        addLog(`[SW] Error: ${err.message}`);
       });
 
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         setSwStatus("active");
-        addLog("[SW] Service Worker controller changed - App updated");
       });
     }
 
