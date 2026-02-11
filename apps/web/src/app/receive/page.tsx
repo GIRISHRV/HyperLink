@@ -53,8 +53,9 @@ export default function ReceivePage() {
     password?: string;
   } | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [logs, setLogs] = useState<string[]>(["[RADAR] Initializing P2P receiver...", "[RADAR] Waiting for incoming connections..."]);
+  const [showMyQRModal, setShowMyQRModal] = useState(false);
+  const [preparedShareData, setPreparedShareData] = useState<ShareData | null>(null);
+  const [showShareFallback, setShowShareFallback] = useState(false);
 
   // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -110,8 +111,45 @@ export default function ReceivePage() {
     statusRef.current = status;
   }, [status]);
 
-  function addLog(message: string) {
-    setLogs((prev) => [...prev.slice(-10), message]);
+
+  function getMimeType(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      // --- Images ---
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'svg': 'image/svg+xml',
+      'avif': 'image/avif',
+      'ico': 'image/x-icon',
+
+      // --- Documents ---
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'csv': 'text/csv',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+
+      // --- Media ---
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'ogg': 'audio/ogg',
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'mov': 'video/quicktime',
+
+      // --- Archives (Normalized to octet-stream for Android sharing compatibility) ---
+      'zip': 'application/octet-stream',
+      'tar': 'application/octet-stream',
+      'gz': 'application/octet-stream',
+      '7z': 'application/octet-stream',
+      'rar': 'application/octet-stream',
+    };
+    return mimeTypes[ext || ''] || 'application/octet-stream';
   }
 
   const isTransferActive = status === "connecting" || status === "prompted" || status === "receiving" || status === "paused";
@@ -242,7 +280,7 @@ export default function ReceivePage() {
         setError("");
         setProgress(null);
         setIsPaused(false);
-        addLog("[CONNECTION] Incoming peer connection detected");
+        logger.info("[CONNECTION] Incoming peer connection detected");
 
         connection.on("open", () => {
           if (activeConnectionRef.current !== connection) return;
@@ -250,7 +288,7 @@ export default function ReceivePage() {
 
         connection.on("close", () => {
           if (activeConnectionRef.current !== connection) return;
-          addLog("[CONNECTION] Peer connection closed");
+          logger.info("[CONNECTION] Peer connection closed");
 
           if (statusRef.current === "complete") {
             activeConnectionRef.current = null;
@@ -277,7 +315,7 @@ export default function ReceivePage() {
           if (message.type === "file-offer") {
             logger.info({ message }, "[RECEIVE] 🎯 FILE-OFFER received");
             // Close any open modals that might interfere
-            setShowQRModal(false);
+            setShowMyQRModal(false);
             setShowCancelModal(false);
 
             // We know the payload is FileOfferPayload based on message type
@@ -376,6 +414,31 @@ export default function ReceivePage() {
 
     receiver.onComplete((blob) => {
       setReceivedFile({ name: pendingOffer.filename, size: pendingOffer.fileSize, blob });
+
+      // Pre-prepare share data to ensure instant navigator.share on user click
+      try {
+        const type = getMimeType(pendingOffer.filename);
+
+        // Super-Clean Strategy: Sanitize filename (remove special chars)
+        const nameParts = pendingOffer.filename.split('.');
+        const extension = nameParts.length > 1 ? nameParts.pop() : '';
+        const baseName = nameParts.join('.').replace(/[^a-z0-9]/gi, '_');
+        const cleanName = extension ? `${baseName}.${extension}` : baseName;
+
+        const fileToShow = new File([blob], cleanName, {
+          type,
+          lastModified: Date.now()
+        });
+
+        // Strip text/url from payload for maximum Android compatibility
+        setPreparedShareData({
+          files: [fileToShow],
+          title: cleanName,
+        });
+      } catch (e) {
+        console.error("Failed to pre-prepare share data:", e);
+      }
+
       setStatus("complete");
       vibrate('success');
       playSuccessSound();
@@ -390,7 +453,7 @@ export default function ReceivePage() {
 
     receiver.onCancel(() => {
       setStatus("cancelled");
-      addLog("[CANCEL] Transfer cancelled by sender");
+      logger.info("[CANCEL] Transfer cancelled by sender");
       vibrate('error');
       playErrorSound();
       if (dbTransferId) updateTransferStatus(dbTransferId, "cancelled");
@@ -400,10 +463,10 @@ export default function ReceivePage() {
       setIsPaused(paused);
       if (paused) {
         setStatus("paused");
-        addLog("[PAUSE] Transfer paused by sender");
+        logger.info("[PAUSE] Transfer paused by sender");
       } else {
         setStatus("receiving");
-        addLog("[RESUME] Transfer resumed by sender");
+        logger.info("[RESUME] Transfer resumed by sender");
       }
     });
 
@@ -499,114 +562,45 @@ export default function ReceivePage() {
     URL.revokeObjectURL(url);
   }
 
-  function getMimeType(filename: string): string {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      // --- Images ---
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'gif': 'image/gif',
-      'webp': 'image/webp',
-      'svg': 'image/svg+xml',
-      'avif': 'image/avif',
-      'ico': 'image/x-icon',
-      'tiff': 'image/tiff',
-      'bmp': 'image/bmp',
-
-      // --- Documents (PDF & Office) ---
-      'pdf': 'application/pdf',
-      'txt': 'text/plain',
-      'csv': 'text/csv',
-      'rtf': 'application/rtf',
-      // Microsoft Word
-      'doc': 'application/msword',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      // Microsoft Excel
-      'xls': 'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      // Microsoft PowerPoint
-      'ppt': 'application/vnd.ms-powerpoint',
-      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-
-      // --- Audio ---
-      'mp3': 'audio/mpeg',
-      'wav': 'audio/wav',
-      'ogg': 'audio/ogg',
-      'm4a': 'audio/x-m4a',
-      'aac': 'audio/aac',
-      'flac': 'audio/flac',
-
-      // --- Video ---
-      'mp4': 'video/mp4',
-      'webm': 'video/webm',
-      'mpeg': 'video/mpeg',
-      'mov': 'video/quicktime',
-      'avi': 'video/x-msvideo',
-
-      // --- Archives ---
-      'zip': 'application/zip',
-      'tar': 'application/x-tar',
-      'gz': 'application/gzip',
-    };
-    return mimeTypes[ext || ''] || 'application/octet-stream';
-  }
-
   async function handleShare() {
-    if (!receivedFile || !receivedFile.blob) {
-      toast.error("No file available to share.");
+    if (!preparedShareData) {
+      toast.error("Share data not ready.");
       return;
     }
 
-    // Infer MIME type if the blob has a generic or missing type
-    let type = receivedFile.blob.type;
-    if (!type || type === 'application/octet-stream') {
-      type = getMimeType(receivedFile.name);
-    }
-
-    // Creating the file object synchronously to keep the user gesture alive
-    const fileToShow = new File([receivedFile.blob], receivedFile.name, { type });
-
-    const shareData: ShareData = {
-      files: [fileToShow],
-      title: receivedFile.name,
-      text: `HyperLink: Shared file ${receivedFile.name}`
-    };
-
     try {
-      // Check for file sharing support specifically
-      if (navigator.canShare && navigator.canShare(shareData)) {
-        await navigator.share(shareData);
-      } else if (navigator.share) {
-        // Fallback to title/text/url if files aren't supported
-        toast.info("Browser doesn't support file sharing. Attempting text share...");
-        await navigator.share({
-          title: receivedFile.name,
-          text: `HyperLink: Receive this file at ${window.location.origin}`
-        });
-      } else {
-        toast.error("Web Share API not supported on this device.");
-      }
+      // Direct call - ONLY ONE ATTEMPT to keep gesture alive
+      await navigator.share(preparedShareData);
+      logger.info("✓ Share successful");
     } catch (err) {
       const error = err as Error;
       if (error.name === 'AbortError') return;
 
-      console.error("Share failed:", error);
+      console.error("[Share] Failed:", error);
+      logger.error(`✗ Share Error: ${error.name}`);
 
-      if (error.name === 'NotAllowedError') {
-        const isSecure = isSecureContext();
-        if (!isSecure) {
-          toast.error("Share failed: Insecure Context. Please use HTTPS or localhost (IP-based testing is blocked).");
-        } else {
-          toast.error("Permission denied. System blocked the share request (might be file type or size).");
-        }
-      } else if (receivedFile.size > 100 * 1024 * 1024) { // 100MB
-        toast.error("File might be too large for the system share menu. Try downloading instead.");
-      } else {
-        toast.error(`Share failed: ${error.message}`);
-      }
+      // If file share fails, show the manual fallback button instead of trying another async task
+      setShowShareFallback(true);
+      toast.info("System blocked the file share. Tap the 'Share Link' button that just appeared.");
     }
   }
+
+  async function handleTextShareFallback() {
+    if (!receivedFile) return;
+    try {
+      await navigator.share({
+        title: receivedFile.name,
+        text: `HyperLink: Receive file at ${window.location.origin}`,
+        url: window.location.origin
+      });
+      logger.info("✓ Shared text fallback");
+      setShowShareFallback(false);
+    } catch (err) {
+      logger.error(`✗ Fallback failed: ${(err as Error).name}`);
+      toast.error("Sharing failed. Try downloading directly.");
+    }
+  }
+
 
   function handleCancelClick() {
     setShowCancelModal(true);
@@ -811,17 +805,6 @@ export default function ReceivePage() {
                 </div>
 
 
-                {/* Terminal / Log Output */}
-                <div className="flex-1 min-h-0 pt-8">
-                  <div className="bg-black/40 border-l-2 border-primary p-4 font-mono text-xs text-[#bcb89a] h-full overflow-y-auto">
-                    {logs.map((log, i) => (
-                      <p key={i} className="mb-1">
-                        <span className="text-primary">&gt;</span> {log}
-                      </p>
-                    ))}
-                    <span className="inline-block w-2 h-4 bg-primary animate-pulse align-middle"></span>
-                  </div>
-                </div>
               </div>
             ) : (
               /* === LAYOUT 2: IDLE/PROMPTED/RESULT (Standard Grid) === */
@@ -862,7 +845,7 @@ export default function ReceivePage() {
                           Copy ID
                         </button>
                         <button
-                          onClick={() => setShowQRModal(true)}
+                          onClick={() => setShowMyQRModal(true)}
                           disabled={!myPeerId}
                           className="flex-1 h-12 bg-transparent border-2 border-primary hover:bg-primary/10 text-primary text-base font-bold tracking-wide uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -997,13 +980,24 @@ export default function ReceivePage() {
                           </button>
 
                           {typeof navigator !== 'undefined' && (navigator as any).share && (
-                            <button
-                              onClick={handleShare}
-                              className="h-14 px-6 bg-[#2d2b1f] border border-primary/30 hover:bg-primary/10 text-primary transition-all active:scale-[0.95] flex items-center justify-center z-10"
-                              title="Share Locally"
-                            >
-                              <span className="material-symbols-outlined">share</span>
-                            </button>
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={handleShare}
+                                className={`h-14 px-6 border transition-all active:scale-[0.95] flex items-center justify-center z-10 ${showShareFallback ? 'bg-[#1a1a1a] border-white/10 text-white/50' : 'bg-[#2d2b1f] border-primary/30 text-primary hover:bg-primary/10'}`}
+                                title="Share Locally"
+                              >
+                                <span className="material-symbols-outlined">share</span>
+                              </button>
+
+                              {showShareFallback && (
+                                <button
+                                  onClick={handleTextShareFallback}
+                                  className="h-10 px-4 bg-primary/20 border border-primary/40 text-primary text-[10px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-2"
+                                >
+                                  Share as Link
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -1117,20 +1111,6 @@ export default function ReceivePage() {
                       {status === "cancelled" && "Transfer Cancelled"}
                     </p>
 
-                    {/* Console Logs */}
-                    <div className="absolute bottom-4 left-4 right-4 bg-black/80 border-l-2 border-primary p-3 max-h-64 overflow-y-auto z-20">
-                      <div className="font-mono text-xs space-y-1">
-                        {logs.map((log, index) => (
-                          <div key={index} className="text-green-400">
-                            <span className="text-primary">›</span> {log}
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-1">
-                          <span className="text-primary">›</span>
-                          <span className="w-2 h-3 bg-primary animate-pulse"></span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </section>
               </div>
@@ -1210,10 +1190,11 @@ export default function ReceivePage() {
         )
       }
       <QRCodeModal
-        isOpen={showQRModal}
+        isOpen={showMyQRModal}
         peerId={myPeerId}
-        onClose={() => setShowQRModal(false)}
+        onClose={() => setShowMyQRModal(false)}
       />
+
     </div >
   );
 }

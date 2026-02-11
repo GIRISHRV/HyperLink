@@ -46,6 +46,7 @@ function SendPageContent() {
   const [zipProgress, setZipProgress] = useState(0);
   const [password, setPassword] = useState("");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [swStatus, setSwStatus] = useState<"not_registered" | "installing" | "active" | "error">("not_registered");
 
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
@@ -123,12 +124,19 @@ function SendPageContent() {
       setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
     }
 
-    const isShared = searchParams?.get("shared") === "true";
+    const shared = searchParams?.get("shared");
+    const isShared = shared === "true";
     const title = searchParams?.get("title");
     const text = searchParams?.get("text");
     const url = searchParams?.get("url");
 
+    if (shared === "middleware_bypass" || shared === "legacy_fallback" || shared === "failed_sw_bypass") {
+      addLog("⚠ PWA Service Worker not active. Files could not be captured.");
+      setError("PWA background sync is not yet active. Please open the app first, then try sharing again.");
+    }
+
     if (isShared) {
+      addLog("> Shared data detected via Service Worker interception...");
       (async () => {
         try {
           const db = await openDB(DB_NAME, 1);
@@ -156,10 +164,12 @@ function SendPageContent() {
 
             // Cleanup
             await db.delete(STORE_NAME, "latest");
+          } else {
+            addLog("✗ No shared data found in temporary storage");
           }
         } catch (err) {
           console.error("Failed to load shared data:", err);
-          addLog("✗ Failed to load shared data from system");
+          addLog(`✗ Storage error: ${(err as Error).message}`);
         }
       })();
     } else if (title || text || url) {
@@ -174,6 +184,22 @@ function SendPageContent() {
         setFile(sharedFile);
         addLog(`✓ Received shared content from system`);
       }
+    }
+
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+
+      navigator.serviceWorker.ready.then((reg) => {
+        setSwStatus(reg.active ? "active" : "installing");
+        addLog(`[SW] Service Worker is ${reg.active ? 'active' : 'installing'}`);
+      }).catch(err => {
+        setSwStatus("error");
+        addLog(`[SW] Error: ${err.message}`);
+      });
+
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        setSwStatus("active");
+        addLog("[SW] Service Worker controller changed - App updated");
+      });
     }
 
     if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
@@ -516,6 +542,11 @@ function SendPageContent() {
                 <span>/secure_channel/send</span>
                 <span className={`w-2 h-2 rounded-full ${isPeerReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'} ml-2`}></span>
                 <span className={isPeerReady ? 'text-green-500' : 'text-red-500'}>{isPeerReady ? 'WEBRTC_READY' : 'INITIALIZING'}</span>
+                {swStatus !== "active" && (
+                  <span className="ml-2 text-[10px] px-1.5 py-0.5 border border-bauhaus-red text-bauhaus-red animate-pulse">
+                    SW_WAITING: REFRESH AGAIN
+                  </span>
+                )}
               </div>
             </div>
 

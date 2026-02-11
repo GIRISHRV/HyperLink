@@ -7,6 +7,7 @@ const PORT = parseInt(process.env.PORT || "9000");
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || [
   "http://localhost:3000",
   "https://hyperlink.vercel.app",
+  "*",
 ];
 
 const app = express();

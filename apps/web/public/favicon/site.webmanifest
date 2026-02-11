@@ -29,7 +29,7 @@
     "display": "standalone",
     "orientation": "portrait",
     "share_target": {
-        "action": "/send",
+        "action": "/api/share-target",
         "method": "POST",
         "enctype": "multipart/form-data",
         "params": {
@@ -43,6 +43,24 @@
                         "image/*",
                         "video/*",
                         "audio/*",
+                        "text/plain",
+                        "text/csv",
+                        "text/html",
+                        "application/pdf",
+                        "application/rtf",
+                        "application/msword",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/vnd.ms-powerpoint",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "application/zip",
+                        "application/x-zip-compressed",
+                        "application/x-tar",
+                        "application/gzip",
+                        "application/octet-stream",
+                        "application/json",
+                        "application/xml",
                         "*/*"
                     ]
                 }

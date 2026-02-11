@@ -1,8 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { Transfer } from "@repo/types";
 import { formatFileSize } from "@repo/utils";
 import { updateTransferStatus, deleteTransfer } from "@/lib/services/transfer-service";
+import { getFile } from "@/lib/storage/idb-manager";
+import Image from "next/image";
 
 interface TransferDetailsModalProps {
     transfer: Transfer;
@@ -17,6 +20,27 @@ export default function TransferDetailsModal({
     onClose,
     onUpdate,
 }: TransferDetailsModalProps) {
+    const [fileBlob, setFileBlob] = useState<Blob | null>(null);
+    const [isCheckingFile, setIsCheckingFile] = useState(true);
+
+    useEffect(() => {
+        if (isOpen && transfer.status === "complete") {
+            setIsCheckingFile(true);
+            getFile(transfer.id)
+                .then(blob => {
+                    setFileBlob(blob || null);
+                })
+                .catch(err => {
+                    console.error("Failed to check file availability:", err);
+                    setFileBlob(null);
+                })
+                .finally(() => setIsCheckingFile(false));
+        } else {
+            setFileBlob(null);
+            setIsCheckingFile(false);
+        }
+    }, [isOpen, transfer]);
+
     if (!isOpen) return null;
 
     const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
@@ -30,6 +54,16 @@ export default function TransferDetailsModal({
 
     const status = statusConfig[transfer.status] || statusConfig.pending;
     const isActive = ["pending", "connecting", "transferring"].includes(transfer.status);
+
+    // Determine preview type
+    const ext = transfer.filename.split('.').pop()?.toLowerCase();
+    const isImage = fileBlob && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '');
+    const isVideo = fileBlob && ['mp4', 'webm', 'ogg', 'mov'].includes(ext || '');
+
+    function getPreviewUrl() {
+        if (!fileBlob) return '';
+        return URL.createObjectURL(fileBlob);
+    }
 
     async function handleCancel() {
         if (confirm("Are you sure you want to cancel this transfer?")) {
@@ -47,6 +81,18 @@ export default function TransferDetailsModal({
         }
     }
 
+    function handleDownload() {
+        if (!fileBlob) return;
+        const url = URL.createObjectURL(fileBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = transfer.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
@@ -56,9 +102,9 @@ export default function TransferDetailsModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="relative bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
                     <h3 className="text-lg font-bold text-white">Transfer Details</h3>
                     <button
                         onClick={onClose}
@@ -68,8 +114,8 @@ export default function TransferDetailsModal({
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 space-y-6">
+                {/* Content - Scrollable */}
+                <div className="p-6 space-y-6 overflow-y-auto">
                     {/* File Info */}
                     <div className="flex items-start gap-4">
                         <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -90,6 +136,43 @@ export default function TransferDetailsModal({
                             {status.label}
                         </span>
                     </div>
+
+                    {/* PREVIEW SECTION (Merged) */}
+                    {fileBlob && (
+                        <div className="bg-black/40 rounded-lg border border-white/10 overflow-hidden">
+                            {isImage ? (
+                                <div className="relative w-full h-48 sm:h-64">
+                                    <Image
+                                        src={getPreviewUrl()}
+                                        alt={transfer.filename}
+                                        fill
+                                        className="object-contain"
+                                        unoptimized // For blob URLs
+                                    />
+                                </div>
+                            ) : isVideo ? (
+                                <video
+                                    src={getPreviewUrl()}
+                                    controls
+                                    className="w-full max-h-64 bg-black"
+                                />
+                            ) : (
+                                <div className="p-8 flex flex-col items-center justify-center text-gray-500 gap-2">
+                                    <span className="material-symbols-outlined text-4xl">insert_drive_file</span>
+                                    <span className="text-xs uppercase tracking-widest">No Preview Available</span>
+                                </div>
+                            )}
+                            <div className="p-3 bg-white/5 border-t border-white/10 flex justify-end">
+                                <button
+                                    onClick={handleDownload}
+                                    className="text-xs font-bold uppercase tracking-wider text-primary hover:text-white flex items-center gap-1 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-sm">download</span>
+                                    Download File
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -113,19 +196,19 @@ export default function TransferDetailsModal({
                         </div>
                     </div>
 
-                    {/* File Availability Notice */}
-                    {transfer.status === "complete" && (
+                    {/* File Availability Notice (Conditional) */}
+                    {transfer.status === "complete" && !fileBlob && !isCheckingFile && (
                         <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/50 rounded-lg border border-gray-700">
                             <span className="material-symbols-outlined text-gray-400">info</span>
                             <p className="text-gray-400 text-sm">
-                                File no longer available. P2P transfers are not stored on servers.
+                                File details might have been erased. P2P transfers are ephemeral.
                             </p>
                         </div>
                     )}
                 </div>
 
                 {/* Actions */}
-                <div className="px-6 py-4 bg-black/30 flex gap-3 justify-end">
+                <div className="px-6 py-4 bg-black/30 flex gap-3 justify-end shrink-0">
                     {isActive && (
                         <button
                             onClick={handleCancel}

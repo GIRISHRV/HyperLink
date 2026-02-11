@@ -11,10 +11,7 @@ import { DataMovedCard } from "@/components/stats/data-moved-card";
 import { EmptyState } from "@/components/empty-state";
 import { Ripple } from "@/components/ripple";
 import type { Transfer } from "@repo/types";
-import FilePreviewModal from "@/components/file-preview-modal";
 import GlobalHeader from "@/components/global-header";
-import { getFile } from "@/lib/storage/idb-manager";
-import { toast } from "sonner";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -34,10 +31,6 @@ export default function HistoryPage() {
 
   const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
-  // Preview State
-  const [previewFile, setPreviewFile] = useState<Blob | null>(null);
-  const [previewFilename, setPreviewFilename] = useState<string>("");
-  const [showPreview, setShowPreview] = useState(false);
 
   const checkUser = useCallback(async () => {
     const currentUser = await getCurrentUser();
@@ -153,34 +146,6 @@ export default function HistoryPage() {
     return iconMap[ext || ""] || "insert_drive_file";
   };
 
-  const handlePreview = async (e: React.MouseEvent, transfer: Transfer) => {
-    e.stopPropagation(); // Prevent row click
-
-    // 1. Check if file type is supported
-    const ext = transfer.filename.split(".").pop()?.toLowerCase();
-    const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "");
-    const isVideo = ["mp4", "webm", "ogg"].includes(ext || "");
-
-    if (!isImage && !isVideo) {
-      toast.error("Preview not available for this file type.");
-      return;
-    }
-
-    // 2. Try to get file from IndexedDB
-    try {
-      const fileBlob = await getFile(transfer.id);
-      if (fileBlob) {
-        setPreviewFile(fileBlob);
-        setPreviewFilename(transfer.filename);
-        setShowPreview(true);
-      } else {
-        toast.error("File content not found. This may be an old transfer or the data was cleared.");
-      }
-    } catch (err) {
-      console.error("Preview error:", err);
-      toast.error("Failed to load file preview.");
-    }
-  };
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent text-white relative overflow-x-hidden animate-reveal">
@@ -442,17 +407,6 @@ export default function HistoryPage() {
                             {transfer.status}
                           </span>
 
-                          {/* Preview Button (Only for complete transfers) */}
-                          {transfer.status === "complete" && (
-                            <button
-                              onClick={(e) => handlePreview(e, transfer)}
-                              className="size-7 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 text-gray-400 hover:text-primary transition-all active:scale-95"
-                              title="Preview File"
-                              aria-label="Preview File"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">visibility</span>
-                            </button>
-                          )}
                         </div>
                       </td>
                       <td className="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">
@@ -489,15 +443,6 @@ export default function HistoryPage() {
         />
       )}
 
-      {/* File Preview Modal */}
-      {previewFile && (
-        <FilePreviewModal
-          isOpen={showPreview}
-          onClose={() => setShowPreview(false)}
-          file={previewFile}
-          filename={previewFilename}
-        />
-      )}
     </div>
   );
 }
