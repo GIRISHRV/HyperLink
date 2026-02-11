@@ -1,11 +1,13 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import type { FileChunk } from "@repo/types";
-import { addChunk, getAllChunks, clearTransfer } from "@/lib/storage/idb-manager";
+import { addChunk, getAllChunks, clearTransfer, addFile } from "@/lib/storage/idb-manager";
 import { logger } from "@repo/utils";
+
 
 export class FileReceiver {
   private transferId: string = "";
+  private storageId: string | null = null;
   private filename: string = "";
   private fileSize: number = 0;
   private fileType: string = "";
@@ -20,6 +22,13 @@ export class FileReceiver {
   private completeCallback?: (blob: Blob, filename: string) => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
+
+  /**
+   * Set the ID to use for storage (overriding the P2P transfer ID)
+   */
+  setStorageId(id: string): void {
+    this.storageId = id;
+  }
 
   /**
    * Set the connection to send ACKs back
@@ -135,6 +144,15 @@ export class FileReceiver {
       const blobParts = chunks.map((chunk) => chunk.data);
       const finalBlob = new Blob(blobParts, { type: this.fileType });
       logger.info({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob size");
+
+      // Store the completed file blob to IndexedDB
+      try {
+        const saveId = this.storageId || this.transferId;
+        await addFile(saveId, this.fileType, finalBlob);
+        logger.info({ saveId }, "[RECEIVER] Saved completed file to IndexedDB");
+      } catch (e) {
+        logger.error({ error: e }, "[RECEIVER] Failed to save completed file");
+      }
 
       // Callback with completed file
       if (this.completeCallback) {

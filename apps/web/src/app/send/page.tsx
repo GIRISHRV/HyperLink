@@ -12,6 +12,7 @@ import { formatFileSize, formatTime, validateFileSize } from "@repo/utils";
 import { requestNotificationPermission, notifyTransferComplete, playErrorSound, playConnectionSound, isSecureContext } from "@/lib/utils/notification";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
+import { useClipboardFile } from "@/lib/hooks/use-clipboard-file";
 import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
 import { ProgressBar } from "@/components/progress-bar";
@@ -95,24 +96,6 @@ export default function SendPage() {
 
   // QoL: Global Drag & Drop + Paste
   useEffect(() => {
-    // 1. Paste Support
-    const handlePaste = (e: ClipboardEvent) => {
-      if (e.clipboardData && e.clipboardData.files.length > 0) {
-        const pastedFile = e.clipboardData.files[0];
-        if (pastedFile) {
-          const validation = validateFileSize(pastedFile.size);
-          if (validation.valid) {
-            setFile(pastedFile);
-            setError("");
-            addLog(`✓ Pasted file: ${pastedFile.name}`);
-          } else {
-            setError(validation.error!);
-            addLog(`✗ Paste failed: ${validation.error}`);
-          }
-        }
-      }
-    };
-
     // 2. Global Drag & Drop
     const handleGlobalDragEnter = (e: DragEvent) => {
       e.preventDefault();
@@ -158,14 +141,88 @@ export default function SendPage() {
       }
     };
 
-    window.addEventListener("paste", handlePaste);
     window.addEventListener("dragenter", handleGlobalDragEnter);
     window.addEventListener("dragleave", handleGlobalDragLeave);
     window.addEventListener("dragover", handleGlobalDragOver);
     window.addEventListener("drop", handleGlobalDrop);
 
     return () => {
-      window.removeEventListener("paste", handlePaste);
+      window.removeEventListener("dragenter", handleGlobalDragEnter);
+      window.removeEventListener("dragleave", handleGlobalDragLeave);
+      window.removeEventListener("dragover", handleGlobalDragOver);
+      window.removeEventListener("drop", handleGlobalDrop);
+    };
+  }, []);
+
+
+  // 1. Paste Support via Hook
+  useClipboardFile((pastedFile) => {
+    if (pastedFile) {
+      const validation = validateFileSize(pastedFile.size);
+      if (validation.valid) {
+        setFile(pastedFile);
+        setError("");
+        addLog(`✓ Pasted file: ${pastedFile.name}`);
+      } else {
+        setError(validation.error!);
+        addLog(`✗ Paste failed: ${validation.error}`);
+      }
+    }
+  });
+
+  // QoL: Global Drag & Drop + Paste
+  useEffect(() => {
+    // 2. Global Drag & Drop
+    const handleGlobalDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer?.types.includes("Files")) {
+        setIsDraggingOver(true);
+      }
+    };
+
+    const handleGlobalDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Only set false if leaving the window (relatedTarget is null)
+      if (e.relatedTarget === null) {
+        setIsDraggingOver(false);
+      }
+    };
+
+    const handleGlobalDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(true); // Ensure it stays true while over
+    };
+
+    const handleGlobalDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile) {
+          const validation = validateFileSize(droppedFile.size);
+          if (validation.valid) {
+            setFile(droppedFile);
+            setError("");
+            addLog(`✓ Dropped file: ${droppedFile.name}`);
+          } else {
+            setError(validation.error!);
+            addLog(`✗ Drop failed: ${validation.error}`);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("dragenter", handleGlobalDragEnter);
+    window.addEventListener("dragleave", handleGlobalDragLeave);
+    window.addEventListener("dragover", handleGlobalDragOver);
+    window.addEventListener("drop", handleGlobalDrop);
+
+    return () => {
       window.removeEventListener("dragenter", handleGlobalDragEnter);
       window.removeEventListener("dragleave", handleGlobalDragLeave);
       window.removeEventListener("dragover", handleGlobalDragOver);
@@ -335,7 +392,7 @@ export default function SendPage() {
       setStatus("transferring");
       addLog("> Starting file transfer protocol...");
 
-      fileSenderRef.current = new FileSender(file, connection);
+      fileSenderRef.current = new FileSender(file, connection, transfer.id);
 
       // Setup pause callback
       fileSenderRef.current.onPauseChange((paused) => {

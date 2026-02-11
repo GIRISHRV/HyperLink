@@ -174,3 +174,33 @@ export async function deleteMultipleTransfers(transferIds: string[]): Promise<bo
   logger.info({ data }, "[TRANSFER-SERVICE] Actually deleted");
   return true;
 }
+
+/**
+ * Get total transfer statistics for the current user
+ */
+export async function getUserTransferStats(): Promise<{
+  totalBytes: number;
+  totalTransfers: number;
+} | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("transfers")
+    .select("file_size")
+    .eq("sender_id", user.id)
+    .eq("status", "complete");
+
+  if (error) {
+    logger.error({ error }, "Error fetching transfer stats");
+    return null;
+  }
+
+  const totalBytes = data.reduce((acc, curr) => acc + (curr.file_size || 0), 0);
+  const totalTransfers = data.length;
+
+  return { totalBytes, totalTransfers };
+}

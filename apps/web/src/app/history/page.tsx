@@ -8,10 +8,14 @@ import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 import type { User } from "@supabase/supabase-js";
 import { formatFileSize } from "@repo/utils";
 import TransferDetailsModal from "@/components/transfer-details-modal";
+import { DataMovedCard } from "@/components/stats/data-moved-card";
 import { EmptyState } from "@/components/empty-state";
 import { Ripple } from "@/components/ripple";
 import type { Transfer } from "@repo/types";
 import Link from "next/link";
+import FilePreviewModal from "@/components/file-preview-modal";
+import { getFile } from "@/lib/storage/idb-manager";
+import { toast } from "sonner";
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -23,6 +27,11 @@ export default function HistoryPage() {
   const [avatarIcon, setAvatarIcon] = useState("person");
   const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
   const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
+
+  // Preview State
+  const [previewFile, setPreviewFile] = useState<Blob | null>(null);
+  const [previewFilename, setPreviewFilename] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
 
   const checkUser = useCallback(async () => {
     const currentUser = await getCurrentUser();
@@ -145,7 +154,34 @@ export default function HistoryPage() {
     return iconMap[ext || ""] || "insert_drive_file";
   };
 
+  const handlePreview = async (e: React.MouseEvent, transfer: Transfer) => {
+    e.stopPropagation(); // Prevent row click
 
+    // 1. Check if file type is supported
+    const ext = transfer.filename.split(".").pop()?.toLowerCase();
+    const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "");
+    const isVideo = ["mp4", "webm", "ogg"].includes(ext || "");
+
+    if (!isImage && !isVideo) {
+      toast.error("Preview not available for this file type.");
+      return;
+    }
+
+    // 2. Try to get file from IndexedDB
+    try {
+      const fileBlob = await getFile(transfer.id);
+      if (fileBlob) {
+        setPreviewFile(fileBlob);
+        setPreviewFilename(transfer.filename);
+        setShowPreview(true);
+      } else {
+        toast.error("File content not found. This may be an old transfer or the data was cleared.");
+      }
+    } catch (err) {
+      console.error("Preview error:", err);
+      toast.error("Failed to load file preview.");
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent text-white relative overflow-x-hidden animate-reveal">
@@ -185,6 +221,12 @@ export default function HistoryPage() {
 
       {/* Main Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-10">
+
+        {/* Stats Section */}
+        <div className="mb-8">
+          <DataMovedCard />
+        </div>
+
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
@@ -397,12 +439,25 @@ export default function HistoryPage() {
                         </div>
                       </td>
                       <td className="py-5 px-6">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${style.bg} ${style.text} text-[10px] font-black uppercase tracking-wider border ${style.border}`}>
-                          <span className={`material-symbols-outlined text-[14px] ${transfer.status === "transferring" ? "animate-spin" : ""}`}>
-                            {style.icon}
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${style.bg} ${style.text} text-[10px] font-black uppercase tracking-wider border ${style.border}`}>
+                            <span className={`material-symbols-outlined text-[14px] ${transfer.status === "transferring" ? "animate-spin" : ""}`}>
+                              {style.icon}
+                            </span>
+                            {transfer.status}
                           </span>
-                          {transfer.status}
-                        </span>
+
+                          {/* Preview Button (Only for complete transfers) */}
+                          {transfer.status === "complete" && (
+                            <button
+                              onClick={(e) => handlePreview(e, transfer)}
+                              className="size-7 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 text-gray-400 hover:text-primary transition-all active:scale-95"
+                              title="Preview File"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">visibility</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-5 px-6 text-right font-mono text-sm text-gray-500 group-hover:text-white">
                         {new Date(transfer.created_at).toLocaleString("en-US", {
@@ -437,10 +492,16 @@ export default function HistoryPage() {
           onUpdate={() => refresh()}
         />
       )}
+
+      {/* File Preview Modal */}
+      {previewFile && (
+        <FilePreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          file={previewFile}
+          filename={previewFilename}
+        />
+      )}
     </div>
   );
 }
-
-
-
-

@@ -333,6 +333,9 @@ export default function ReceivePage() {
     const receiver = new FileReceiver();
     fileReceiverRef.current = receiver;
     receiver.setConnection(connection);
+    if (senderDbId) {
+      receiver.setStorageId(senderDbId);
+    }
     logger.info("[RECEIVE PAGE] FileReceiver created and assigned to ref");
 
     let dbTransferId: string | null = null;

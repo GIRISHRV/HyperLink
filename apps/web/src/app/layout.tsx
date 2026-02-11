@@ -23,6 +23,9 @@ export const metadata: Metadata = {
   manifest: "/favicon/site.webmanifest",
 };
 
+import { ClipboardListener } from "@/components/clipboard-listener";
+import { Toaster } from "sonner";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
@@ -31,6 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <div className="relative z-10">{children}</div>
         <BackgroundGrid />
+        <ClipboardListener />
+        <Toaster />
       </body>
     </html>
   );

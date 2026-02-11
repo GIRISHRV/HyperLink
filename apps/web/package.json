@@ -21,6 +21,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.45.0",
+    "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.0",
     "lucide-react": "^0.446.0",
@@ -28,7 +29,9 @@
     "peerjs": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
