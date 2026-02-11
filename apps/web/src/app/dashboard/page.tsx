@@ -46,6 +46,11 @@ export default function DashboardPage() {
       }
 
       setLoading(false);
+
+      // App Badging API - Clear badge when entering dashboard
+      if ('clearAppBadge' in navigator) {
+        (navigator as any).clearAppBadge().catch(console.error);
+      }
     } catch (e) {
       console.error("Auth check failed:", e);
       router.push("/auth");

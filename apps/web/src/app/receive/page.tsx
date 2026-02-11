@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import TransferHeader from "@/components/transfer-header";
 import { getCurrentUser } from "@/lib/services/auth-service";
@@ -380,6 +381,11 @@ export default function ReceivePage() {
       playSuccessSound();
       notifyTransferComplete("received", pendingOffer.filename);
       if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
+
+      // App Badging API (Native Experience)
+      if ('setAppBadge' in navigator) {
+        (navigator as any).setAppBadge(1).catch(console.error);
+      }
     });
 
     receiver.onCancel(() => {
@@ -491,6 +497,26 @@ export default function ReceivePage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  async function handleShare() {
+    if (!receivedFile || !receivedFile.blob) return;
+    try {
+      const fileToShow = new File([receivedFile.blob], receivedFile.name, { type: receivedFile.blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [fileToShow] })) {
+        await navigator.share({
+          files: [fileToShow],
+          title: receivedFile.name,
+          text: `HyperLink: Shared file ${receivedFile.name}`
+        });
+      } else {
+        toast.error("Sharing not supported on this device/browser.");
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Share failed:", err);
+      }
+    }
   }
 
   function handleCancelClick() {
@@ -872,13 +898,25 @@ export default function ReceivePage() {
                           </div>
                         )}
 
-                        <button
-                          onClick={handleDownload}
-                          className="w-full h-14 bg-primary hover:bg-[#ffea2e] text-black text-sm font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.6)] z-10"
-                        >
-                          <span className="material-symbols-outlined !text-[20px]">download</span>
-                          Save File
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleDownload}
+                            className="flex-1 h-14 bg-primary hover:bg-[#ffea2e] text-black text-sm font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.6)] z-10"
+                          >
+                            <span className="material-symbols-outlined !text-[20px]">download</span>
+                            Save
+                          </button>
+
+                          {typeof navigator !== 'undefined' && (navigator as any).share && (
+                            <button
+                              onClick={handleShare}
+                              className="h-14 px-6 bg-[#2d2b1f] border border-primary/30 hover:bg-primary/10 text-primary transition-all active:scale-[0.95] flex items-center justify-center z-10"
+                              title="Share Locally"
+                            >
+                              <span className="material-symbols-outlined">share</span>
+                            </button>
+                          )}
+                        </div>
 
                         <button
                           onClick={resetReceive}

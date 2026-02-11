@@ -51,6 +51,11 @@ export default function HistoryPage() {
 
   useEffect(() => {
     checkUser();
+
+    // App Badging API - Clear badge when entering history
+    if ('clearAppBadge' in navigator) {
+      (navigator as any).clearAppBadge().catch(console.error);
+    }
   }, [checkUser]);
 
   if (loading) {
@@ -443,6 +448,7 @@ export default function HistoryPage() {
                               onClick={(e) => handlePreview(e, transfer)}
                               className="size-7 flex items-center justify-center rounded-full bg-white/5 hover:bg-primary/20 text-gray-400 hover:text-primary transition-all active:scale-95"
                               title="Preview File"
+                              aria-label="Preview File"
                             >
                               <span className="material-symbols-outlined text-[16px]">visibility</span>
                             </button>

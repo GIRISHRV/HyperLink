@@ -27,5 +27,53 @@
     "background_color": "#0a0a0a",
     "start_url": "/",
     "display": "standalone",
-    "orientation": "portrait"
+    "orientation": "portrait",
+    "share_target": {
+        "action": "/send",
+        "method": "GET",
+        "enctype": "application/x-www-form-urlencoded",
+        "params": {
+            "title": "title",
+            "text": "text",
+            "url": "url"
+        }
+    },
+    "shortcuts": [
+        {
+            "name": "Send File",
+            "short_name": "Send",
+            "description": "Start a new file transfer",
+            "url": "/send",
+            "icons": [
+                {
+                    "src": "/favicon/android-chrome-192x192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Receive File",
+            "short_name": "Receive",
+            "description": "Receive a file from someone",
+            "url": "/receive",
+            "icons": [
+                {
+                    "src": "/favicon/android-chrome-192x192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "History",
+            "short_name": "History",
+            "description": "View your transfer history",
+            "url": "/history",
+            "icons": [
+                {
+                    "src": "/favicon/android-chrome-192x192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
 }

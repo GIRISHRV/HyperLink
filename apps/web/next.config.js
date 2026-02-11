@@ -9,8 +9,8 @@ const withPWA = withPWAInit({
   buildExcludes: [/middleware-manifest\.json$/],
   publicExcludes: ['!robots.txt', '!sitemap.xml'],
   fallbacks: {
-    // Failed page requests fallback to this (if you have one)
-    // document: '/offline',
+    // Failed page requests fallback to this
+    document: '/offline',
   },
   // Customize caching strategy
   runtimeCaching: [

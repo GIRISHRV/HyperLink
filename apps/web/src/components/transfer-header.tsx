@@ -61,6 +61,7 @@ export default function TransferHeader({ isPeerReady = false, status = "idle", o
                     <button
                         onClick={handleBack}
                         className="h-12 px-6 bg-[#333] hover:bg-[#555] text-white text-sm font-bold uppercase tracking-wide transition-colors relative overflow-hidden"
+                        aria-label="Back to Dashboard"
                     >
                         <span className="relative z-10">← Dashboard</span>
                         <Ripple />

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
 import TransferHeader from "@/components/transfer-header";
@@ -22,8 +22,9 @@ import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import PasswordModal from "@/components/password-modal";
 
-export default function SendPage() {
+function SendPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [receiverPeerId, setReceiverPeerId] = useState("");
@@ -35,11 +36,11 @@ export default function SendPage() {
   const [transferId, setTransferId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [isDraggingOver, setIsDraggingOver] = useState(false); // Global drag state
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isPeerReady, setIsPeerReady] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
-  const [password, setPassword] = useState(""); // Password state
+  const [password, setPassword] = useState("");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const [logs, setLogs] = useState<string[]>([
@@ -47,7 +48,6 @@ export default function SendPage() {
     "Waiting for peer connection...",
   ]);
 
-  // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<import("@repo/types").ChatMessage[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
@@ -56,32 +56,93 @@ export default function SendPage() {
   const initializingRef = useRef(false);
   const fileSenderRef = useRef<FileSender | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const connectionRef = useRef<any>(null); // Keep track of active connection
+  const connectionRef = useRef<any>(null);
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
 
   const { vibrate } = useHaptics();
 
   const isTransferActive = status === "connecting" || status === "waiting" || status === "transferring";
-  // Protect against accidental navigation (back button, etc.)
   const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(
     transferId,
     isTransferActive
   );
 
-  // Robustness: Tab Title & Notifications
-  useEffect(() => {
-    // 1. Request permission on load
-    requestNotificationPermission();
-
-    // 2. Check for secure context
-    if (!isSecureContext() && window.location.hostname !== 'localhost') {
-      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
-      addLog("✗ CRITICAL: This browser context is not secure. WebRTC requires HTTPS.");
-    }
+  const addLog = useCallback((message: string) => {
+    setLogs((prev) => [...prev, message]);
   }, []);
 
+  const processFiles = useCallback(async (files: File[]) => {
+    const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+    const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
+    if (totalSize > MAX_SIZE) {
+      setError(`Total size (${formatFileSize(totalSize)}) exceeds the 10GB limit for browser zipping.`);
+      addLog(`✗ Size limit exceeded: ${formatFileSize(totalSize)}`);
+      return;
+    }
+
+    const isSingleFile = files.length === 1;
+    const hasPath = files[0].webkitRelativePath && files[0].webkitRelativePath.includes("/");
+
+    if (isSingleFile && !hasPath) {
+      const file = files[0];
+      const validation = validateFileSize(file.size);
+      if (!validation.valid) {
+        setError(validation.error!);
+        addLog(`✗ File validation failed: ${validation.error}`);
+        return;
+      }
+      setFile(file);
+      setError("");
+      addLog(`✓ File selected: ${file.name} (${formatFileSize(file.size)})`);
+    } else {
+      try {
+        setIsZipping(true);
+        setZipProgress(0);
+        setError("");
+        addLog(`> Zipping ${files.length} files...`);
+        const zippedFile = await zipFiles(files, (percent) => setZipProgress(percent));
+        setFile(zippedFile);
+        addLog(`✓ Zipping complete: ${zippedFile.name} (${formatFileSize(zippedFile.size)})`);
+      } catch (err: any) {
+        console.error("Zipping failed:", err);
+        setError("Failed to zip files. Browser memory might be full.");
+        addLog(`✗ Zipping error: ${err.message}`);
+      } finally {
+        setIsZipping(false);
+      }
+    }
+  }, [addLog]);
+
   useEffect(() => {
-    // 1. Tab Title Progress
+    requestNotificationPermission();
+    if (!isSecureContext() && window.location.hostname !== 'localhost') {
+      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
+    }
+
+    const title = searchParams?.get("title");
+    const text = searchParams?.get("text");
+    const url = searchParams?.get("url");
+
+    if (title || text || url) {
+      const content = [
+        title ? `Title: ${title}` : "",
+        text ? `Text: ${text}` : "",
+        url ? `URL: ${url}` : ""
+      ].filter(Boolean).join("\n");
+
+      if (content) {
+        const sharedFile = new File([content], "shared_content.txt", { type: "text/plain" });
+        setFile(sharedFile);
+        addLog(`✓ Received shared content from system`);
+      }
+    }
+
+    if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
+      (navigator as any).clearAppBadge().catch(console.error);
+    }
+  }, [searchParams, addLog]);
+
+  useEffect(() => {
     if (status === "transferring" && progress) {
       document.title = `${progress.percentage.toFixed(0)}% - Uploading...`;
     } else if (status === "complete") {
@@ -90,11 +151,9 @@ export default function SendPage() {
       document.title = "HyperLink - Secure P2P";
     }
 
-    // 2. Browser Notifications
     if (status === "complete") {
       notifyTransferComplete("sent", file?.name || "File");
     }
-    // 3. Screen Wake Lock
     if (status === "connecting" || status === "transferring") {
       requestWakeLock();
     } else {
@@ -102,9 +161,13 @@ export default function SendPage() {
     }
   }, [status, progress, file, requestWakeLock, releaseWakeLock]);
 
-  // QoL: Global Drag & Drop + Paste
+  const handlePaste = useCallback((file: File) => {
+    processFiles([file]);
+  }, [processFiles]);
+
+  useClipboardFile(handlePaste);
+
   useEffect(() => {
-    // 2. Global Drag & Drop
     const handleGlobalDragEnter = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -116,7 +179,6 @@ export default function SendPage() {
     const handleGlobalDragLeave = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Only set false if leaving the window (relatedTarget is null)
       if (e.relatedTarget === null) {
         setIsDraggingOver(false);
       }
@@ -125,26 +187,19 @@ export default function SendPage() {
     const handleGlobalDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsDraggingOver(true); // Ensure it stays true while over
+      setIsDraggingOver(true);
     };
 
-    const handleGlobalDrop = (e: DragEvent) => {
+    const handleGlobalDrop = async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDraggingOver(false);
 
-      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile) {
-          const validation = validateFileSize(droppedFile.size);
-          if (validation.valid) {
-            setFile(droppedFile);
-            setError("");
-            addLog(`✓ Dropped file: ${droppedFile.name}`);
-          } else {
-            setError(validation.error!);
-            addLog(`✗ Drop failed: ${validation.error}`);
-          }
+      if (e.dataTransfer && e.dataTransfer.items) {
+        const droppedFiles = await getFilesFromDataTransferItems(e.dataTransfer.items);
+        if (droppedFiles.length > 0) {
+          addLog(`✓ Dropped ${droppedFiles.length} file(s)`);
+          await processFiles(droppedFiles);
         }
       }
     };
@@ -160,90 +215,9 @@ export default function SendPage() {
       window.removeEventListener("dragover", handleGlobalDragOver);
       window.removeEventListener("drop", handleGlobalDrop);
     };
-  }, []);
+  }, [processFiles, addLog]);
 
-
-  // 1. Paste Support via Hook
-  useClipboardFile((pastedFile) => {
-    if (pastedFile) {
-      const validation = validateFileSize(pastedFile.size);
-      if (validation.valid) {
-        setFile(pastedFile);
-        setError("");
-        addLog(`✓ Pasted file: ${pastedFile.name}`);
-      } else {
-        setError(validation.error!);
-        addLog(`✗ Paste failed: ${validation.error}`);
-      }
-    }
-  });
-
-  // QoL: Global Drag & Drop + Paste
-  useEffect(() => {
-    // 2. Global Drag & Drop
-    const handleGlobalDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer?.types.includes("Files")) {
-        setIsDraggingOver(true);
-      }
-    };
-
-    const handleGlobalDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // Only set false if leaving the window (relatedTarget is null)
-      if (e.relatedTarget === null) {
-        setIsDraggingOver(false);
-      }
-    };
-
-    const handleGlobalDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingOver(true); // Ensure it stays true while over
-    };
-
-    const handleGlobalDrop = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingOver(false);
-
-      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile) {
-          const validation = validateFileSize(droppedFile.size);
-          if (validation.valid) {
-            setFile(droppedFile);
-            setError("");
-            addLog(`✓ Dropped file: ${droppedFile.name}`);
-          } else {
-            setError(validation.error!);
-            addLog(`✗ Drop failed: ${validation.error}`);
-          }
-        }
-      }
-    };
-
-    window.addEventListener("dragenter", handleGlobalDragEnter);
-    window.addEventListener("dragleave", handleGlobalDragLeave);
-    window.addEventListener("dragover", handleGlobalDragOver);
-    window.addEventListener("drop", handleGlobalDrop);
-
-    return () => {
-      window.removeEventListener("dragenter", handleGlobalDragEnter);
-      window.removeEventListener("dragleave", handleGlobalDragLeave);
-      window.removeEventListener("dragover", handleGlobalDragOver);
-      window.removeEventListener("drop", handleGlobalDrop);
-    };
-  }, []);
-
-  function addLog(message: string) {
-    setLogs((prev) => [...prev, message]);
-  }
-
-  // Handle incoming chat messages
-  function handleData(data: any) {
+  const handleData = useCallback((data: any) => {
     if (data && data.type === "chat-message") {
       const msg = data.payload as import("@repo/types").ChatMessage;
       setMessages((prev) => [...prev, msg]);
@@ -251,32 +225,26 @@ export default function SendPage() {
         setHasUnread(true);
       }
     }
-  }
+  }, [isChatOpen]);
 
-  function handleSendMessage(text: string) {
+  const handleSendMessage = (text: string) => {
     if (!connectionRef.current || !user) return;
-
     const msg: import("@repo/types").ChatMessage = {
       id: crypto.randomUUID(),
-      senderId: user.id, // Current user ID
+      senderId: user.id,
       text,
       timestamp: Date.now(),
     };
-
-    // Send to peer
     connectionRef.current.send({
       type: "chat-message",
-      transferId: transferId || "", // Optional context
+      transferId: transferId || "",
       payload: msg,
       timestamp: Date.now(),
     });
-
-    // Add to local state
     setMessages((prev) => [...prev, msg]);
-  }
+  };
 
   const checkAuthAndInitPeer = useCallback(async () => {
-    // ... existing implementation ...
     if (initializingRef.current || peerManagerRef.current) return;
     initializingRef.current = true;
     try {
@@ -306,7 +274,7 @@ export default function SendPage() {
     } finally {
       initializingRef.current = false;
     }
-  }, [router]);
+  }, [router, addLog]);
 
   useEffect(() => {
     checkAuthAndInitPeer();
@@ -317,106 +285,38 @@ export default function SendPage() {
     };
   }, [checkAuthAndInitPeer]);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
-
     await processFiles(selectedFiles);
-  }
+  };
 
-  async function handleDrop(e: React.DragEvent) {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     const items = e.dataTransfer.items;
-
-    // Use getFilesFromDataTransferItems to handle folders recursively
     const droppedFiles = await getFilesFromDataTransferItems(items);
     if (droppedFiles.length === 0) return;
-
     await processFiles(droppedFiles);
-  }
+  };
 
-  async function processFiles(files: File[]) {
-    // 1. Calculate total size
-    const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-
-    // 2. Validate Size (10GB Limit)
-    const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
-    if (totalSize > MAX_SIZE) {
-      setError(`Total size (${formatFileSize(totalSize)}) exceeds the 10GB limit for browser zipping.`);
-      addLog(`✗ Size limit exceeded: ${formatFileSize(totalSize)}`);
-      return;
-    }
-
-    // 3. Check logic: Single file (no folder) vs Multiple/Folder
-    const isSingleFile = files.length === 1;
-    // Check if the single file has a path that suggests it's in a subfolder (from DnD)
-    // If we just select one file via input, webkitRelativePath is usually empty.
-    const hasPath = files[0].webkitRelativePath && files[0].webkitRelativePath.includes("/");
-
-    if (isSingleFile && !hasPath) {
-      // Simple single file case
-      const file = files[0];
-      const validation = validateFileSize(file.size);
-      if (!validation.valid) {
-        setError(validation.error!);
-        addLog(`✗ File validation failed: ${validation.error}`);
-        return;
-      }
-      setFile(file);
-      setError("");
-      addLog(`✓ File selected: ${file.name} (${formatFileSize(file.size)})`);
-    } else {
-      // Multiple files or folder structure -> ZIP IT
-      try {
-        setIsZipping(true);
-        setZipProgress(0);
-        setError("");
-        addLog(`> Zipping ${files.length} files...`);
-
-        const zippedFile = await zipFiles(files, (percent) => setZipProgress(percent));
-
-        setFile(zippedFile);
-        addLog(`✓ Zipping complete: ${zippedFile.name} (${formatFileSize(zippedFile.size)})`);
-      } catch (err: any) {
-        console.error("Zipping failed:", err);
-        setError("Failed to zip files. Browser memory might be full.");
-        addLog(`✗ Zipping error: ${err.message}`);
-      } finally {
-        setIsZipping(false);
-      }
-    }
-  }
-
-
-  async function handleSend() {
-    if (!file || !receiverPeerId) {
-      return;
-    }
-    if (!peerManagerRef.current) return;
-
+  const handleSend = async () => {
+    if (!file || !receiverPeerId || !peerManagerRef.current) return;
     setStatus("connecting");
     setError("");
     addLog(`> Connecting to peer: ${receiverPeerId.slice(0, 8)}...`);
 
     try {
-      const transfer = await createTransfer({
-        filename: file.name,
-        fileSize: file.size,
-      });
-
-      if (!transfer) {
-        throw new Error("Failed to create transfer record");
-      }
+      const transfer = await createTransfer({ filename: file.name, fileSize: file.size });
+      if (!transfer) throw new Error("Failed to create transfer record");
 
       setTransferId(transfer.id);
       addLog(`✓ Transfer record created: ${transfer.id.slice(0, 8)}`);
 
       const connection = peerManagerRef.current.connectToPeer(receiverPeerId);
-      connectionRef.current = connection; // Store reference
+      connectionRef.current = connection;
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Connection timeout")), 30000);
-
         connection.on("open", () => {
           clearTimeout(timeout);
           addLog("✓ Peer connection established");
@@ -424,10 +324,7 @@ export default function SendPage() {
           playConnectionSound();
           resolve();
         });
-
-        // Listen for chat messages here as well to ensure we catch them
         connection.on("data", handleData);
-
         connection.on("error", (err) => {
           clearTimeout(timeout);
           addLog(`✗ Connection error: ${err}`);
@@ -440,20 +337,14 @@ export default function SendPage() {
       addLog("> Starting file transfer protocol...");
 
       fileSenderRef.current = new FileSender(file, connection, transfer.id);
-
       if (password) {
         addLog("> 🔒 Encrypting file with password...");
         await fileSenderRef.current.setPassword(password);
       }
 
-      // Setup pause callback
       fileSenderRef.current.onPauseChange((paused) => {
         setIsPaused(paused);
-        if (paused) {
-          addLog("> Transfer paused by receiver");
-        } else {
-          addLog("> Transfer resumed by receiver");
-        }
+        addLog(paused ? "> Transfer paused by receiver" : "> Transfer resumed by receiver");
       });
 
       fileSenderRef.current.onReject(() => {
@@ -464,23 +355,16 @@ export default function SendPage() {
         playErrorSound();
       });
 
-      // Track if we've already switched to transferring state
       let hasStartedTransfer = false;
-
-      // Start listening for accept/reject events BEFORE sending the offer
-      // This prevents a race condition where the receiver accepts before we're listening
       const transferPromise = fileSenderRef.current.startTransfer((progressData) => {
-        // Update status to transferring on first progress update
         if (!hasStartedTransfer) {
           hasStartedTransfer = true;
           setStatus("transferring");
           addLog("> File accepted! Starting transfer...");
         }
         setProgress(progressData);
-        // Log every 10% progress
-        const percentage = progressData.percentage;
-        if (Math.floor(percentage) % 10 === 0 && Math.floor(percentage) !== Math.floor((progressData.bytesTransferred - 16384) / progressData.totalBytes * 100)) {
-          addLog(`> Progress: ${percentage.toFixed(0)}%`);
+        if (Math.floor(progressData.percentage) % 10 === 0 && Math.floor(progressData.percentage) !== Math.floor((progressData.bytesTransferred - 16384) / progressData.totalBytes * 100)) {
+          addLog(`> Progress: ${progressData.percentage.toFixed(0)}%`);
         }
       });
 
@@ -489,15 +373,17 @@ export default function SendPage() {
       setStatus("waiting");
       addLog("> Waiting for receiver to accept...");
 
-      // Wait for the transfer to complete (or fail)
       await transferPromise;
-
       await updateTransferStatus(transfer.id, "complete");
       setStatus("complete");
       addLog("✓ Transfer completed successfully");
       vibrate('success');
       playSuccessSound();
       notifyTransferComplete("sent", file.name);
+
+      if ('setAppBadge' in navigator) {
+        (navigator as any).setAppBadge(1).catch(console.error);
+      }
     } catch (err: any) {
       console.error("Transfer failed:", err);
       setError(err.message || "Transfer failed");
@@ -505,32 +391,13 @@ export default function SendPage() {
       addLog(`✗ Transfer failed: ${err.message}`);
       vibrate('error');
       playErrorSound();
-
-      if (transferId) {
-        await updateTransferStatus(transferId, "failed");
-      }
+      if (transferId) await updateTransferStatus(transferId, "failed");
     }
-  }
+  };
 
-  function resetTransfer() {
-    // Cleanup if transfer is in progress
-    if (fileSenderRef.current) {
-      try {
-        fileSenderRef.current.cancel();
-      } catch (e) {
-        console.error("Error cancelling transfer:", e);
-      }
-    }
-
-    // Explicitly close connection
-    if (connectionRef.current) {
-      try {
-        connectionRef.current.close();
-      } catch (e) {
-        console.error("Error closing connection:", e);
-      }
-    }
-
+  const resetTransfer = () => {
+    if (fileSenderRef.current) fileSenderRef.current.cancel();
+    if (connectionRef.current) connectionRef.current.close();
     setFile(null);
     setReceiverPeerId("");
     setStatus("idle");
@@ -541,13 +408,10 @@ export default function SendPage() {
     fileSenderRef.current = null;
     connectionRef.current = null;
     setMessages([]);
-    setLogs([
-      "Initializing WebRTC handshake...",
-      "Waiting for peer connection...",
-    ]);
-  }
+    setLogs(["Initializing WebRTC handshake...", "Waiting for peer connection..."]);
+  };
 
-  function handlePauseResume() {
+  const handlePauseResume = () => {
     if (!fileSenderRef.current) return;
     if (isPaused) {
       fileSenderRef.current.resume();
@@ -558,21 +422,18 @@ export default function SendPage() {
       setIsPaused(true);
       addLog("> Transfer paused");
     }
-  }
+  };
 
-  function handleCancel() {
+  const handleCancel = () => {
     if (!fileSenderRef.current) return;
     fileSenderRef.current.cancel();
     setStatus("error");
     addLog("✗ Transfer cancelled by user");
-    if (transferId) {
-      updateTransferStatus(transferId, "cancelled");
-    }
-  }
+    if (transferId) updateTransferStatus(transferId, "cancelled");
+  };
 
   return (
     <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
-      {/* Modal for Back Navigation Confirmation */}
       <ConfirmLeaveModal
         isOpen={showBackModal}
         onConfirm={confirmBackNavigation}
@@ -592,7 +453,6 @@ export default function SendPage() {
         isCreation={true}
       />
 
-      {/* Navbar: Split Header Design */}
       <TransferHeader
         isPeerReady={isPeerReady}
         status={status}
@@ -605,14 +465,9 @@ export default function SendPage() {
         }}
       />
 
-      {/* Main Layout */}
       <main className="flex-grow flex flex-col relative">
-        {/* Central Workspace with Grid Background */}
-        {/* Central Workspace */}
         <section className="flex-1 flex flex-col relative">
-          {/* Content Container */}
           <div className="flex-1 p-6 md:p-12 flex flex-col max-w-7xl mx-auto w-full gap-8">
-            {/* Page Header */}
             <div className="flex flex-col gap-1">
               <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white uppercase">
                 Secure Transfer <span className="text-primary">Uplink</span>
@@ -627,28 +482,24 @@ export default function SendPage() {
 
             {status === "idle" && (
               <>
-                {/* Drag & Drop Zone - Mechanical/Breathing */}
                 <div
                   className="group relative w-full h-80 md:h-96 border-[2px] border-white/10 bg-[#0a0a0a]/50 backdrop-blur-sm hover:bg-[#0a0a0a]/80 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-6 overflow-hidden hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_50px_-10px_rgba(255,234,46,0.1)]"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  {/* Breathing Glow Border */}
                   <div className="absolute inset-0 border-[2px] border-primary/20 group-hover:border-primary/60 transition-colors duration-500 mask-container"></div>
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,rgba(255,234,46,0.05)_0%,transparent_70%)]"></div>
-
 
                   <input
                     ref={fileInputRef}
                     data-testid="file-input"
                     type="file"
-                    multiple // Allow multiple files
+                    multiple
                     onChange={handleFileSelect}
                     className="hidden"
                   />
 
-                  {/* Animated Center Icon */}
                   <div className="relative z-10 flex flex-col items-center gap-4 group-hover:-translate-y-2 transition-transform duration-300">
                     <div className="relative w-24 h-24 flex items-center justify-center">
                       <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-20 group-hover:opacity-40 duration-1000"></div>
@@ -677,28 +528,21 @@ export default function SendPage() {
                     )}
                   </div>
 
-                  {/* Mechanical Corner Brackets */}
                   <div className="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
                   <div className="absolute top-4 right-4 w-4 h-4 border-r-2 border-t-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
                   <div className="absolute bottom-4 left-4 w-4 h-4 border-l-2 border-b-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
                   <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-white/30 group-hover:border-primary group-hover:w-8 group-hover:h-8 transition-all duration-300"></div>
-
-                  {/* Scanline Effect */}
                   <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(255,255,255,0.02)_50%,transparent_100%)] h-[200%] w-full animate-[scan_4s_linear_infinite] pointer-events-none opacity-0 group-hover:opacity-100"></div>
                 </div>
 
-                {/* File Preview & Transfer Controls */}
                 {file && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* File Preview Card with Corner Fold */}
                     <div className="lg:col-span-2">
                       <h3 className="font-mono text-[#bcb89a] text-sm mb-4 uppercase tracking-widest">Selected Payload</h3>
                       <div className="corner-fold bg-surface-dark p-6 md:p-8 min-h-[200px] flex gap-6 shadow-2xl">
-                        {/* File Icon */}
                         <div className="w-32 h-32 bg-[#11110f] flex items-center justify-center shrink-0 border border-[#3a3827]">
                           <span className="material-symbols-outlined text-white/50" style={{ fontSize: '48px' }}>description</span>
                         </div>
-                        {/* File Details */}
                         <div className="flex flex-col justify-between flex-1 py-1">
                           <div>
                             <h4 className="text-white text-xl md:text-2xl font-bold leading-tight mb-2">{file.name}</h4>
@@ -707,7 +551,6 @@ export default function SendPage() {
                               <p className="truncate max-w-[300px] md:max-w-md text-xs opacity-50">Ready for encrypted transfer</p>
                             </div>
                           </div>
-                          {/* Remove Action */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -723,13 +566,9 @@ export default function SendPage() {
                       </div>
                     </div>
 
-                    {/* Transfer Controls */}
                     <div className="lg:col-span-1 flex flex-col gap-6">
                       <h3 className="font-mono text-[#bcb89a] text-sm mb-2 uppercase tracking-widest">Transfer Control</h3>
-
-                      {/* Peer ID Input */}
                       <div className="flex flex-col gap-3">
-                        {/* ... Peer ID Label and Input ... */}
                         <label className="text-xs font-bold tracking-[0.1em] text-primary uppercase flex items-center gap-2">
                           <span className="material-symbols-outlined text-sm">hub</span>
                           Destination Peer ID
@@ -754,7 +593,6 @@ export default function SendPage() {
                         </div>
                       </div>
 
-                      {/* Password Protection Toggle */}
                       <div className="flex flex-col gap-3">
                         <label className="text-xs font-bold tracking-[0.1em] text-primary uppercase flex items-center gap-2">
                           <span className="material-symbols-outlined text-sm">enhanced_encryption</span>
@@ -784,7 +622,6 @@ export default function SendPage() {
                         )}
                       </div>
 
-                      {/* Main Action Button */}
                       <button
                         data-testid="initiate-transfer-button"
                         onClick={handleSend}
@@ -806,7 +643,6 @@ export default function SendPage() {
               </>
             )}
 
-            {/* Zipping State */}
             {isZipping && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
@@ -824,7 +660,6 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Connecting State */}
             {status === "connecting" && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
@@ -841,7 +676,6 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Waiting for Acceptance State */}
             {status === "waiting" && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
@@ -859,12 +693,9 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Transferring State - Split Layout */}
             {status === "transferring" && file && progress && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 h-full">
-                {/* Left Column: Controls & Progress */}
                 <div className="lg:col-span-5 flex flex-col gap-6">
-                  {/* Connected Peer Card */}
                   <div className="bg-[#1a1a1a] p-4 border-l-4 border-primary flex items-center justify-between shadow-lg">
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -881,12 +712,8 @@ export default function SendPage() {
                     <span className="text-primary material-symbols-outlined animate-pulse">lock</span>
                   </div>
 
-                  {/* Main Progress Card */}
                   <div className="bg-[#11110f]/90 backdrop-blur-sm p-6 border border-[#3a3827] flex-1 flex flex-col gap-6 relative overflow-hidden group">
-                    {/* Background Grid */}
                     <div className="absolute inset-0 bg-[radial-gradient(#3a3827_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
-
-                    {/* Header */}
                     <div className="flex justify-between items-start z-10">
                       <div>
                         <h3 className="text-white font-black uppercase text-xl tracking-tighter">Uploading Payload</h3>
@@ -898,7 +725,6 @@ export default function SendPage() {
                       </div>
                     </div>
 
-                    {/* Enhanced Progress Bar */}
                     <ProgressBar
                       percentage={progress.percentage}
                       isPaused={isPaused}
@@ -908,7 +734,6 @@ export default function SendPage() {
                       timeRemaining={progress.timeRemaining}
                     />
 
-                    {/* Controls */}
                     <div className="grid grid-cols-2 gap-3 mt-auto z-10">
                       <button
                         onClick={handlePauseResume}
@@ -933,9 +758,7 @@ export default function SendPage() {
                   </div>
                 </div>
 
-                {/* Right Column: Uplink Visualizer */}
                 <div className="lg:col-span-7 relative min-h-[400px] border border-[#3a3827] bg-[#0a0a0a] overflow-hidden flex items-center justify-center">
-                  {/* Background Elements */}
                   <div className="absolute inset-0 pointer-events-none opacity-20"
                     style={{
                       backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
@@ -943,18 +766,15 @@ export default function SendPage() {
                     }}
                   />
 
-                  {/* Central Emitter */}
                   <div className="relative z-10 flex items-center justify-center">
                     <div className="absolute w-[300px] h-[300px] border border-primary/20 rounded-full animate-[spin_10s_linear_infinite]" />
                     <div className="absolute w-[200px] h-[200px] border border-dashed border-primary/40 rounded-full animate-[spin_20s_linear_infinite_reverse]" />
                     <div className="absolute w-[100px] h-[100px] bg-primary/10 rounded-full blur-xl animate-pulse" />
 
-                    {/* Core */}
                     <div className="w-16 h-16 bg-[#1a1a1a] border border-primary rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,234,46,0.5)] z-20">
                       <span className={`material-symbols-outlined text-primary text-3xl ${!isPaused && "animate-ping"}`}>upload</span>
                     </div>
 
-                    {/* Particles (CSS Simulated) */}
                     {!isPaused && (
                       <>
                         <div className="absolute w-2 h-2 bg-primary rounded-full animate-[ping_2s_linear_infinite]" style={{ top: '-100px' }} />
@@ -963,11 +783,9 @@ export default function SendPage() {
                       </>
                     )}
 
-                    {/* Scanning Line */}
                     <div className="absolute inset-0 w-full h-[2px] bg-primary/50 top-1/2 -translate-y-1/2 animate-[spin_4s_linear_infinite] shadow-[0_0_10px_rgba(255,234,46,0.8)]" />
                   </div>
 
-                  {/* Status Overlays */}
                   <div className="absolute top-6 left-6 flex flex-col gap-1">
                     <span className="text-[10px] font-bold text-primary uppercase tracking-widest border border-primary px-2 py-1 bg-primary/10">Uplink Active</span>
                     <span className="text-[10px] font-mono text-white/50">CHANNEL_SECURE</span>
@@ -987,7 +805,6 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Error State */}
             {status === "error" && (
               <div className="text-center py-12 max-w-2xl mx-auto">
                 <div className="w-16 h-16 mx-auto mb-4 bg-bauhaus-red flex items-center justify-center shadow-[0_0_20px_rgba(255,59,48,0.3)]">
@@ -998,7 +815,6 @@ export default function SendPage() {
                   {error || "Unknown error occurred"}
                 </p>
 
-                {/* Diagnostic Insights */}
                 <div className="mb-8 p-4 bg-white/5 border border-white/10 text-left font-mono text-[10px] space-y-2">
                   <p className="text-primary font-bold uppercase mb-2 flex items-center gap-2">
                     <span className="material-symbols-outlined text-xs">analytics</span>
@@ -1006,11 +822,11 @@ export default function SendPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 opacity-70">
                     <p>SECURE_CONTEXT:</p> <p className={isSecureContext() ? "text-green-400" : "text-bauhaus-red"}>{String(isSecureContext()).toUpperCase()}</p>
-                    <p>NETWORK_STATUS:</p> <p className="text-white">{navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
+                    <p>NETWORK_STATUS:</p> <p className="text-white">{typeof navigator !== 'undefined' && navigator.onLine ? "ONLINE" : "OFFLINE"}</p>
                     <p>SIGNALING_SERVER:</p> <p className={peerManagerRef.current?.getState() === 'failed' ? "text-bauhaus-red" : "text-green-400"}>{peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}</p>
                   </div>
                   <p className="mt-4 text-[9px] text-white/30 italic">
-                    Hint: If on mobile, ensure you are using HTTPS. &quot;Connection timeout&quot; often indicates NAT traversal issues—check if both devices are on the same network or if a VPN is interfering.
+                    Hint: If on mobile, ensure you are using HTTPS. &quot;Connection timeout&quot; often indicates NAT traversal issues.
                   </p>
                 </div>
 
@@ -1031,7 +847,6 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Complete State */}
             {status === "complete" && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 bg-green-500 flex items-center justify-center">
@@ -1048,7 +863,6 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* Terminal / Log Output */}
             <div className="mt-auto pt-8">
               <div className="bg-black/40 border-l-2 border-primary p-4 font-mono text-xs text-[#bcb89a] h-64 overflow-y-auto">
                 {logs.map((log, i) => (
@@ -1063,7 +877,6 @@ export default function SendPage() {
         </section>
       </main>
 
-      {/* Footer: Tri-Color Strip */}
       <footer className="mt-auto">
         <div className="flex h-3 w-full">
           <div className="flex-1 bg-bauhaus-blue"></div>
@@ -1081,13 +894,9 @@ export default function SendPage() {
         peerId={receiverPeerId}
       />
 
-      {/* Floating Chat Button */}
       {status !== "idle" && (
         <button
-          onClick={() => {
-            setIsChatOpen(true);
-            setHasUnread(false);
-          }}
+          onClick={() => { setIsChatOpen(true); setHasUnread(false); }}
           className="fixed bottom-6 right-6 z-40 bg-primary text-black p-4 rounded-full shadow-xl hover:scale-110 transition-transform flex items-center justify-center border-2 border-[#121212]"
         >
           <span className="material-symbols-outlined text-2xl">forum</span>
@@ -1100,20 +909,11 @@ export default function SendPage() {
         </button>
       )}
 
-      {/* Custom Styles */}
       <style jsx>{`
-        /* Corner Fold Effect */
         .corner-fold {
-          clip-path: polygon(
-            0 0,
-            calc(100% - 48px) 0,
-            100% 48px,
-            100% 100%,
-            0 100%
-          );
+          clip-path: polygon(0 0, calc(100% - 48px) 0, 100% 48px, 100% 100%, 0 100%);
           position: relative;
         }
-
         .corner-fold::after {
           content: '';
           position: absolute;
@@ -1124,27 +924,21 @@ export default function SendPage() {
           background: linear-gradient(to bottom left, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(0,0,0,0.3) 100%);
           pointer-events: none;
         }
-
         @keyframes scan {
           0% { transform: translateY(-50%); }
           100% { transform: translateY(0%); }
         }
       `}</style>
 
-      {/* Global Drag Overlay */}
       {isDraggingOver && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-200">
           <div className="w-64 h-64 rounded-full border-4 border-dashed border-primary animate-[spin_10s_linear_infinite] flex items-center justify-center mb-8">
             <div className="w-48 h-48 rounded-full bg-primary/20 animate-pulse"></div>
           </div>
-          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
-            Drop Payload Here
-          </h2>
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Drop Payload Here</h2>
           <p className="text-primary font-mono mt-4">Initiating Transfer Sequence</p>
         </div>
       )}
-
-
 
       <QRScannerModal
         isOpen={showQRScanner}
@@ -1155,5 +949,20 @@ export default function SendPage() {
         onClose={() => setShowQRScanner(false)}
       />
     </div>
+  );
+}
+
+export default function SendPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <p className="font-mono text-primary animate-pulse text-xs uppercase tracking-widest">Initialising Uplink...</p>
+        </div>
+      </div>
+    }>
+      <SendPageContent />
+    </Suspense>
   );
 }
