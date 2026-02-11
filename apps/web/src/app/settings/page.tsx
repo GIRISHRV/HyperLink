@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser, signOut } from "@/lib/services/auth-service";
 import { getUserProfile, updateUserProfile } from "@/lib/services/profile-service";
@@ -50,11 +50,7 @@ export default function SettingsPage() {
   // UI state
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    checkUserAndLoadProfile();
-  }, []);
-
-  async function checkUserAndLoadProfile() {
+  const checkUserAndLoadProfile = useCallback(async () => {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
       router.push("/auth");
@@ -73,7 +69,11 @@ export default function SettingsPage() {
     }
 
     setLoading(false);
-  }
+  }, [router]);
+
+  useEffect(() => {
+    checkUserAndLoadProfile();
+  }, [checkUserAndLoadProfile]);
 
   async function handleSave() {
     setSaving(true);

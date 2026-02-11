@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 
 interface QRScannerModalProps {
@@ -15,22 +15,26 @@ export default function QRScannerModal({ isOpen, onScan, onClose }: QRScannerMod
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const hasScannedRef = useRef(false);
 
-    useEffect(() => {
-        if (!isOpen) {
-            cleanup();
-            return;
+    const cleanup = useCallback(async () => {
+        if (scannerRef.current) {
+            try {
+                // Check if scanner is actually running before trying to stop
+                const state = await scannerRef.current.getState();
+                // State 2 = SCANNING, State 3 = PAUSED
+                if (state === 2 || state === 3) {
+                    await scannerRef.current.stop();
+                }
+                scannerRef.current.clear();
+            } catch (err) {
+                // Silently handle cleanup errors (common in React strict mode)
+                console.warn("QR Scanner cleanup warning:", err);
+            }
+            scannerRef.current = null;
         }
+        setIsScanning(false);
+    }, []);
 
-        hasScannedRef.current = false;
-        setError("");
-        startScanner();
-
-        return () => {
-            cleanup();
-        };
-    }, [isOpen]);
-
-    async function startScanner() {
+    const startScanner = useCallback(async () => {
         try {
             setIsScanning(true);
             const scanner = new Html5Qrcode("qr-reader");
@@ -59,26 +63,22 @@ export default function QRScannerModal({ isOpen, onScan, onClose }: QRScannerMod
             setError(err.message || "Failed to access camera. Please check permissions.");
             setIsScanning(false);
         }
-    }
+    }, [onScan, onClose, cleanup]);
 
-    async function cleanup() {
-        if (scannerRef.current) {
-            try {
-                // Check if scanner is actually running before trying to stop
-                const state = await scannerRef.current.getState();
-                // State 2 = SCANNING, State 3 = PAUSED
-                if (state === 2 || state === 3) {
-                    await scannerRef.current.stop();
-                }
-                scannerRef.current.clear();
-            } catch (err) {
-                // Silently handle cleanup errors (common in React strict mode)
-                console.warn("QR Scanner cleanup warning:", err);
-            }
-            scannerRef.current = null;
+    useEffect(() => {
+        if (!isOpen) {
+            cleanup();
+            return;
         }
-        setIsScanning(false);
-    }
+
+        hasScannedRef.current = false;
+        setError("");
+        startScanner();
+
+        return () => {
+            cleanup();
+        };
+    }, [isOpen, startScanner, cleanup]);
 
     if (!isOpen) return null;
 

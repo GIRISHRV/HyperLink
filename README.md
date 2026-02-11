@@ -19,6 +19,7 @@ A decentralized file-sharing application capable of transferring 10GB+ files bet
 - **Storage:** IndexedDB (`idb` wrapper)
 - **Auth & DB:** Supabase
 - **Signaling:** PeerServer (Node.js)
+- **Monitoring:** Sentry (Performance & Error Tracking)
 
 ## 🚀 Quick Start
 
@@ -49,6 +50,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 NEXT_PUBLIC_PEER_SERVER_HOST=localhost
 NEXT_PUBLIC_PEER_SERVER_PORT=9000
 NEXT_PUBLIC_PEER_SERVER_PATH=/myapp
+NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
 ```
 
 ## 📦 Project Structure
@@ -62,7 +64,7 @@ hyperlink/
 │   ├── typescript-config/
 │   ├── eslint-config/
 │   ├── types/
-│   └── utils/
+│   └── utils/            # Includes specialized logger
 ├── supabase/
 │   └── migrations/
 └── turbo.json
@@ -75,8 +77,13 @@ hyperlink/
 - **Direct-to-Disk:** IndexedDB streaming for received chunks
 - **Supabase Auth:** Secure authentication
 - **Transfer History:** Metadata tracking in Postgres
+- **PWA Ready:** Installable with offline support and custom branding
+- **Real-time Monitoring:** Sentry integration for client and server-side errors
 
 ## 🛠️ Development
+
+### Logging
+The project uses a centralized `logger` from `@repo/utils`. Avoid using `console.log`. Use `logger.info`, `logger.warn`, or `logger.error` which are properly structured for production monitoring.
 
 ```bash
 # Run all apps

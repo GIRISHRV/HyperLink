@@ -1,6 +1,6 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
-import { generateTransferId, calculateChunkCount } from "@repo/utils";
+import { generateTransferId, calculateChunkCount, logger } from "@repo/utils";
 
 const CHUNK_SIZE = 64 * 1024; // 64KB chunks for higher throughput
 const WINDOW_SIZE = 16; // reduced window size to prevent buffer overflow with larger chunks
@@ -50,9 +50,9 @@ export class FileSender {
       timestamp: Date.now(),
     };
 
-    console.log("[SENDER] 📤 Sending FILE-OFFER to receiver:", offerMessage);
+    logger.info({ offerMessage }, "[SENDER] 📤 Sending FILE-OFFER to receiver");
     await this.safeSend(offerMessage);
-    console.log("[SENDER] ✅ FILE-OFFER sent successfully");
+    logger.info("[SENDER] ✅ FILE-OFFER sent successfully");
     return this.transferId;
   }
   /**
@@ -60,7 +60,7 @@ export class FileSender {
    */
   async startTransfer(onProgress?: (progress: TransferProgress) => void): Promise<void> {
     if (this.isTransferring) {
-      console.warn("[SENDER] Transfer already in progress, ignoring duplicate call");
+      logger.warn("[SENDER] Transfer already in progress, ignoring duplicate call");
       return;
     }
 
@@ -71,17 +71,17 @@ export class FileSender {
     return new Promise((resolve, reject) => {
       this.rejectTransfer = reject;
 
-      console.log("[SENDER] Setting up Turbo Mode (Sliding Window)...");
+      logger.info("[SENDER] Setting up Turbo Mode (Sliding Window)...");
 
       // Listen for connection events to detect failure during transfer
       const onClose = () => {
-        console.error("[SENDER] Connection closed during transfer");
+        logger.error("[SENDER] Connection closed during transfer");
         cleanup();
         reject(new Error("Connection closed abruptly"));
       };
 
       const onError = (err: any) => {
-        console.error("[SENDER] Connection error during transfer:", err);
+        logger.error({ err }, "[SENDER] Connection error during transfer");
         cleanup();
         reject(err instanceof Error ? err : new Error(String(err)));
       };
@@ -113,7 +113,7 @@ export class FileSender {
 
         // Wait for file-accept before sending first chunk
         if (message.type === "file-accept" && !transferStarted) {
-          console.log("[SENDER] Received file-accept, pumping chunks...");
+          logger.info("[SENDER] Received file-accept, pumping chunks...");
           transferStarted = true;
           this.pump();
           return;
@@ -130,7 +130,7 @@ export class FileSender {
           if (this.currentChunk >= this.totalChunks && this.activeChunks <= 0) {
             cleanup();
             this.sendComplete().catch(err => {
-              console.error("[SENDER] Final complete failed:", err);
+              logger.error({ err }, "[SENDER] Final complete failed");
             }).finally(() => {
               resolve();
             });
@@ -141,30 +141,30 @@ export class FileSender {
           this.pump();
 
         } else if (message.type === "file-reject") {
-          console.log("[SENDER] Receiver rejected the file offer");
+          logger.info("[SENDER] Receiver rejected the file offer");
           this.isCancelled = true;
           this.rejectCallback?.();
           cleanup();
           reject(new Error("File offer rejected by receiver"));
         } else if (message.type === "transfer-cancel") {
-          console.log("[SENDER] Receiver cancelled transfer");
+          logger.info("[SENDER] Receiver cancelled transfer");
           this.isCancelled = true;
           this.cancelCallback?.();
           cleanup();
           reject(new Error("Transfer cancelled by receiver"));
         } else if (message.type === "transfer-pause") {
-          console.log("[SENDER] Receiver requested pause");
+          logger.info("[SENDER] Receiver requested pause");
           this.isPaused = true;
           this.pauseCallback?.(true);
         } else if (message.type === "transfer-resume") {
-          console.log("[SENDER] Receiver requested resume");
+          logger.info("[SENDER] Receiver requested resume");
           this.isPaused = false;
           this.pauseCallback?.(false);
           this.pump();
         }
       });
 
-      console.log("[SENDER] Waiting for receiver to accept...");
+      logger.info("[SENDER] Waiting for receiver to accept...");
     });
   }
 
@@ -237,7 +237,7 @@ export class FileSender {
     };
 
     this.safeSend(chunkMessage).catch(err => {
-      console.error("[SENDER] Failed to send chunk:", err);
+      logger.error({ err }, "[SENDER] Failed to send chunk");
       this.sendError("Chunk transmission failed");
       this.rejectTransfer?.(new Error("Chunk transmission failed"));
     });
@@ -275,7 +275,7 @@ export class FileSender {
     };
 
     await this.safeSend(completeMessage);
-    console.log("[SENDER] Transfer complete!");
+    logger.info("[SENDER] Transfer complete!");
   }
 
   /**
@@ -300,7 +300,7 @@ export class FileSender {
 
     // Wait for connection to be ready if it's not open yet
     if (!this.connection.open) {
-      console.warn("[SENDER] Connection not open. Waiting for ready state...");
+      logger.warn("[SENDER] Connection not open. Waiting for ready state...");
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Timeout waiting for connection to open")), 5000);
 
@@ -324,11 +324,11 @@ export class FileSender {
       this.connection.send(message);
     } catch (err: any) {
       const dc = (this.connection as any).dataChannel;
-      console.error("[SENDER] Send failed. DataChannel state:", dc?.readyState, "Error:", err);
+      logger.error({ readyState: dc?.readyState, err }, "[SENDER] Send failed");
 
       // If it's a "not open" error despite the check, wait a tick and retry once
       if (err?.message?.includes("not open") || err?.toString().includes("not open")) {
-        console.log("[SENDER] Retrying send after tick...");
+        logger.info("[SENDER] Retrying send after tick...");
         await new Promise(r => setTimeout(r, 100));
         this.connection.send(message);
       } else {
@@ -351,7 +351,7 @@ export class FileSender {
     try {
       this.safeSend(cancelMessage);
     } catch (e) {
-      console.warn("[SENDER] Failed to send cancel message:", e);
+      logger.warn({ e }, "[SENDER] Failed to send cancel message");
     }
     this.rejectTransfer?.(new Error("Transfer cancelled by sender"));
   }
@@ -371,9 +371,9 @@ export class FileSender {
     try {
       this.safeSend(pauseMessage);
     } catch (e) {
-      console.warn("[SENDER] Failed to send pause message:", e);
+      logger.warn({ e }, "[SENDER] Failed to send pause message");
     }
-    console.log("[SENDER] Transfer paused");
+    logger.info("[SENDER] Transfer paused");
   }
 
   /**
@@ -391,9 +391,9 @@ export class FileSender {
     try {
       this.safeSend(resumeMessage);
     } catch (e) {
-      console.warn("[SENDER] Failed to send resume message:", e);
+      logger.warn({ e }, "[SENDER] Failed to send resume message");
     }
-    console.log("[SENDER] Transfer resumed, pumping...");
+    logger.info("[SENDER] Transfer resumed, pumping...");
     this.pump();
   }
 

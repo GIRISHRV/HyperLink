@@ -32,6 +32,7 @@ export default function SendPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false); // Global drag state
+  const [isPeerReady, setIsPeerReady] = useState(false);
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
     "Waiting for peer connection...",
@@ -232,9 +233,11 @@ export default function SendPage() {
     try {
       await peerManagerRef.current.initialize();
       addLog("✓ Peer manager initialized successfully");
+      setIsPeerReady(true);
     } catch (err: any) {
       setError(`Failed to connect to signaling server: ${err.message}`);
       addLog(`✗ Error: ${err.message}`);
+      setIsPeerReady(false);
     } finally {
       initializingRef.current = false;
     }
@@ -277,13 +280,15 @@ export default function SendPage() {
       return;
     }
 
-    setFile(droppedFile);
-    setError("");
     addLog(`✓ File selected: ${droppedFile.name} (${formatFileSize(droppedFile.size)})`);
   }
 
+
   async function handleSend() {
-    if (!file || !receiverPeerId || !peerManagerRef.current) return;
+    if (!file || !receiverPeerId) {
+      return;
+    }
+    if (!peerManagerRef.current) return;
 
     setStatus("connecting");
     setError("");
@@ -384,6 +389,7 @@ export default function SendPage() {
       vibrate('success');
       notifyTransferComplete("sent", file.name);
     } catch (err: any) {
+      console.error("Transfer failed:", err);
       setError(err.message || "Transfer failed");
       setStatus("error");
       addLog(`✗ Transfer failed: ${err.message}`);
@@ -512,8 +518,8 @@ export default function SendPage() {
               <div className="flex items-center gap-2 text-[#bcb89a] font-mono text-sm">
                 <span className="material-symbols-outlined text-sm">lock</span>
                 <span>/secure_channel/send</span>
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2"></span>
-                <span className="text-green-500">WEBRTC_READY</span>
+                <span className={`w-2 h-2 rounded-full ${isPeerReady ? 'bg-green-500 animate-pulse' : 'bg-red-500'} ml-2`}></span>
+                <span className={isPeerReady ? 'text-green-500' : 'text-red-500'}>{isPeerReady ? 'WEBRTC_READY' : 'INITIALIZING'}</span>
               </div>
             </div>
 
@@ -532,6 +538,7 @@ export default function SendPage() {
 
                   <input
                     ref={fileInputRef}
+                    data-testid="file-input"
                     type="file"
                     onChange={handleFileSelect}
                     className="hidden"
@@ -624,6 +631,7 @@ export default function SendPage() {
                         </label>
                         <div className="flex gap-2">
                           <input
+                            data-testid="peer-id-input"
                             className="flex-1 bg-transparent border-b-2 border-white/20 focus:border-primary px-0 py-3 text-lg font-mono text-white placeholder-white/20 outline-none transition-colors"
                             placeholder="Enter hash..."
                             type="text"
@@ -643,8 +651,9 @@ export default function SendPage() {
 
                       {/* Main Action Button */}
                       <button
+                        data-testid="initiate-transfer-button"
                         onClick={handleSend}
-                        disabled={!file || !receiverPeerId}
+                        disabled={!file || !receiverPeerId || !isPeerReady}
                         className="w-full bg-primary hover:bg-[#e6ce00] text-black h-16 flex items-center justify-center gap-3 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span className="font-black text-lg tracking-wider">INITIATE TRANSFER</span>

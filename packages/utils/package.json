@@ -11,5 +11,9 @@
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3"
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { getUserProfile } from "@/lib/services/profile-service";
@@ -21,18 +21,7 @@ export default function DashboardPage() {
   const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
   const { transfers, loading: transfersLoading, removeTransfer } = useUserTransfersRealtime();
 
-  useEffect(() => {
-    checkUser();
-
-    // Update time every second
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  async function checkUser() {
+  const checkUser = useCallback(async () => {
     try {
       const currentUser = await getCurrentUser();
       if (!currentUser) {
@@ -61,7 +50,18 @@ export default function DashboardPage() {
       console.error("Auth check failed:", e);
       router.push("/auth");
     }
-  }
+  }, [router]);
+
+  useEffect(() => {
+    checkUser();
+
+    // Update time every second
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [checkUser]);
 
   if (loading) {
     return (

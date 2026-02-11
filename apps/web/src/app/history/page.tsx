@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { getUserProfile } from "@/lib/services/profile-service";
@@ -24,11 +24,7 @@ export default function HistoryPage() {
   const [avatarColor, setAvatarColor] = useState({ value: "bg-primary", text: "text-black" });
   const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
-  useEffect(() => {
-    checkUser();
-  }, []);
-
-  async function checkUser() {
+  const checkUser = useCallback(async () => {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
       router.push("/auth");
@@ -52,7 +48,11 @@ export default function HistoryPage() {
     }
 
     setLoading(false);
-  }
+  }, [router]);
+
+  useEffect(() => {
+    checkUser();
+  }, [checkUser]);
 
   if (loading) {
     return (

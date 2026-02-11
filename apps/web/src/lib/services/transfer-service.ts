@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { logger } from "@repo/utils";
 import type { Transfer } from "@repo/types";
 
 /**
@@ -28,7 +29,7 @@ export async function createTransfer(data: {
     .single();
 
   if (error) {
-    console.error("Error creating transfer:", error);
+    logger.error({ error }, "Error creating transfer");
     return null;
   }
 
@@ -51,7 +52,7 @@ export async function updateTransferStatus(
   const { error } = await supabase.from("transfers").update(updates).eq("id", transferId);
 
   if (error) {
-    console.error("Error updating transfer:", error);
+    logger.error({ error }, "Error updating transfer");
     return false;
   }
 
@@ -76,7 +77,7 @@ export async function claimTransferAsReceiver(transferId: string): Promise<Trans
   });
 
   if (error) {
-    console.error("Error claiming transfer:", error);
+    logger.error({ error }, "Error claiming transfer");
     return null;
   }
 
@@ -101,7 +102,7 @@ export async function getUserTransfers(): Promise<Transfer[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching transfers:", error);
+    logger.error({ error }, "Error fetching transfers");
     return [];
   }
 
@@ -119,7 +120,7 @@ export async function getTransfer(transferId: string): Promise<Transfer | null> 
     .single();
 
   if (error) {
-    console.error("Error fetching transfer:", error);
+    logger.error({ error }, "Error fetching transfer");
     return null;
   }
 
@@ -133,7 +134,7 @@ export async function deleteTransfer(transferId: string): Promise<boolean> {
   const { error } = await supabase.from("transfers").delete().eq("id", transferId);
 
   if (error) {
-    console.error("Error deleting transfer:", error);
+    logger.error({ error }, "Error deleting transfer");
     return false;
   }
 
@@ -146,18 +147,18 @@ export async function deleteTransfer(transferId: string): Promise<boolean> {
 export async function deleteMultipleTransfers(transferIds: string[]): Promise<boolean> {
   if (transferIds.length === 0) return true;
 
-  console.log("[TRANSFER-SERVICE] Deleting transfers:", transferIds);
-  
+  logger.info({ transferIds }, "[TRANSFER-SERVICE] Deleting transfers");
+
   // First check what we can actually see
   const { data: user } = await supabase.auth.getUser();
-  console.log("[TRANSFER-SERVICE] Current user ID:", user?.user?.id);
-  
+  logger.info({ userId: user?.user?.id }, "[TRANSFER-SERVICE] Current user ID");
+
   const { data: checkData } = await supabase
     .from("transfers")
     .select("id, sender_id, receiver_id")
     .in("id", transferIds);
-  console.log("[TRANSFER-SERVICE] Transfers we can SELECT:", checkData);
-  
+  logger.info({ checkData }, "[TRANSFER-SERVICE] Transfers we can SELECT");
+
   // Use .select() to get rows that were deleted (requires RLS access)
   const { data, error } = await supabase
     .from("transfers")
@@ -166,10 +167,10 @@ export async function deleteMultipleTransfers(transferIds: string[]): Promise<bo
     .select("id");
 
   if (error) {
-    console.error("[TRANSFER-SERVICE] Error deleting transfers:", error);
+    logger.error({ error }, "[TRANSFER-SERVICE] Error deleting transfers");
     return false;
   }
 
-  console.log("[TRANSFER-SERVICE] Actually deleted:", data);
+  logger.info({ data }, "[TRANSFER-SERVICE] Actually deleted");
   return true;
 }

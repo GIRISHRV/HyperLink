@@ -2,6 +2,7 @@ import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import type { FileChunk } from "@repo/types";
 import { addChunk, getAllChunks, clearTransfer } from "@/lib/storage/idb-manager";
+import { logger } from "@repo/utils";
 
 export class FileReceiver {
   private transferId: string = "";
@@ -39,7 +40,7 @@ export class FileReceiver {
     this.startTime = Date.now();
     this.receivedChunks = 0;
     this.bytesReceived = 0;
-    console.log("[RECEIVER] handleOffer:", { transferId: this.transferId, filename: this.filename, totalChunks: this.totalChunks });
+    logger.info({ transferId: this.transferId, filename: this.filename, totalChunks: this.totalChunks }, "[RECEIVER] handleOffer");
   }
 
   /**
@@ -61,7 +62,7 @@ export class FileReceiver {
     try {
       await addChunk(chunk);
     } catch (error) {
-      console.error(`[RECEIVER] Failed to store chunk ${chunkIndex}:`, error);
+      logger.error({ chunkIndex, error }, "[RECEIVER] Failed to store chunk");
       return;
     }
 
@@ -71,7 +72,7 @@ export class FileReceiver {
     // Log progress every 10%
     const percentage = (this.receivedChunks / this.totalChunks) * 100;
     if (this.receivedChunks % Math.ceil(this.totalChunks / 10) === 0) {
-      console.log(`[RECEIVER] Progress: ${percentage.toFixed(0)}% (chunk ${this.receivedChunks}/${this.totalChunks})`);
+      logger.info({ percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks }, "[RECEIVER] Progress");
     }
 
     // Update progress callback
@@ -95,7 +96,7 @@ export class FileReceiver {
 
     // Check if transfer is complete
     if (this.receivedChunks === this.totalChunks) {
-      console.log("[RECEIVER] All chunks received, assembling file...");
+      logger.info("[RECEIVER] All chunks received, assembling file...");
       await this.assembleFile();
     }
   }
@@ -105,11 +106,11 @@ export class FileReceiver {
    */
   private sendAck(chunkIndex: number): void {
     if (!this.connection) {
-      console.warn("[RECEIVER] No connection to send ACK!");
+      logger.warn("[RECEIVER] No connection to send ACK!");
       return;
     }
 
-    console.log(`[RECEIVER] Sending ACK for chunk ${chunkIndex}`);
+    logger.info({ chunkIndex }, "[RECEIVER] Sending ACK");
 
     const ackMessage: PeerMessage = {
       type: "chunk-ack",
@@ -126,28 +127,28 @@ export class FileReceiver {
    */
   private async assembleFile(): Promise<void> {
     try {
-      console.log("[RECEIVER] assembleFile: Retrieving chunks from IndexedDB...");
+      logger.info("[RECEIVER] assembleFile: Retrieving chunks from IndexedDB...");
       const chunks = await getAllChunks(this.transferId);
-      console.log("[RECEIVER] assembleFile: Got", chunks.length, "chunks");
+      logger.info({ count: chunks.length }, "[RECEIVER] assembleFile: Got chunks");
 
       // Combine chunks into single Blob
       const blobParts = chunks.map((chunk) => chunk.data);
       const finalBlob = new Blob(blobParts, { type: this.fileType });
-      console.log("[RECEIVER] assembleFile: Final blob size:", finalBlob.size);
+      logger.info({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob size");
 
       // Callback with completed file
       if (this.completeCallback) {
-        console.log("[RECEIVER] Calling completeCallback");
+        logger.info("[RECEIVER] Calling completeCallback");
         this.completeCallback(finalBlob, this.filename);
       } else {
-        console.warn("[RECEIVER] No completeCallback set!");
+        logger.warn("[RECEIVER] No completeCallback set!");
       }
 
       // Clear chunks from IndexedDB
       await clearTransfer(this.transferId);
-      console.log("[RECEIVER] Cleared chunks from IndexedDB");
+      logger.info("[RECEIVER] Cleared chunks from IndexedDB");
     } catch (error) {
-      console.error("Error assembling file:", error);
+      logger.error({ error }, "Error assembling file");
     }
   }
 
@@ -186,7 +187,7 @@ export class FileReceiver {
     if (message.transferId !== this.transferId) return false;
 
     if (message.type === "transfer-cancel") {
-      console.log("[RECEIVER] Sender cancelled transfer");
+      logger.info("[RECEIVER] Sender cancelled transfer");
       this.isCancelled = true;
       this.cancelCallback?.();
       // Clean up partial chunks from IndexedDB
@@ -195,14 +196,14 @@ export class FileReceiver {
     }
 
     if (message.type === "transfer-pause") {
-      console.log("[RECEIVER] Sender paused transfer");
+      logger.info("[RECEIVER] Sender paused transfer");
       this.isPaused = true;
       this.pauseCallback?.(true);
       return true;
     }
 
     if (message.type === "transfer-resume") {
-      console.log("[RECEIVER] Sender resumed transfer");
+      logger.info("[RECEIVER] Sender resumed transfer");
       this.isPaused = false;
       this.pauseCallback?.(false);
       return true;
@@ -225,11 +226,11 @@ export class FileReceiver {
     try {
       this.connection?.send(cancelMessage);
     } catch (e) {
-      console.warn("[RECEIVER] Failed to send cancel message:", e);
+      logger.warn({ e }, "[RECEIVER] Failed to send cancel message");
     }
     // Clean up partial chunks from IndexedDB
     clearTransfer(this.transferId).catch(console.error);
-    console.log("[RECEIVER] Transfer cancelled");
+    logger.info("[RECEIVER] Transfer cancelled");
   }
 
   /**
@@ -247,10 +248,10 @@ export class FileReceiver {
     try {
       this.connection?.send(pauseMessage);
     } catch (e) {
-      console.warn("[RECEIVER] Failed to send pause message:", e);
+      logger.warn({ e }, "[RECEIVER] Failed to send pause message");
     }
     this.pauseCallback?.(true);
-    console.log("[RECEIVER] Transfer paused by receiver");
+    logger.info("[RECEIVER] Transfer paused by receiver");
   }
 
   /**
@@ -268,10 +269,10 @@ export class FileReceiver {
     try {
       this.connection?.send(resumeMessage);
     } catch (e) {
-      console.warn("[RECEIVER] Failed to send resume message:", e);
+      logger.warn({ e }, "[RECEIVER] Failed to send resume message");
     }
     this.pauseCallback?.(false);
-    console.log("[RECEIVER] Transfer resumed by receiver");
+    logger.info("[RECEIVER] Transfer resumed by receiver");
   }
 
   /**

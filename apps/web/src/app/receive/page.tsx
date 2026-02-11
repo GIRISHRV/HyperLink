@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/lib/services/auth-service";
 import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
@@ -9,7 +10,7 @@ import { FileReceiver } from "@/lib/transfer/receiver";
 import { getPeerConfig } from "@/lib/config/webrtc";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import type { PeerMessage, TransferProgress } from "@repo/types";
-import { formatFileSize, formatTime } from "@repo/utils";
+import { formatFileSize, formatTime, logger } from "@repo/utils";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import FileOfferPrompt from "@/components/file-offer-prompt";
@@ -55,7 +56,7 @@ export default function ReceivePage() {
   const [hasUnread, setHasUnread] = useState(false);
 
   // Handle incoming chat messages
-  function handleData(data: any) {
+  const handleData = useCallback((data: any) => {
     if (data && data.type === "chat-message") {
       const msg = data.payload as import("@repo/types").ChatMessage;
       setMessages((prev) => [...prev, msg]);
@@ -63,7 +64,7 @@ export default function ReceivePage() {
         setHasUnread(true);
       }
     }
-  }
+  }, [isChatOpen]);
 
   function handleSendMessage(text: string) {
     if (!activeConnectionRef.current || !user) return;
@@ -156,58 +157,58 @@ export default function ReceivePage() {
   }, [isTransferActive]);
 
   const checkAuthAndInitPeer = useCallback(async (isMountedCheck: () => boolean) => {
-    console.log("[RECEIVE] checkAuthAndInitPeer called", {
+    logger.info({
       hasPeerManager: !!peerManagerRef.current,
       isInitializing: initializingRef.current
-    });
+    }, "[RECEIVE] checkAuthAndInitPeer called");
 
     // If already initialized, just set the peer ID
     if (peerManagerRef.current) {
       const peerId = peerManagerRef.current.getPeerId();
-      console.log("[RECEIVE] Peer already exists, ID:", peerId);
+      logger.info({ peerId }, "[RECEIVE] Peer already exists");
       if (peerId) {
         setMyPeerId(peerId);
-        console.log("[RECEIVE] Set peer ID:", peerId);
+        logger.info({ peerId }, "[RECEIVE] Set peer ID");
       }
       return;
     }
 
     if (initializingRef.current) {
-      console.log("[RECEIVE] Already initializing, skipping");
+      logger.info("[RECEIVE] Already initializing, skipping");
       return;
     }
 
-    console.log("[RECEIVE] Starting initialization...");
+    logger.info("[RECEIVE] Starting initialization...");
     initializingRef.current = true;
     try {
       const currentUser = await getCurrentUser();
 
       if (!isMountedCheck()) {
-        console.log("[RECEIVE] Component unmounted during auth check");
+        logger.info("[RECEIVE] Component unmounted during auth check");
         return;
       }
 
       if (!currentUser) {
-        console.log("[RECEIVE] No user, redirecting to auth");
+        logger.info("[RECEIVE] No user, redirecting to auth");
         router.push("/auth");
         return;
       }
       setUser(currentUser);
-      console.log("[RECEIVE] User authenticated:", currentUser.id);
+      logger.info({ userId: currentUser.id }, "[RECEIVE] User authenticated");
 
       const config = getPeerConfig();
-      console.log("[RECEIVE] Creating PeerManager with config:", config);
+      logger.info({ config }, "[RECEIVE] Creating PeerManager");
       peerManagerRef.current = new PeerManager(config);
 
-      console.log("[RECEIVE] Initializing PeerManager...");
+      logger.info("[RECEIVE] Initializing PeerManager...");
       const peerId = await peerManagerRef.current.initialize();
 
       if (!isMountedCheck()) {
-        console.log("[RECEIVE] Component unmounted during peer init");
+        logger.info("[RECEIVE] Component unmounted during peer init");
         return;
       }
 
-      console.log("[RECEIVE] PeerManager initialized with ID:", peerId);
+      logger.info({ peerId }, "[RECEIVE] PeerManager initialized");
       setMyPeerId(peerId);
 
       peerManagerRef.current.on("incoming-connection", async (connection: any) => {
@@ -256,7 +257,7 @@ export default function ReceivePage() {
 
         connection.on("error", (err: any) => {
           if (activeConnectionRef.current !== connection) return;
-          console.error("[RECEIVE PAGE] Connection ERROR:", err);
+          logger.error({ err }, "[RECEIVE PAGE] Connection ERROR");
           setError(`Connection error: ${err}`);
           setStatus("error");
         });
@@ -267,7 +268,7 @@ export default function ReceivePage() {
           const message = data as PeerMessage;
 
           if (message.type === "file-offer") {
-            console.log("[RECEIVE] 🎯 FILE-OFFER received:", message);
+            logger.info({ message }, "[RECEIVE] 🎯 FILE-OFFER received");
             // Close any open modals that might interfere
             setShowQRModal(false);
             setShowCancelModal(false);
@@ -320,19 +321,19 @@ export default function ReceivePage() {
       initializingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkAuthAndInitPeer]);
+  }, [checkAuthAndInitPeer, handleData]);
 
   async function handleAcceptOffer() {
-    console.log("[RECEIVE PAGE] handleAcceptOffer called");
+    logger.info("[RECEIVE PAGE] handleAcceptOffer called");
     if (!pendingOffer) return;
 
     const { connection, message, dbTransferId: senderDbId } = pendingOffer;
 
-    console.log("[RECEIVE PAGE] Creating FileReceiver...");
+    logger.info("[RECEIVE PAGE] Creating FileReceiver...");
     const receiver = new FileReceiver();
     fileReceiverRef.current = receiver;
     receiver.setConnection(connection);
-    console.log("[RECEIVE PAGE] FileReceiver created and assigned to ref");
+    logger.info("[RECEIVE PAGE] FileReceiver created and assigned to ref");
 
     let dbTransferId: string | null = null;
 
@@ -367,17 +368,17 @@ export default function ReceivePage() {
       }
     });
 
-    console.log("[RECEIVE PAGE] Calling handleOffer on receiver...");
+    logger.info("[RECEIVE PAGE] Calling handleOffer on receiver...");
     receiver.handleOffer(message as any);
-    console.log("[RECEIVE PAGE] handleOffer completed");
+    logger.info("[RECEIVE PAGE] handleOffer completed");
     setStatus("receiving");
     setPendingOffer(null);
 
     // Give the receiver a moment to fully initialize before sending acceptance
     // This prevents chunks from arriving before the receiver is ready
-    console.log("[RECEIVE PAGE] Waiting 100ms before sending accept...");
+    logger.info("[RECEIVE PAGE] Waiting 100ms before sending accept...");
     await new Promise(resolve => setTimeout(resolve, 100));
-    console.log("[RECEIVE PAGE] Sending file-accept message to sender...");
+    logger.info("[RECEIVE PAGE] Sending file-accept message to sender...");
 
     const acceptMessage: PeerMessage = {
       type: "file-accept",
@@ -386,7 +387,7 @@ export default function ReceivePage() {
       timestamp: Date.now(),
     };
     connection.send(acceptMessage);
-    console.log("[RECEIVE PAGE] file-accept message sent");
+    logger.info("[RECEIVE PAGE] file-accept message sent");
 
     if (senderDbId) {
       const claimed = await claimTransferAsReceiver(senderDbId);
@@ -690,7 +691,7 @@ export default function ReceivePage() {
 
                       <div className="flex flex-col gap-2 z-10">
                         <label className="text-[#bcb89a] text-xs font-bold uppercase tracking-[0.15em]">Your Peer ID</label>
-                        <div className="font-mono text-2xl md:text-3xl text-white font-bold tracking-tight break-all border-l-4 border-primary pl-4 py-2">
+                        <div data-testid="my-peer-id" className="font-mono text-2xl md:text-3xl text-white font-bold tracking-tight break-all border-l-4 border-primary pl-4 py-2">
                           {myPeerId ? myPeerId : "Loading..."}
                         </div>
                       </div>
@@ -794,11 +795,15 @@ export default function ReceivePage() {
 
                             {/* Image Preview */}
                             {/\.(jpg|jpeg|png|gif|webp)$/i.test(receivedFile.name) ? (
-                              <img
-                                src={URL.createObjectURL(receivedFile.blob)}
-                                alt="Preview"
-                                className="max-h-80 object-contain rounded-sm relative z-10 transition-transform duration-500 hover:scale-[1.02]"
-                              />
+                              <div className="relative w-full h-[320px]">
+                                <Image
+                                  src={URL.createObjectURL(receivedFile.blob)}
+                                  alt="Preview"
+                                  fill
+                                  className="object-contain rounded-sm z-10 transition-transform duration-500 hover:scale-[1.02]"
+                                  unoptimized
+                                />
+                              </div>
                             ) : /* Video Preview */
                               /\.(mp4|webm|ogg)$/i.test(receivedFile.name) ? (
                                 <video

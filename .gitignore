@@ -15,11 +15,12 @@ out/
 .env*.local
 .env.production
 
-# Logs
+# Logs and Caches
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+.eslintcache
 
 # OS
 .DS_Store
@@ -44,3 +45,9 @@ coverage/
 .gemini/
 .antigravity/
 FEATURE_ROADMAP.md
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { logger } from "@repo/utils";
 import type { Transfer } from "@repo/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { deleteTransfer as deleteTransferFromDB, deleteMultipleTransfers as deleteMultipleFromDB } from "@/lib/services/transfer-service";
@@ -225,10 +226,10 @@ export function useUserTransfersRealtime() {
    * Optimistically remove multiple transfers and delete from DB
    */
   const removeMultipleTransfers = useCallback(async (transferIds: string[]) => {
-    console.log("[REALTIME] Removing multiple transfers:", transferIds);
+    logger.info({ transferIds }, "[REALTIME] Removing multiple transfers");
     setTransfers((prev) => prev.filter((t) => !transferIds.includes(t.id)));
     const result = await deleteMultipleFromDB(transferIds);
-    console.log("[REALTIME] Delete result:", result);
+    logger.info({ result }, "[REALTIME] Delete result");
     return result;
   }, []);
 

@@ -1,5 +1,6 @@
 import Peer, { type DataConnection } from "peerjs";
 import type { PeerConfig, ConnectionState } from "@repo/types";
+import { logger } from "@repo/utils";
 
 export class PeerManager {
   private peer: Peer | null = null;
@@ -15,7 +16,7 @@ export class PeerManager {
   /**
    * Initialize PeerJS connection to signaling server
    */
-  async initialize(peerId?: string): Promise<string> {
+  initialize(peerId?: string): Promise<string> {
     if (this.isDestroyed) return Promise.reject(new Error("PeerManager is destroyed"));
     if (this.initializationPromise) return this.initializationPromise;
 
@@ -30,13 +31,13 @@ export class PeerManager {
           config: this.config.config, // Use the provided RTCPeerConnection configuration
         };
 
-        console.log("[PeerManager] Initializing with config:", {
+        logger.info({
           ...options,
           config: {
             ...options.config,
             iceServers: options.config?.iceServers?.map((s: any) => ({ ...s, credential: '***' }))
           }
-        });
+        }, "[PeerManager] Initializing with config");
 
         if (peerId) {
           this.peer = new Peer(peerId, options);
@@ -138,44 +139,40 @@ export class PeerManager {
           const type = event.candidate.type; // 'host', 'srflx' (STUN), or 'relay' (TURN)
           const protocol = event.candidate.protocol;
           const address = event.candidate.address || (event.candidate as any).ip;
-          console.log(
-            `[ICE] Candidate gathered - Type: ${type}, Protocol: ${protocol}, Address: ${address}`
-          );
+          logger.info({ type, protocol, address }, "[ICE] Candidate gathered");
         } else {
-          console.log("[ICE] All local candidates gathered");
+          logger.info("[ICE] All local candidates gathered");
         }
       });
 
       // Monitor signaling state
       pc.addEventListener("signalingstatechange", () => {
-        console.log(`[WEBRTC] Signaling state: ${pc.signalingState}`);
+        logger.info({ state: pc.signalingState }, "[WEBRTC] Signaling state changed");
       });
 
       // Monitor ICE connection state changes
       pc.addEventListener("iceconnectionstatechange", () => {
         const state = pc.iceConnectionState;
-        console.log(`[ICE] Connection state: ${state}`);
+        logger.info({ state }, "[ICE] Connection state changed");
 
         if (state === "failed") {
-          console.error(
-            "[ICE] Connection failed - may need TURN server or network issue. Diagnostics:",
-            {
-              iceGatheringState: pc.iceGatheringState,
-              signalingState: pc.signalingState,
-              localDescription: pc.localDescription?.type,
-              remoteDescription: pc.remoteDescription?.type,
-              isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : 'unknown'
-            }
-          );
+          logger.error({
+            iceGatheringState: pc.iceGatheringState,
+            signalingState: pc.signalingState,
+            localDescription: pc.localDescription?.type,
+            remoteDescription: pc.remoteDescription?.type,
+            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : 'unknown'
+          }, "[ICE] Connection failed - diagnostics");
         } else if (state === "connected" || state === "completed") {
           // Log the selected candidate pair to see if TURN was used
           pc.getStats(null).then((stats: RTCStatsReport) => {
             stats.forEach((report: any) => {
               if (report.type === "candidate-pair" && report.state === "succeeded") {
-                console.log(
-                  `[ICE] Connected using candidate pair - Local: ${report.localCandidateId}, Remote: ${report.remoteCandidateId}`,
-                  "Report:", report
-                );
+                logger.info({
+                  local: report.localCandidateId,
+                  remote: report.remoteCandidateId,
+                  report
+                }, "[ICE] Connected using candidate pair");
               }
             });
           });
@@ -184,7 +181,7 @@ export class PeerManager {
 
       // Monitor gathering state
       pc.addEventListener("icegatheringstatechange", () => {
-        console.log(`[ICE] Gathering state: ${pc.iceGatheringState}`);
+        logger.info({ state: pc.iceGatheringState }, "[ICE] Gathering state changed");
       });
     }
   }
