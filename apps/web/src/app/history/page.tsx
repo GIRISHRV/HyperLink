@@ -21,14 +21,6 @@ export default function HistoryPage() {
   const [showClearAll, setShowClearAll] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
 
-  // Use profile directly without local state if possible, or keep local state if setting from profile
-  // Actually, the original code SETS these from profile. 
-  // But wait, the original code had them unused? No, they are likely used in the render.
-  // Lint said: 'avatarIcon' is declared but its value is never read.
-  // This means they are NOT used in the render.
-  // Let's check where they *should* be used. GlobalHeader handles the avatar now!
-  // So we can remove duplicate avatar logic from HistoryPage.
-
   const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
 
 
