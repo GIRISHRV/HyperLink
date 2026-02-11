@@ -21,6 +21,10 @@ import { ProgressBar } from "@/components/progress-bar";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
 import PasswordModal from "@/components/password-modal";
+import { openDB } from "idb";
+
+const DB_NAME = "hyperlink-pwa-share";
+const STORE_NAME = "shared-files";
 
 function SendPageContent() {
   const router = useRouter();
@@ -119,11 +123,46 @@ function SendPageContent() {
       setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
     }
 
+    const isShared = searchParams?.get("shared") === "true";
     const title = searchParams?.get("title");
     const text = searchParams?.get("text");
     const url = searchParams?.get("url");
 
-    if (title || text || url) {
+    if (isShared) {
+      (async () => {
+        try {
+          const db = await openDB(DB_NAME, 1);
+          const sharedData = await db.get(STORE_NAME, "latest");
+
+          if (sharedData) {
+            addLog(`✓ Loading shared content from System`);
+
+            if (sharedData.files && sharedData.files.length > 0) {
+              const files = sharedData.files.map((f: any) => new File([f.blob], f.name, { type: f.type }));
+              await processFiles(files);
+            } else {
+              const content = [
+                sharedData.title ? `Title: ${sharedData.title}` : "",
+                sharedData.text ? `Text: ${sharedData.text}` : "",
+                sharedData.url ? `URL: ${sharedData.url}` : ""
+              ].filter(Boolean).join("\n");
+
+              if (content) {
+                const sharedFile = new File([content], "shared_content.txt", { type: "text/plain" });
+                setFile(sharedFile);
+                addLog(`✓ Received shared text from system`);
+              }
+            }
+
+            // Cleanup
+            await db.delete(STORE_NAME, "latest");
+          }
+        } catch (err) {
+          console.error("Failed to load shared data:", err);
+          addLog("✗ Failed to load shared data from system");
+        }
+      })();
+    } else if (title || text || url) {
       const content = [
         title ? `Title: ${title}` : "",
         text ? `Text: ${text}` : "",
@@ -140,7 +179,7 @@ function SendPageContent() {
     if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
       (navigator as any).clearAppBadge().catch(console.error);
     }
-  }, [searchParams, addLog]);
+  }, [searchParams, addLog, processFiles]);
 
   useEffect(() => {
     if (status === "transferring" && progress) {

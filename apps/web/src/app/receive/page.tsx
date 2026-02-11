@@ -500,21 +500,35 @@ export default function ReceivePage() {
   }
 
   async function handleShare() {
-    if (!receivedFile || !receivedFile.blob) return;
+    if (!receivedFile || !receivedFile.blob) {
+      toast.error("No file available to share.");
+      return;
+    }
+
     try {
       const fileToShow = new File([receivedFile.blob], receivedFile.name, { type: receivedFile.blob.type });
+
+      // Check if navigator.canShare is available and supports the file
       if (navigator.canShare && navigator.canShare({ files: [fileToShow] })) {
         await navigator.share({
           files: [fileToShow],
           title: receivedFile.name,
           text: `HyperLink: Shared file ${receivedFile.name}`
         });
+      } else if (navigator.share) {
+        // Fallback for when files are not supported but sharing is
+        toast.info("File sharing not supported by your browser. Attempting text share instead.");
+        await navigator.share({
+          title: receivedFile.name,
+          text: `HyperLink: Check out this file: ${receivedFile.name}`
+        });
       } else {
-        toast.error("Sharing not supported on this device/browser.");
+        toast.error("Web Share API is not supported on this device/browser. Please download the file manually.");
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.error("Share failed:", err);
+        toast.error(`Share failed: ${(err as Error).message}`);
       }
     }
   }
