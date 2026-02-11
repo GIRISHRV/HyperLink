@@ -499,36 +499,111 @@ export default function ReceivePage() {
     URL.revokeObjectURL(url);
   }
 
+  function getMimeType(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      // --- Images ---
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'svg': 'image/svg+xml',
+      'avif': 'image/avif',
+      'ico': 'image/x-icon',
+      'tiff': 'image/tiff',
+      'bmp': 'image/bmp',
+
+      // --- Documents (PDF & Office) ---
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'csv': 'text/csv',
+      'rtf': 'application/rtf',
+      // Microsoft Word
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      // Microsoft Excel
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      // Microsoft PowerPoint
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+      // --- Audio ---
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'ogg': 'audio/ogg',
+      'm4a': 'audio/x-m4a',
+      'aac': 'audio/aac',
+      'flac': 'audio/flac',
+
+      // --- Video ---
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'mpeg': 'video/mpeg',
+      'mov': 'video/quicktime',
+      'avi': 'video/x-msvideo',
+
+      // --- Archives ---
+      'zip': 'application/zip',
+      'tar': 'application/x-tar',
+      'gz': 'application/gzip',
+    };
+    return mimeTypes[ext || ''] || 'application/octet-stream';
+  }
+
   async function handleShare() {
     if (!receivedFile || !receivedFile.blob) {
       toast.error("No file available to share.");
       return;
     }
 
-    try {
-      const fileToShow = new File([receivedFile.blob], receivedFile.name, { type: receivedFile.blob.type });
+    // Infer MIME type if the blob has a generic or missing type
+    let type = receivedFile.blob.type;
+    if (!type || type === 'application/octet-stream') {
+      type = getMimeType(receivedFile.name);
+    }
 
-      // Check if navigator.canShare is available and supports the file
-      if (navigator.canShare && navigator.canShare({ files: [fileToShow] })) {
-        await navigator.share({
-          files: [fileToShow],
-          title: receivedFile.name,
-          text: `HyperLink: Shared file ${receivedFile.name}`
-        });
+    // Creating the file object synchronously to keep the user gesture alive
+    const fileToShow = new File([receivedFile.blob], receivedFile.name, { type });
+
+    const shareData: ShareData = {
+      files: [fileToShow],
+      title: receivedFile.name,
+      text: `HyperLink: Shared file ${receivedFile.name}`
+    };
+
+    try {
+      // Check for file sharing support specifically
+      if (navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
       } else if (navigator.share) {
-        // Fallback for when files are not supported but sharing is
-        toast.info("File sharing not supported by your browser. Attempting text share instead.");
+        // Fallback to title/text/url if files aren't supported
+        toast.info("Browser doesn't support file sharing. Attempting text share...");
         await navigator.share({
           title: receivedFile.name,
-          text: `HyperLink: Check out this file: ${receivedFile.name}`
+          text: `HyperLink: Receive this file at ${window.location.origin}`
         });
       } else {
-        toast.error("Web Share API is not supported on this device/browser. Please download the file manually.");
+        toast.error("Web Share API not supported on this device.");
       }
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        console.error("Share failed:", err);
-        toast.error(`Share failed: ${(err as Error).message}`);
+      const error = err as Error;
+      if (error.name === 'AbortError') return;
+
+      console.error("Share failed:", error);
+
+      if (error.name === 'NotAllowedError') {
+        const isSecure = isSecureContext();
+        if (!isSecure) {
+          toast.error("Share failed: Insecure Context. Please use HTTPS or localhost (IP-based testing is blocked).");
+        } else {
+          toast.error("Permission denied. System blocked the share request (might be file type or size).");
+        }
+      } else if (receivedFile.size > 100 * 1024 * 1024) { // 100MB
+        toast.error("File might be too large for the system share menu. Try downloading instead.");
+      } else {
+        toast.error(`Share failed: ${error.message}`);
       }
     }
   }
