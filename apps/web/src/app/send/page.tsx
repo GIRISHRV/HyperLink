@@ -13,6 +13,7 @@ import { requestNotificationPermission, notifyTransferComplete, playErrorSound, 
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import { useClipboardFile } from "@/lib/hooks/use-clipboard-file";
+import { zipFiles, getFilesFromDataTransferItems } from "@/lib/utils/zip-helper";
 import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
 import { ProgressBar } from "@/components/progress-bar";
@@ -34,6 +35,9 @@ export default function SendPage() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false); // Global drag state
   const [isPeerReady, setIsPeerReady] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
+  const [zipProgress, setZipProgress] = useState(0);
+
   const [logs, setLogs] = useState<string[]>([
     "Initializing WebRTC handshake...",
     "Waiting for peer connection...",
@@ -309,35 +313,74 @@ export default function SendPage() {
     };
   }, [checkAuthAndInitPeer]);
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
 
-    const validation = validateFileSize(selectedFile.size);
-    if (!validation.valid) {
-      setError(validation.error!);
-      addLog(`✗ File validation failed: ${validation.error}`);
-      return;
-    }
-
-    setFile(selectedFile);
-    setError("");
-    addLog(`✓ File selected: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`);
+    await processFiles(selectedFiles);
   }
 
-  function handleDrop(e: React.DragEvent) {
+  async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (!droppedFile) return;
+    const items = e.dataTransfer.items;
 
-    const validation = validateFileSize(droppedFile.size);
-    if (!validation.valid) {
-      setError(validation.error!);
-      addLog(`✗ File validation failed: ${validation.error}`);
+    // Use getFilesFromDataTransferItems to handle folders recursively
+    const droppedFiles = await getFilesFromDataTransferItems(items);
+    if (droppedFiles.length === 0) return;
+
+    await processFiles(droppedFiles);
+  }
+
+  async function processFiles(files: File[]) {
+    // 1. Calculate total size
+    const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+
+    // 2. Validate Size (10GB Limit)
+    const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
+    if (totalSize > MAX_SIZE) {
+      setError(`Total size (${formatFileSize(totalSize)}) exceeds the 10GB limit for browser zipping.`);
+      addLog(`✗ Size limit exceeded: ${formatFileSize(totalSize)}`);
       return;
     }
 
-    addLog(`✓ File selected: ${droppedFile.name} (${formatFileSize(droppedFile.size)})`);
+    // 3. Check logic: Single file (no folder) vs Multiple/Folder
+    const isSingleFile = files.length === 1;
+    // Check if the single file has a path that suggests it's in a subfolder (from DnD)
+    // If we just select one file via input, webkitRelativePath is usually empty.
+    const hasPath = files[0].webkitRelativePath && files[0].webkitRelativePath.includes("/");
+
+    if (isSingleFile && !hasPath) {
+      // Simple single file case
+      const file = files[0];
+      const validation = validateFileSize(file.size);
+      if (!validation.valid) {
+        setError(validation.error!);
+        addLog(`✗ File validation failed: ${validation.error}`);
+        return;
+      }
+      setFile(file);
+      setError("");
+      addLog(`✓ File selected: ${file.name} (${formatFileSize(file.size)})`);
+    } else {
+      // Multiple files or folder structure -> ZIP IT
+      try {
+        setIsZipping(true);
+        setZipProgress(0);
+        setError("");
+        addLog(`> Zipping ${files.length} files...`);
+
+        const zippedFile = await zipFiles(files, (percent) => setZipProgress(percent));
+
+        setFile(zippedFile);
+        addLog(`✓ Zipping complete: ${zippedFile.name} (${formatFileSize(zippedFile.size)})`);
+      } catch (err: any) {
+        console.error("Zipping failed:", err);
+        setError("Failed to zip files. Browser memory might be full.");
+        addLog(`✗ Zipping error: ${err.message}`);
+      } finally {
+        setIsZipping(false);
+      }
+    }
   }
 
 
@@ -593,10 +636,12 @@ export default function SendPage() {
                   <div className="absolute inset-0 border-[2px] border-primary/20 group-hover:border-primary/60 transition-colors duration-500 mask-container"></div>
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,rgba(255,234,46,0.05)_0%,transparent_70%)]"></div>
 
+
                   <input
                     ref={fileInputRef}
                     data-testid="file-input"
                     type="file"
+                    multiple // Allow multiple files
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -726,6 +771,24 @@ export default function SendPage() {
                   </div>
                 )}
               </>
+            )}
+
+            {/* Zipping State */}
+            {isZipping && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
+                  <span className="material-symbols-outlined text-3xl text-black animate-spin">folder_zip</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2 uppercase">Compressing...</h3>
+                <p className="text-gray-400 mb-6 font-mono text-sm">Preparing your files for transfer</p>
+                <div className="w-64 h-2 bg-white/10 rounded-full mx-auto overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300 ease-out"
+                    style={{ width: `${zipProgress}%` }}
+                  />
+                </div>
+                <p className="text-primary font-mono text-xs mt-2">{zipProgress.toFixed(0)}%</p>
+              </div>
             )}
 
             {/* Connecting State */}

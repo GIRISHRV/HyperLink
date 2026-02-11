@@ -8,10 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:visual": "set VISUAL=true && playwright test --project=chromium --headed --workers=1"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -22,6 +19,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.45.0",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.2",
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.0",
     "lucide-react": "^0.446.0",
@@ -34,7 +32,6 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@testing-library/dom": "^10.4.1",
