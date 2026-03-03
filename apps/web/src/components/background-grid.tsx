@@ -12,7 +12,7 @@ export default function BackgroundGrid() {
     if (!mounted) return null;
 
     return (
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none bg-[#0a0a0a]">
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none bg-surface-deep">
             {/* 1. Base Dot Grid */}
             <div className="absolute inset-0 bg-[radial-gradient(#444_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.1]" />
 
@@ -34,14 +34,14 @@ export default function BackgroundGrid() {
             <div className="absolute top-[10%] left-[5%] w-3 h-3 bg-primary/20" />
             <div className="absolute top-[12%] left-[8%] w-2 h-2 bg-white/10" />
             <div className="absolute top-[15%] left-[4%] w-24 h-24 border border-white/5 rounded-full" />
-            <div className="absolute top-[18%] left-[12%] text-white/5 font-mono text-[10px]">SYS_01</div>
+            <div className="absolute top-[18%] left-[12%] text-white/5 font-mono text-xs">SYS_01</div>
             <div className="absolute top-[8%] left-[15%] w-16 h-[1px] bg-white/10" />
             <div className="absolute top-[25%] left-[6%] w-4 h-4 border border-primary/20 rotate-45" />
 
             {/* Top Center */}
             <div className="absolute top-[5%] left-[40%] w-[1px] h-12 bg-white/10" />
             <div className="absolute top-[5%] left-[60%] w-[1px] h-12 bg-white/10" />
-            <div className="absolute top-[8%] left-[45%] w-4 h-4 bg-bauhaus-blue/10 rounded-sm" />
+            <div className="absolute top-[8%] left-[45%] w-4 h-4 bg-bauhaus-blue/10 rounded-none" />
             <div className="absolute top-[6%] left-[55%] text-white/5 font-black text-4xl">+</div>
 
             {/* Top Right Quadrant */}
@@ -66,7 +66,7 @@ export default function BackgroundGrid() {
             <div className="absolute bottom-[20%] left-[10%] w-48 h-48 border border-white/5 rounded-full" />
             <div className="absolute bottom-[25%] left-[15%] w-32 h-32 border border-dashed border-white/5 rounded-full opacity-50" />
             <div className="absolute bottom-[15%] left-[5%] w-4 h-4 bg-white/5" />
-            <div className="absolute bottom-[10%] left-[12%] text-white/5 font-mono text-[10px]">A-74</div>
+            <div className="absolute bottom-[10%] left-[12%] text-white/5 font-mono text-xs">A-74</div>
             <div className="absolute bottom-[30%] left-[8%] w-2 h-12 bg-bauhaus-blue/5" />
 
             {/* Bottom Center */}

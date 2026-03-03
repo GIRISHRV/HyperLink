@@ -1,5 +1,7 @@
 "use client";
 
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
+
 interface ConfirmLeaveModalProps {
   isOpen: boolean;
   onConfirm: () => void;
@@ -11,10 +13,11 @@ export default function ConfirmLeaveModal({
   onConfirm,
   onCancel,
 }: ConfirmLeaveModalProps) {
+  const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onCancel);
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+    <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="Transfer In Progress" className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -22,7 +25,7 @@ export default function ConfirmLeaveModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-surface border border-white/10 rounded-none shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-bauhaus-red via-primary to-bauhaus-blue" />
 

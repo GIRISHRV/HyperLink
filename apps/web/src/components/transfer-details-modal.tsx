@@ -6,6 +6,7 @@ import { formatFileSize } from "@repo/utils";
 import { updateTransferStatus, deleteTransfer } from "@/lib/services/transfer-service";
 import { getFile } from "@/lib/storage/idb-manager";
 import Image from "next/image";
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
 
 interface TransferDetailsModalProps {
     transfer: Transfer;
@@ -22,6 +23,7 @@ export default function TransferDetailsModal({
 }: TransferDetailsModalProps) {
     const [fileBlob, setFileBlob] = useState<Blob | null>(null);
     const [isCheckingFile, setIsCheckingFile] = useState(true);
+    const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onClose);
 
     useEffect(() => {
         if (isOpen && transfer.status === "complete") {
@@ -94,7 +96,7 @@ export default function TransferDetailsModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="Transfer Details" className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -102,7 +104,7 @@ export default function TransferDetailsModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+            <div className="relative bg-surface border border-white/10 rounded-none shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
                     <h3 className="text-lg font-bold text-white">Transfer Details</h3>
@@ -118,7 +120,7 @@ export default function TransferDetailsModal({
                 <div className="p-6 space-y-6 overflow-y-auto">
                     {/* File Info */}
                     <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 bg-primary/20 rounded-none flex items-center justify-center flex-shrink-0">
                             <span className="material-symbols-outlined text-primary text-2xl">
                                 description
                             </span>
@@ -139,7 +141,7 @@ export default function TransferDetailsModal({
 
                     {/* PREVIEW SECTION (Merged) */}
                     {fileBlob && (
-                        <div className="bg-black/40 rounded-lg border border-white/10 overflow-hidden">
+                        <div className="bg-black/40 rounded-none border border-white/10 overflow-hidden">
                             {isImage ? (
                                 <div className="relative w-full h-48 sm:h-64">
                                     <Image
@@ -198,7 +200,7 @@ export default function TransferDetailsModal({
 
                     {/* File Availability Notice (Conditional) */}
                     {transfer.status === "complete" && !fileBlob && !isCheckingFile && (
-                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/50 rounded-none border border-gray-700">
                             <span className="material-symbols-outlined text-gray-400">info</span>
                             <p className="text-gray-400 text-sm">
                                 File details might have been erased. P2P transfers are ephemeral.

@@ -2,7 +2,7 @@
  * Format bytes to human-readable file size
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
+  if (bytes <= 0 || isNaN(bytes)) return "0 Bytes";
 
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
@@ -15,7 +15,7 @@ export function formatFileSize(bytes: number): string {
  * Generate unique transfer ID
  */
 export function generateTransferId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 /**
@@ -108,3 +108,4 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 }
 
 export * from './logger';
+export * from './constants';

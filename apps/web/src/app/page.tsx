@@ -1,53 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getCurrentUser } from "@/lib/services/auth-service";
+import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
+import AppHeader from "@/components/app-header";
 
 export default function LandingPage() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+
+  const checkAuth = useCallback(async () => {
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+  }, []);
 
   useEffect(() => {
     checkAuth();
-  }, []);
-
-  async function checkAuth() {
-    const currentUser = await getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
-  }
+  }, [checkAuth]);
 
   return (
-    <div className="bg-background-light dark:bg-[#121212] min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
-      {/* Navbar: Split Header Design */}
-      <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
-        {/* Left: Logo Block */}
-        <Link href="/" className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px] hover:bg-primary/90 transition-colors">
-          <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </Link>
-        {/* Right: Navigation & Secondary Logo Part */}
-        <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <Link href="/" className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white hover:opacity-80 transition-opacity">LINK</Link>
-          <div className="flex gap-4 md:gap-8 items-center">
-            <Link href="/about" className="text-sm font-bold uppercase tracking-wide text-[#121212] dark:text-white hover:text-primary dark:hover:text-primary transition-colors">
-              About
-            </Link>
-            {!loading && (
-              <Link href={user ? "/dashboard" : "/auth"}>
-                <button className="h-12 px-6 bg-primary text-black text-sm font-bold uppercase tracking-wide hover:bg-yellow-400 transition-colors">
-                  {user ? "Dashboard" : "Get Started"}
-                </button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
+    <div className="bg-background-light dark:bg-background-dark min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
+      {/* Navbar: Unified AppHeader */}
+      <AppHeader variant="landing" />
 
       {/* Main Content Area */}
       <main className="flex-grow flex flex-col">
         {/* Hero Section: Asymmetric Grid */}
-        <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[600px] border-b border-[#333]">
+        <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[600px] border-b border-subtle">
           {/* Text & Hero Content (Left/Top) */}
           <div className="lg:col-span-7 p-8 md:p-16 flex flex-col justify-center relative overflow-hidden">
             {/* Decorative Geometric Background Elements */}
@@ -82,9 +61,9 @@ export default function LandingPage() {
           </div>
 
           {/* Geometric Composition & CTAs (Right/Bottom) */}
-          <div className="lg:col-span-5 border-l border-[#333] flex flex-col">
+          <div className="lg:col-span-5 border-l border-subtle flex flex-col">
             {/* Abstract Art Piece */}
-            <div className="flex-1 relative bg-[#1a1a1a] min-h-[300px] overflow-hidden flex items-center justify-center p-8 group">
+            <div className="flex-1 relative bg-surface min-h-[300px] overflow-hidden flex items-center justify-center p-8 group">
               {/* This section represents the 'connection' visually */}
               <div className="relative w-64 h-64">
                 {/* Blue Circle */}
@@ -125,7 +104,7 @@ export default function LandingPage() {
         </div>
 
         {/* Feature Grid: Asymmetric Columns */}
-        <div className="w-full max-w-[1440px] mx-auto px-6 py-20 bg-background-light dark:bg-[#121212]">
+        <div className="w-full max-w-[1440px] mx-auto px-6 py-20 bg-background-light dark:bg-background-dark">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
             {/* Feature 1 */}
             <div className="flex flex-col gap-6 group">
@@ -141,7 +120,7 @@ export default function LandingPage() {
 
             {/* Feature 2 */}
             <div className="flex flex-col gap-6 group">
-              <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-[#121212] mb-2 shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] group-hover:translate-x-1 group-hover:translate-y-1 group-hover:shadow-none transition-all">
+              <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-background-dark mb-2 shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)] group-hover:translate-x-1 group-hover:translate-y-1 group-hover:shadow-none transition-all">
                 <span className="material-symbols-outlined text-3xl">bolt</span>
               </div>
               <h3 className="text-2xl font-black uppercase tracking-tight">WebRTC Speed</h3>
@@ -166,25 +145,7 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* Footer: Tri-Color Strip */}
-      <footer className="mt-auto">
-        {/* Colorful Strip */}
-        <div className="flex h-3 w-full">
-          <div className="flex-1 bg-bauhaus-blue"></div>
-          <div className="flex-1 bg-bauhaus-red"></div>
-          <div className="flex-1 bg-primary"></div>
-        </div>
 
-        {/* Footer Content */}
-        <div className="bg-[#0f0f0f] py-12 px-8 border-t border-[#333]">
-          <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex items-center justify-center md:justify-start gap-1">
-              <span className="font-black text-xl tracking-tighter uppercase text-white">HYPER</span>
-              <span className="font-black text-xl tracking-tighter uppercase text-gray-500">LINK</span>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

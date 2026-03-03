@@ -39,7 +39,7 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
     return window.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
-            salt: salt as unknown as BufferSource,
+            salt: salt as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
             iterations: PBKDF2_ITERATIONS,
             hash: "SHA-256",
         },
@@ -60,7 +60,7 @@ export async function encryptChunk(data: ArrayBuffer, key: CryptoKey): Promise<A
     const ciphertext = await window.crypto.subtle.encrypt(
         {
             name: "AES-GCM",
-            iv: iv as unknown as BufferSource,
+            iv: iv as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
         },
         key,
         data
@@ -85,7 +85,7 @@ export async function decryptChunk(data: ArrayBuffer, key: CryptoKey): Promise<A
     return window.crypto.subtle.decrypt(
         {
             name: "AES-GCM",
-            iv: new Uint8Array(iv) as unknown as BufferSource,
+            iv: new Uint8Array(iv) as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
         },
         key,
         ciphertext

@@ -37,9 +37,9 @@ export async function zipFiles(files: File[], onProgress?: (percent: number) => 
                     reject(err);
                     return;
                 }
-                // Create blob
-                // Cast to any to avoid SharedArrayBuffer vs ArrayBuffer mismatch in strict TS environments
-                const zipBlob = new Blob([data as any], { type: 'application/zip' });
+                // fflate's zip() callback returns Uint8Array; we cast to BlobPart to bypass
+                // the SharedArrayBuffer vs ArrayBuffer DOM typing mismatch without using `any`.
+                const zipBlob = new Blob([data as unknown as BlobPart], { type: 'application/zip' });
                 const zipFile = new File([zipBlob], `archive_${Date.now()}.zip`, { type: 'application/zip' });
                 if (onProgress) onProgress(100);
                 resolve(zipFile);

@@ -2,15 +2,31 @@ import { ExpressPeerServer } from "peer";
 import express from "express";
 import cors from "cors";
 import http from "http";
+import rateLimit from "express-rate-limit";
 
 const PORT = parseInt(process.env.PORT || "9000");
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",") || [
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",").map(s => s.trim()) || [
   "http://localhost:3000",
   "https://hyperlink.vercel.app",
-  "*",
 ];
 
 const app = express();
+
+// Rate limiting — FINDING-016 fix
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,            // max 200 requests per IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down." },
+});
+
+const healthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,             // health checks once per second at most
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -23,7 +39,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       // Check against allowed origins
-      if (ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed) || allowed === "*")) {
+      if (ALLOWED_ORIGINS.some((allowed) => origin === allowed || origin.startsWith(allowed))) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -33,8 +49,10 @@ app.use(
   })
 );
 
-// Health check endpoint
-app.get("/health", (_req, res) => {
+// Apply general rate limit to all routes
+app.use(generalLimiter);
+
+app.get("/health", healthLimiter, (_req, res) => {
   res.json({
     status: "healthy",
     service: "HyperLink Signaling Server",
@@ -60,7 +78,7 @@ const peerServer = ExpressPeerServer(server, {
 // We mount at root so path matches
 app.use("/", peerServer);
 
-// Track connected peers
+// Track connected peer count with a simple counter
 let connectedPeers = 0;
 
 // PeerServer event handlers
@@ -71,7 +89,7 @@ peerServer.on("connection", (client) => {
 });
 
 peerServer.on("disconnect", (client) => {
-  if (connectedPeers > 0) connectedPeers--;
+  connectedPeers = Math.max(0, connectedPeers - 1);
   // eslint-disable-next-line no-console
   console.log(`[DISCONNECT] Peer disconnected: ${client.getId()} | Total: ${connectedPeers}`);
 });

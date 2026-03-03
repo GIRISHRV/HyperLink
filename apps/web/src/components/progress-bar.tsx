@@ -29,12 +29,12 @@ export function ProgressBar({
 
     return (
         <div className="relative z-10 py-4">
-            <div className="flex justify-between text-[10px] font-mono text-[#bcb89a] mb-2 uppercase tracking-widest">
+            <div className="flex justify-between text-xs font-mono text-muted mb-2 uppercase tracking-widest">
                 <span>Transmission Speed: {formatFileSize(speed)}/s</span>
                 <span>ETA: {formatTime(timeRemaining)}</span>
             </div>
 
-            <div className="h-4 w-full bg-[#1a1a1a] border border-[#3a3827] p-[2px] relative overflow-hidden">
+            <div className="h-4 w-full bg-surface border border-subtle-bauhaus p-[2px] relative overflow-hidden">
                 <div
                     className={`h-full ${isPaused ? "bg-orange-400" : "bg-primary"
                         } relative overflow-hidden transition-all duration-300`}

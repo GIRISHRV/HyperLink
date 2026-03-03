@@ -45,7 +45,7 @@ export function ClipboardListener() {
 
     return createPortal(
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className="bg-[#1a1a1a] border border-primary/20 shadow-2xl rounded-sm p-4 flex items-center gap-4 min-w-[350px]">
+            <div className="bg-surface border border-primary/20 shadow-2xl rounded-none p-4 flex items-center gap-4 min-w-[350px]">
                 <div className="bg-primary/20 p-2 rounded-full text-primary">
                     <span className="material-symbols-outlined">content_paste</span>
                 </div>
@@ -55,11 +55,12 @@ export function ClipboardListener() {
                 </div>
                 <button
                     onClick={handleSendNow}
-                    className="bg-primary hover:bg-yellow-400 text-black text-xs font-bold uppercase py-2 px-4 rounded-sm transition-colors active:scale-95"
+                    className="bg-primary hover:bg-yellow-400 text-black text-xs font-bold uppercase py-2 px-4 rounded-none transition-colors active:scale-95"
                 >
                     Go to Send
                 </button>
                 <button
+                    aria-label="Dismiss notification"
                     onClick={() => setShowToast(false)}
                     className="text-gray-500 hover:text-white transition-colors"
                 >

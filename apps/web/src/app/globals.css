@@ -125,10 +125,6 @@
     clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
   }
 
-  .shape-quarter-circle {
-    border-radius: 100% 0 0 0;
-  }
-
   /* Micro-interactions */
   .btn-press {
     @apply transition-transform active:scale-95 duration-100;
@@ -140,5 +136,17 @@
 
   .interactive-card {
     @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5;
+  }
+}
+
+/* Accessibility: Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

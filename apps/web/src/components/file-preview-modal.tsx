@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatFileSize } from "@repo/utils";
 import { Ripple } from "@/components/ripple";
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
 
 interface FilePreviewModalProps {
     isOpen: boolean;
@@ -20,6 +21,7 @@ export default function FilePreviewModal({
     const [objectUrl, setObjectUrl] = useState<string | null>(null);
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
+    const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onClose);
 
     useEffect(() => {
         if (isOpen && file) {
@@ -32,15 +34,15 @@ export default function FilePreviewModal({
     if (!isOpen || !objectUrl) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="File Preview" className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div
                 className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
                 onClick={onClose}
             />
 
-            <div className="relative w-full max-w-5xl bg-[#1a1a1a] border border-white/10 rounded-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="relative w-full max-w-5xl bg-surface border border-white/10 rounded-none shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#222]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-surface-elevated">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <span className="material-symbols-outlined text-primary">
                             {isImage ? "image" : isVideo ? "movie" : "description"}
@@ -55,7 +57,7 @@ export default function FilePreviewModal({
                         <a
                             href={objectUrl}
                             download={filename}
-                            className="flex items-center justify-center size-8 rounded-sm hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative overflow-hidden"
+                            className="flex items-center justify-center size-8 rounded-none hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative overflow-hidden"
                             title="Download"
                         >
                             <span className="material-symbols-outlined text-[20px] relative z-10">download</span>
@@ -63,7 +65,7 @@ export default function FilePreviewModal({
                         </a>
                         <button
                             onClick={onClose}
-                            className="flex items-center justify-center size-8 rounded-sm hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative overflow-hidden"
+                            className="flex items-center justify-center size-8 rounded-none hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative overflow-hidden"
                         >
                             <span className="material-symbols-outlined text-[20px] relative z-10">close</span>
                             <Ripple />
@@ -72,13 +74,13 @@ export default function FilePreviewModal({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-auto bg-[#0f0f0f] flex items-center justify-center p-4 min-h-[300px]">
+                <div className="flex-1 overflow-auto bg-surface-preview flex items-center justify-center p-4 min-h-[300px]">
                     {isImage && (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                             src={objectUrl}
                             alt={filename}
-                            className="max-w-full max-h-[75vh] object-contain rounded-sm shadow-lg"
+                            className="max-w-full max-h-[75vh] object-contain rounded-none shadow-lg"
                         />
                     )}
                     {isVideo && (
@@ -86,7 +88,7 @@ export default function FilePreviewModal({
                             src={objectUrl}
                             controls
                             autoPlay
-                            className="max-w-full max-h-[75vh] rounded-sm shadow-lg"
+                            className="max-w-full max-h-[75vh] rounded-none shadow-lg"
                         />
                     )}
                     {!isImage && !isVideo && (

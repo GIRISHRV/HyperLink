@@ -7,7 +7,11 @@ export interface TransferStats {
     isLoading: boolean;
 }
 
-export function useTransferStats() {
+/**
+ * SEC-007: userId is only used as a readiness signal.
+ * The RPC uses auth.uid() server-side — no user ID is sent over the wire.
+ */
+export function useTransferStats(userId?: string) {
     const [stats, setStats] = useState<TransferStats>({
         totalBytes: 0,
         totalTransfers: 0,
@@ -16,11 +20,16 @@ export function useTransferStats() {
 
     useEffect(() => {
         async function fetchStats() {
+            if (!userId) {
+                setStats((prev) => ({ ...prev, isLoading: false }));
+                return;
+            }
+
             try {
                 const data = await getUserTransferStats();
                 if (data) {
                     setStats({
-                        totalBytes: data.totalBytes,
+                        totalBytes: data.totalBytesSent,
                         totalTransfers: data.totalTransfers,
                         isLoading: false,
                     });
@@ -34,7 +43,7 @@ export function useTransferStats() {
         }
 
         fetchStats();
-    }, []);
+    }, [userId]);
 
     return stats;
 }

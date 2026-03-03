@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
 
 interface QRCodeModalProps {
     isOpen: boolean;
@@ -9,15 +10,21 @@ interface QRCodeModalProps {
 }
 
 export default function QRCodeModal({ isOpen, peerId, onClose }: QRCodeModalProps) {
+    const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onClose);
     if (!isOpen) return null;
 
     return (
         <div
+            ref={modalRef}
+            onKeyDown={handleKeyDown}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Scan Peer ID"
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
-                className="bg-[#1a1a1a] border border-[#3a3827] max-w-md w-full p-8 relative"
+                className="bg-surface border border-subtle-bauhaus max-w-md w-full p-8 relative"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Close button */}
@@ -33,7 +40,7 @@ export default function QRCodeModal({ isOpen, peerId, onClose }: QRCodeModalProp
                     <h2 className="text-2xl font-black uppercase tracking-tighter text-white mb-2">
                         Scan <span className="text-primary">Peer ID</span>
                     </h2>
-                    <p className="text-[#bcb89a] text-sm font-mono">
+                    <p className="text-muted text-sm font-mono">
                         Use sender&apos;s camera to scan this code
                     </p>
                 </div>
@@ -49,8 +56,8 @@ export default function QRCodeModal({ isOpen, peerId, onClose }: QRCodeModalProp
                 </div>
 
                 {/* Peer ID Text */}
-                <div className="bg-[#11110f] border border-[#3a3827] p-4">
-                    <p className="text-[#bcb89a] text-xs font-bold uppercase tracking-wider mb-2">
+                <div className="bg-surface-inset border border-subtle-bauhaus p-4">
+                    <p className="text-muted text-xs font-bold uppercase tracking-wider mb-2">
                         Manual Entry
                     </p>
                     <p className="text-white font-mono text-sm break-all">
@@ -61,7 +68,7 @@ export default function QRCodeModal({ isOpen, peerId, onClose }: QRCodeModalProp
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="w-full mt-6 h-12 bg-primary hover:bg-[#ffea2e] text-black font-bold uppercase tracking-wider transition-colors"
+                    className="w-full mt-6 h-12 bg-primary hover:bg-primary-hover text-black font-bold uppercase tracking-wider transition-colors"
                 >
                     Close
                 </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatFileSize } from "@repo/utils";
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
 
 interface FileOfferPromptProps {
   isOpen: boolean;
@@ -19,17 +20,18 @@ export default function FileOfferPrompt({
   onAccept,
   onReject,
 }: FileOfferPromptProps) {
+  const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onReject);
   if (!isOpen) return null;
 
   const extension = filename.split(".").pop()?.toUpperCase() || "FILE";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+    <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="Incoming File" className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-surface border border-white/10 rounded-none shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-bauhaus-blue via-primary to-bauhaus-red" />
 
@@ -43,7 +45,7 @@ export default function FileOfferPrompt({
               </span>
             </div>
             {/* Incoming badge */}
-            <div className="absolute -top-2 -right-2 w-7 h-7 bg-bauhaus-blue rounded-full flex items-center justify-center border-2 border-[#1a1a1a]">
+            <div className="absolute -top-2 -right-2 w-7 h-7 bg-bauhaus-blue rounded-full flex items-center justify-center border-2 border-surface">
               <span className="material-symbols-outlined text-white text-sm">
                 arrow_downward
               </span>
@@ -60,11 +62,11 @@ export default function FileOfferPrompt({
           </div>
 
           {/* File details */}
-          <div className="w-full bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+          <div className="w-full bg-white/5 border border-white/10 rounded-none p-4 space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white text-black flex items-center justify-center font-bold text-xs relative shrink-0">
                 {extension}
-                <div className="absolute top-0 right-0 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-[#1a1a1a]"></div>
+                <div className="absolute top-0 right-0 w-0 h-0 border-l-[8px] border-l-transparent border-t-[8px] border-t-surface"></div>
               </div>
               <div className="text-left min-w-0">
                 <p className="text-white font-bold truncate text-sm">{filename}</p>

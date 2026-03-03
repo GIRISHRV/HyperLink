@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
+import { logger } from "@repo/utils";
+import { withRetry } from "@/lib/utils/with-retry";
 
 export interface UserProfile {
   id: string;
@@ -19,23 +21,20 @@ export interface UpdateProfileData {
 /**
  * Get the current user's profile
  */
-export async function getUserProfile(): Promise<UserProfile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await withRetry(() =>
+    supabase.from("user_profiles").select("*").eq("user_id", userId).single()
+  );
 
   if (error) {
-    console.warn("User profile not found or error fetching, creating default profile...", error);
-    // Fallback: Create a default profile if one doesn't exist
-    return await createUserProfile(user.id, user.email?.split("@")[0] || "User");
+    // FINDING-020: Only auto-create on genuine "row not found" (PGRST116).
+    // Any other error (network, auth, server) should propagate, not silently
+    // create a profile, which would mask the underlying problem.
+    if (error.code === "PGRST116") {
+      // NOTE: We don't have the user's email here anymore, so we fallback to "User"
+      return await createUserProfile(userId, "User");
+    }
+    throw error;
   }
 
   return data;
@@ -44,31 +43,28 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 /**
  * Update the current user's profile
  */
-export async function updateUserProfile(updates: UpdateProfileData): Promise<UserProfile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
+export async function updateUserProfile(
+  userId: string,
+  updates: UpdateProfileData
+): Promise<UserProfile | null> {
   // Use upsert to handle cases where the profile might not exist yet (e.g. older users)
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .upsert(
-      {
-        user_id: user.id,
-        ...updates,
-        updated_at: new Date().toISOString(), // Manually update timestamp for upsert
-      },
-      {
-        onConflict: "user_id",
-      }
-    )
-    .select()
-    .single();
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from("user_profiles")
+      .upsert(
+        {
+          user_id: userId,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      )
+      .select()
+      .single()
+  );
 
   if (error) {
-    console.error("Error updating user profile:", error);
+    logger.error({ error }, "Error updating user profile");
     throw error;
   }
 
@@ -94,7 +90,7 @@ export async function createUserProfile(
     .single();
 
   if (error) {
-    console.error("Error creating user profile:", error);
+    logger.error({ error }, "Error creating user profile");
     return null;
   }
 

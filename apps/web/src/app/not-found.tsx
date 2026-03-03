@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
     return (
-        <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-background-dark text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
             {/* Background Geometric Shapes */}
             <div className="absolute top-20 left-10 w-32 h-32 rounded-full bg-bauhaus-blue opacity-20 blur-xl animate-pulse" />
             <div className="absolute bottom-32 right-20 w-40 h-40 bg-bauhaus-red opacity-10 rotate-45" />
@@ -43,17 +44,17 @@ export default function NotFound() {
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto">
                     <Link href="/">
-                        <button className="w-full sm:w-auto h-14 px-8 bg-primary hover:bg-[#ffea2e] text-black font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2">
+                        <Button size="lg" className="w-full sm:w-auto">
                             <span className="material-symbols-outlined">home</span>
                             Go Home
-                        </button>
+                        </Button>
                     </Link>
 
                     <Link href="/dashboard">
-                        <button className="w-full sm:w-auto h-14 px-8 bg-transparent border-2 border-white/20 hover:border-primary hover:bg-primary/10 text-white font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+                        <Button variant="outline" size="lg" className="w-full sm:w-auto">
                             <span className="material-symbols-outlined">dashboard</span>
                             Dashboard
-                        </button>
+                        </Button>
                     </Link>
                 </div>
 

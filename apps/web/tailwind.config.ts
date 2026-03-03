@@ -13,6 +13,7 @@ const config: Config = {
         // Bauhaus Color Palette
         primary: {
           DEFAULT: "#ffd900", // Bauhaus Yellow
+          hover: "#ffea2e",   // Primary hover state
           400: "#ffd900",
           500: "#ffd900",
           600: "#e6c400",
@@ -30,9 +31,29 @@ const config: Config = {
           600: "#d72638",
           700: "#991b1b",
         },
+        // Surface tokens (cards, modals, interactive elements)
+        surface: {
+          DEFAULT: "#1a1a1a",   // Cards, modals, panels
+          elevated: "#242424",  // Buttons, interactive surfaces
+          deep: "#0a0a0a",      // Deep backgrounds, overlays
+          inset: "#11110f",     // Inset panels, code blocks
+          preview: "#0f0f0f",   // Preview areas
+        },
         "background-dark": "#121212",
+        "background-light": "#f5f5f5",
         "surface-dark": "#1e1e1e",
         "surface-light": "#2a2614",
+        // Text tokens
+        muted: {
+          DEFAULT: "#bcb89a",   // Muted gold text (labels, captions)
+          dim: "#a1a1a1",       // Dimmer text
+        },
+        // Border tokens
+        subtle: {
+          DEFAULT: "#333333",   // Standard subtle borders
+          bauhaus: "#3a3827",   // Bauhaus-themed borders
+          gold: "#6b6644",      // Gold-tinted borders
+        },
         accent: {
           DEFAULT: "#dc2626",
           400: "#dc2626",

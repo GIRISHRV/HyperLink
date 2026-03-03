@@ -16,7 +16,10 @@ export async function createClient() {
           try {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
-            // Server Component cookie setting
+            // Server Component cookie operations may fail; log for debugging
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[Supabase Server] Cookie operation failed:', error);
+            }
           }
         },
         remove(name: string, options: CookieOptions) {

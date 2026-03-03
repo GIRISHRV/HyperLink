@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, errorInfo: any) {
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
         console.error("Error Boundary caught an error:", error, errorInfo);
     }
 
@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
             }
 
             return (
-                <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-center p-4">
+                <div className="min-h-screen bg-background-dark text-white flex flex-col items-center justify-center p-4">
                     <div className="max-w-2xl text-center flex flex-col items-center gap-6">
                         <div className="w-20 h-20 rounded-full bg-bauhaus-red/20 flex items-center justify-center">
                             <span className="material-symbols-outlined text-5xl text-bauhaus-red">
@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
                         </p>
 
                         {this.state.error && (
-                            <div className="w-full bg-[#1a1a1a] border border-bauhaus-red/30 p-4 rounded font-mono text-xs text-left overflow-auto">
+                            <div className="w-full bg-surface border border-bauhaus-red/30 p-4 rounded font-mono text-xs text-left overflow-auto">
                                 <p className="text-bauhaus-red font-bold mb-2">Error Details:</p>
                                 <p className="text-gray-400">{this.state.error.message}</p>
                             </div>
@@ -58,7 +58,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                         <button
                             onClick={() => this.setState({ hasError: false, error: null })}
-                            className="h-12 px-8 bg-primary hover:bg-[#ffea2e] text-black font-bold uppercase tracking-wider transition-colors"
+                            className="h-12 px-8 bg-primary hover:bg-primary-hover text-black font-bold uppercase tracking-wider transition-colors"
                         >
                             Try Again
                         </button>

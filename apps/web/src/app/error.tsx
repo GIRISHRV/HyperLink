@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function Error({
     error,
@@ -15,7 +16,7 @@ export default function Error({
     }, [error]);
 
     return (
-        <div className="min-h-screen bg-[#121212] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-background-dark text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
             {/* Background Geometric Shapes */}
             <div className="absolute top-20 right-10 w-32 h-32 rounded-full bg-bauhaus-red opacity-20 blur-xl animate-pulse" />
             <div className="absolute bottom-32 left-20 w-40 h-40 bg-primary opacity-10 rotate-12" />
@@ -53,7 +54,7 @@ export default function Error({
 
                 {/* Error Details (Dev Mode) */}
                 {process.env.NODE_ENV === "development" && error.message && (
-                    <div className="w-full bg-[#1a1a1a] border border-bauhaus-red/30 p-4 rounded font-mono text-xs text-left overflow-auto max-w-xl">
+                    <div className="w-full bg-surface border border-bauhaus-red/30 p-4 rounded font-mono text-xs text-left overflow-auto max-w-xl">
                         <p className="text-bauhaus-red font-bold mb-2 uppercase tracking-wider">
                             Debug Info (Dev Mode):
                         </p>
@@ -66,19 +67,20 @@ export default function Error({
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto">
-                    <button
+                    <Button
                         onClick={reset}
-                        className="w-full sm:w-auto h-14 px-8 bg-primary hover:bg-[#ffea2e] text-black font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                        size="lg"
+                        className="w-full sm:w-auto"
                     >
                         <span className="material-symbols-outlined">refresh</span>
                         Try Again
-                    </button>
+                    </Button>
 
                     <Link href="/">
-                        <button className="w-full sm:w-auto h-14 px-8 bg-transparent border-2 border-white/20 hover:border-primary hover:bg-primary/10 text-white font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+                        <Button variant="outline" size="lg" className="w-full sm:w-auto">
                             <span className="material-symbols-outlined">home</span>
                             Go Home
-                        </button>
+                        </Button>
                     </Link>
                 </div>
 
@@ -88,12 +90,7 @@ export default function Error({
                 </div>
             </div>
 
-            {/* Tri-Color Footer Strip */}
-            <div className="absolute bottom-0 left-0 right-0 flex h-2">
-                <div className="flex-1 bg-bauhaus-blue" />
-                <div className="flex-1 bg-bauhaus-red" />
-                <div className="flex-1 bg-primary" />
-            </div>
+
         </div>
     );
 }

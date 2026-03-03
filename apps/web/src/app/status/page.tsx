@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import AppHeader from "@/components/app-header";
 
 interface HealthData {
   status: string;
@@ -54,25 +54,8 @@ export default function StatusPage() {
   };
 
   return (
-    <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
-      {/* Navbar: Split Header Design */}
-      <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
-        {/* Left: Logo Block */}
-        <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
-          <span className="font-black text-4xl tracking-tighter uppercase">HYPER</span>
-        </div>
-        {/* Right: Navigation & Secondary Logo Part */}
-        <div className="flex-1 bg-white dark:bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-          <span className="font-black text-4xl tracking-tighter uppercase text-[#121212] dark:text-white">LINK</span>
-          <div className="flex gap-4 md:gap-8 items-center">
-            <Link href="/">
-              <button className="h-12 px-6 bg-[#333] hover:bg-[#555] text-white text-sm font-bold uppercase tracking-wide transition-colors">
-                ← Back
-              </button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+    <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
+      <AppHeader variant="landing" />
 
       {/* Main Content */}
       <main className="flex-grow flex items-center justify-center p-6">
@@ -94,12 +77,12 @@ export default function StatusPage() {
 
           {/* Status Display */}
           {loading ? (
-            <div className="bg-[#1a1a1a] border border-[#333] p-16 text-center">
+            <div className="bg-surface border border-subtle p-16 text-center">
               <div className="inline-block size-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
               <p className="text-gray-400 font-mono text-sm uppercase tracking-wider">Checking network status...</p>
             </div>
           ) : error ? (
-            <div className="bg-[#1a1a1a] border border-[#333] p-16 text-center">
+            <div className="bg-surface border border-subtle p-16 text-center">
               <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-bauhaus-red/20 flex items-center justify-center">
                 <span className="material-symbols-outlined text-5xl text-bauhaus-red">error</span>
               </div>
@@ -109,7 +92,7 @@ export default function StatusPage() {
           ) : health ? (
             <div className="space-y-6">
               {/* Overall Status Header */}
-              <div className="bg-[#1a1a1a] border border-[#333] p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="bg-surface border border-subtle p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-3xl font-black uppercase tracking-tight mb-2">
                     All Systems Operational
@@ -130,7 +113,7 @@ export default function StatusPage() {
               {/* Metrics Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Service Name */}
-                <div className="bg-[#1a1a1a] border border-[#333] p-8 relative group hover:border-bauhaus-blue transition-colors">
+                <div className="bg-surface border border-subtle p-8 relative group hover:border-bauhaus-blue transition-colors">
                   <div className="absolute top-4 right-4">
                     <div className="w-12 h-12 rounded-full bg-bauhaus-blue/20 flex items-center justify-center">
                       <span className="material-symbols-outlined text-bauhaus-blue text-2xl">cloud</span>
@@ -144,7 +127,7 @@ export default function StatusPage() {
                 </div>
 
                 {/* Uptime */}
-                <div className="bg-[#1a1a1a] border border-[#333] p-8 relative group hover:border-primary transition-colors">
+                <div className="bg-surface border border-subtle p-8 relative group hover:border-primary transition-colors">
                   <div className="absolute top-4 right-4">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                       <span className="material-symbols-outlined text-primary text-2xl">schedule</span>
@@ -158,7 +141,7 @@ export default function StatusPage() {
                 </div>
 
                 {/* Status */}
-                <div className="bg-[#1a1a1a] border border-[#333] p-8 relative group hover:border-green-500 transition-colors">
+                <div className="bg-surface border border-subtle p-8 relative group hover:border-green-500 transition-colors">
                   <div className="absolute top-4 right-4">
                     <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
                       <span className="material-symbols-outlined text-green-500 text-2xl">check_circle</span>
@@ -185,14 +168,7 @@ export default function StatusPage() {
         </div>
       </main>
 
-      {/* Footer: Tri-Color Strip */}
-      <footer className="mt-auto">
-        <div className="flex h-2 w-full">
-          <div className="flex-1 bg-bauhaus-blue"></div>
-          <div className="flex-1 bg-bauhaus-red"></div>
-          <div className="flex-1 bg-primary"></div>
-        </div>
-      </footer>
+
     </div>
   );
 }

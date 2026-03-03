@@ -1,9 +1,12 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import type { FileChunk } from "@repo/types";
-import { addChunk, getAllChunks, clearTransfer, addFile } from "@/lib/storage/idb-manager";
+import { addChunk, assembleFileFromCursor, clearTransfer, addFile, getLastReceivedChunkIndex } from "@/lib/storage/idb-manager";
 import { logger } from "@repo/utils";
 import { deriveKey, decryptChunk, base64ToArrayBuffer } from "@/lib/utils/crypto";
+import type { TransferStatus } from "@/lib/hooks/use-transfer-state";
+
+const CHUNK_SIZE = 64 * 1024; // Must match sender's CHUNK_SIZE
 
 
 export class FileReceiver {
@@ -17,13 +20,13 @@ export class FileReceiver {
   private bytesReceived: number = 0;
   private startTime: number = 0;
   private connection: DataConnection | null = null;
-  private isCancelled: boolean = false;
-  private isPaused: boolean = false;
+  private status: TransferStatus = "idle";
   private progressCallback?: (progress: TransferProgress) => void;
   private completeCallback?: (blob: Blob, filename: string) => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private errorCallback?: (error: Error | string) => void;
+  private resumeFromChunk: number = 0; // For crash recovery
 
   // Encryption state
   private isEncrypted: boolean = false;
@@ -77,12 +80,32 @@ export class FileReceiver {
     this.startTime = Date.now();
     this.receivedChunks = 0;
     this.bytesReceived = 0;
+    this.resumeFromChunk = 0;
+
+    // Check IDB for previously received chunks (crash recovery)
+    try {
+      const lastIndex = await getLastReceivedChunkIndex(this.transferId);
+      if (lastIndex >= 0) {
+        this.receivedChunks = lastIndex + 1;
+        this.bytesReceived = Math.min(this.receivedChunks * CHUNK_SIZE, this.fileSize);
+        this.resumeFromChunk = lastIndex + 1;
+        logger.info({
+          transferId: this.transferId,
+          resumeFrom: this.resumeFromChunk,
+          existingChunks: this.receivedChunks
+        }, "[RECEIVER] Found existing chunks in IDB, will resume");
+      }
+    } catch (err) {
+      logger.warn({ err }, "[RECEIVER] Failed to check for existing chunks, starting fresh");
+    }
+
     logger.info({
       transferId: this.transferId,
       storageId: this.storageId,
       filename: this.filename,
       totalChunks: this.totalChunks,
-      isEncrypted: this.isEncrypted
+      isEncrypted: this.isEncrypted,
+      resumeFrom: this.resumeFromChunk
     }, "[RECEIVER] handleOffer");
   }
 
@@ -104,7 +127,7 @@ export class FileReceiver {
    * Handle incoming chunk - store it and send ACK
    */
   async handleChunk(message: PeerMessage<ChunkPayload>): Promise<void> {
-    if (this.isCancelled) return;
+    if (this.status === "cancelled") return;
 
     const { chunkIndex, data } = message.payload;
     let chunkData = data;
@@ -147,6 +170,17 @@ export class FileReceiver {
       await addChunk(chunk);
     } catch (error) {
       logger.error({ chunkIndex, error }, "[RECEIVER] Failed to store chunk");
+      // EDGE-001: Notify sender of failure to prevent ACK deadlock
+      if (this.connection) {
+        const errorMsg: PeerMessage = {
+          type: "transfer-error",
+          transferId: this.transferId,
+          payload: { message: "Storage write failed" },
+          timestamp: Date.now(),
+        };
+        this.connection.send(errorMsg);
+      }
+      this.cancel();
       return;
     }
 
@@ -161,7 +195,7 @@ export class FileReceiver {
 
     // Update progress callback
     if (this.progressCallback) {
-      const elapsedTime = Date.now() - this.startTime;
+      const elapsedTime = Math.max(1, Date.now() - this.startTime);
       const speed = this.bytesReceived / (elapsedTime / 1000);
       const timeRemaining = (this.fileSize - this.bytesReceived) / speed;
 
@@ -194,7 +228,10 @@ export class FileReceiver {
       return;
     }
 
-    logger.info({ chunkIndex }, "[RECEIVER] Sending ACK");
+    // Log ACK sparingly to avoid flooding console
+    if (chunkIndex % 100 === 0) {
+      logger.debug({ chunkIndex }, "[RECEIVER] ACK batch");
+    }
 
     const ackMessage: PeerMessage = {
       type: "chunk-ack",
@@ -211,14 +248,11 @@ export class FileReceiver {
    */
   private async assembleFile(): Promise<void> {
     try {
-      logger.info("[RECEIVER] assembleFile: Retrieving chunks from IndexedDB...");
-      const chunks = await getAllChunks(this.transferId);
-      logger.info({ count: chunks.length }, "[RECEIVER] assembleFile: Got chunks");
+      logger.info("[RECEIVER] assembleFile: Assembling chunks using IDB cursor stream...");
 
-      // Combine chunks into single Blob
-      const blobParts = chunks.map((chunk) => chunk.data);
-      const finalBlob = new Blob(blobParts, { type: this.fileType });
-      logger.info({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob size");
+      const finalBlob = await assembleFileFromCursor(this.transferId, this.fileType);
+      this.status = "complete";
+      logger.info({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob constructed in memory");
 
       // Store the completed file blob to IndexedDB
       try {
@@ -281,7 +315,7 @@ export class FileReceiver {
 
     if (message.type === "transfer-cancel") {
       logger.info("[RECEIVER] Sender cancelled transfer");
-      this.isCancelled = true;
+      this.status = "cancelled";
       this.cancelCallback?.();
       // Clean up partial chunks from IndexedDB
       clearTransfer(this.transferId).catch(console.error);
@@ -290,14 +324,14 @@ export class FileReceiver {
 
     if (message.type === "transfer-pause") {
       logger.info("[RECEIVER] Sender paused transfer");
-      this.isPaused = true;
+      this.status = "paused";
       this.pauseCallback?.(true);
       return true;
     }
 
     if (message.type === "transfer-resume") {
       logger.info("[RECEIVER] Sender resumed transfer");
-      this.isPaused = false;
+      this.status = "transferring";
       this.pauseCallback?.(false);
       return true;
     }
@@ -309,7 +343,8 @@ export class FileReceiver {
    * Cancel transfer from receiver side - notify sender and clean up
    */
   cancel(): void {
-    this.isCancelled = true;
+    if (this.status === "cancelled" || this.status === "complete") return;
+    this.status = "cancelled";
     const cancelMessage: PeerMessage = {
       type: "transfer-cancel",
       transferId: this.transferId,
@@ -322,7 +357,7 @@ export class FileReceiver {
       logger.warn({ e }, "[RECEIVER] Failed to send cancel message");
     }
     // Clean up partial chunks from IndexedDB
-    clearTransfer(this.transferId).catch(console.error);
+    clearTransfer(this.storageId || this.transferId).catch(console.error);
     logger.info("[RECEIVER] Transfer cancelled");
   }
 
@@ -330,8 +365,8 @@ export class FileReceiver {
    * Pause transfer - notify sender to stop sending chunks
    */
   pause(): void {
-    if (this.isPaused) return;
-    this.isPaused = true;
+    if (this.status === "paused" || this.status === "cancelled") return;
+    this.status = "paused";
     const pauseMessage: PeerMessage = {
       type: "transfer-pause",
       transferId: this.transferId,
@@ -351,8 +386,8 @@ export class FileReceiver {
    * Resume transfer - notify sender to continue sending chunks
    */
   resume(): void {
-    if (!this.isPaused) return;
-    this.isPaused = false;
+    if (this.status !== "paused") return;
+    this.status = "transferring";
     const resumeMessage: PeerMessage = {
       type: "transfer-resume",
       transferId: this.transferId,
@@ -368,18 +403,8 @@ export class FileReceiver {
     logger.info("[RECEIVER] Transfer resumed by receiver");
   }
 
-  /**
-   * Check if cancelled
-   */
-  getIsCancelled(): boolean {
-    return this.isCancelled;
-  }
-
-  /**
-   * Check if paused
-   */
-  getIsPaused(): boolean {
-    return this.isPaused;
+  getStatus(): TransferStatus {
+    return this.status;
   }
 
   /**
@@ -415,5 +440,29 @@ export class FileReceiver {
    */
   getFileSize(): number {
     return this.fileSize;
+  }
+
+  /**
+   * Get the chunk index to resume from (0 = start from beginning)
+   */
+  getResumeFromChunk(): number {
+    return this.resumeFromChunk;
+  }
+
+  /**
+   * Send resume-from message to sender so it skips already-received chunks.
+   * Should be called after file-accept if resumeFromChunk > 0.
+   */
+  sendResumeFrom(): void {
+    if (this.resumeFromChunk <= 0 || !this.connection) return;
+
+    const msg: PeerMessage = {
+      type: "resume-from",
+      transferId: this.transferId,
+      payload: { startChunk: this.resumeFromChunk },
+      timestamp: Date.now(),
+    };
+    this.connection.send(msg);
+    logger.info({ startChunk: this.resumeFromChunk }, "[RECEIVER] Sent resume-from to sender");
   }
 }

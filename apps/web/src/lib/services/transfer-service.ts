@@ -1,32 +1,29 @@
 import { supabase } from "@/lib/supabase/client";
 import { logger } from "@repo/utils";
+import { withRetry } from "@/lib/utils/with-retry";
 import type { Transfer } from "@repo/types";
 
 /**
  * Create a new transfer record
  */
-export async function createTransfer(data: {
+export async function createTransfer(userId: string, data: {
   filename: string;
   fileSize: number;
   receiverId?: string;
 }): Promise<Transfer | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: transfer, error } = await supabase
-    .from("transfers")
-    .insert({
-      filename: data.filename,
-      file_size: data.fileSize,
-      sender_id: user.id,
-      receiver_id: data.receiverId || null,
-      status: "pending",
-    })
-    .select()
-    .single();
+  const { data: transfer, error } = await withRetry(() =>
+    supabase
+      .from("transfers")
+      .insert({
+        filename: data.filename,
+        file_size: data.fileSize,
+        sender_id: userId,
+        receiver_id: data.receiverId || null,
+        status: "pending",
+      })
+      .select()
+      .single()
+  );
 
   if (error) {
     logger.error({ error }, "Error creating transfer");
@@ -63,17 +60,12 @@ export async function updateTransferStatus(
  * Claim an existing transfer as the receiver (set receiver_id)
  */
 export async function claimTransferAsReceiver(transferId: string): Promise<Transfer | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
   // Use RPC to bypass RLS — the receiver can't satisfy the UPDATE policy
   // because receiver_id is still NULL when they try to claim the record.
+  // The function uses auth.uid() server-side, so no receiver_id param needed.
   const { data, error } = await supabase.rpc("claim_transfer", {
     p_transfer_id: transferId,
-    p_receiver_id: user.id,
+    // p_receiver_id removed — migration 006 enforces auth.uid() server-side
   });
 
   if (error) {
@@ -88,18 +80,14 @@ export async function claimTransferAsReceiver(transferId: string): Promise<Trans
 /**
  * Get user's transfer history
  */
-export async function getUserTransfers(): Promise<Transfer[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  const { data, error } = await supabase
-    .from("transfers")
-    .select("*")
-    .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-    .order("created_at", { ascending: false });
+export async function getUserTransfers(userId: string): Promise<Transfer[]> {
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from("transfers")
+      .select("*")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+  );
 
   if (error) {
     logger.error({ error }, "Error fetching transfers");
@@ -107,24 +95,6 @@ export async function getUserTransfers(): Promise<Transfer[]> {
   }
 
   return data || [];
-}
-
-/**
- * Get transfer by ID
- */
-export async function getTransfer(transferId: string): Promise<Transfer | null> {
-  const { data, error } = await supabase
-    .from("transfers")
-    .select("*")
-    .eq("id", transferId)
-    .single();
-
-  if (error) {
-    logger.error({ error }, "Error fetching transfer");
-    return null;
-  }
-
-  return data;
 }
 
 /**
@@ -147,17 +117,7 @@ export async function deleteTransfer(transferId: string): Promise<boolean> {
 export async function deleteMultipleTransfers(transferIds: string[]): Promise<boolean> {
   if (transferIds.length === 0) return true;
 
-  logger.info({ transferIds }, "[TRANSFER-SERVICE] Deleting transfers");
-
-  // First check what we can actually see
-  const { data: user } = await supabase.auth.getUser();
-  logger.info({ userId: user?.user?.id }, "[TRANSFER-SERVICE] Current user ID");
-
-  const { data: checkData } = await supabase
-    .from("transfers")
-    .select("id, sender_id, receiver_id")
-    .in("id", transferIds);
-  logger.info({ checkData }, "[TRANSFER-SERVICE] Transfers we can SELECT");
+  logger.info({ count: transferIds.length }, "[TRANSFER-SERVICE] Deleting transfers");
 
   // Use .select() to get rows that were deleted (requires RLS access)
   const { data, error } = await supabase
@@ -171,36 +131,37 @@ export async function deleteMultipleTransfers(transferIds: string[]): Promise<bo
     return false;
   }
 
-  logger.info({ data }, "[TRANSFER-SERVICE] Actually deleted");
+  logger.info({ deleted: data?.length ?? 0 }, "[TRANSFER-SERVICE] Deleted");
   return true;
 }
 
 /**
- * Get total transfer statistics for the current user
+ * Get total transfer statistics for the current user.
+ * SEC-007: No userId parameter — the RPC uses auth.uid() server-side
+ * to prevent IDOR attacks.
  */
 export async function getUserTransferStats(): Promise<{
-  totalBytes: number;
   totalTransfers: number;
-} | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("transfers")
-    .select("file_size")
-    .eq("sender_id", user.id)
-    .eq("status", "complete");
+  totalBytesSent: number;
+}> {
+  const { data, error } = await withRetry(() =>
+    supabase.rpc("get_user_transfer_stats")
+  );
 
   if (error) {
-    logger.error({ error }, "Error fetching transfer stats");
-    return null;
+    logger.error({ error }, "Error fetching user transfer stats");
+    return { totalTransfers: 0, totalBytesSent: 0 };
   }
 
-  const totalBytes = data.reduce((acc, curr) => acc + (curr.file_size || 0), 0);
-  const totalTransfers = data.length;
+  // Handle both possible RPC return formats depending on the database function version
+  const stats = data as { total_transfers?: number; total_bytes_sent?: number; total_bytes?: number }[];
+  if (!stats || stats.length === 0) {
+    return { totalTransfers: 0, totalBytesSent: 0 };
+  }
 
-  return { totalBytes, totalTransfers };
+  const firstRow = stats[0];
+  return {
+    totalTransfers: Number(firstRow?.total_transfers || 0),
+    totalBytesSent: Number(firstRow?.total_bytes_sent || firstRow?.total_bytes || 0),
+  };
 }

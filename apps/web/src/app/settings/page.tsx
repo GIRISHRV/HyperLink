@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, signOut } from "@/lib/services/auth-service";
-import { getUserProfile, updateUserProfile } from "@/lib/services/profile-service";
-import type { User } from "@supabase/supabase-js";
+import { signOut } from "@/lib/services/auth-service";
+import { useRequireAuth } from "@/lib/hooks/use-require-auth";
+import { getUserProfile, updateUserProfile, type UpdateProfileData } from "@/lib/services/profile-service";
 import { Ripple } from "@/components/ripple";
 import Link from "next/link";
-import GlobalHeader from "@/components/global-header";
+import AppHeader from "@/components/app-header";
+import { toast } from "sonner";
 
 const AVATAR_ICONS = [
   "person",
@@ -39,8 +40,7 @@ const AVATAR_COLORS = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useRequireAuth();
   const [saving, setSaving] = useState(false);
 
   // Profile settings
@@ -51,16 +51,10 @@ export default function SettingsPage() {
   // UI state
   const [saved, setSaved] = useState(false);
 
-  const checkUserAndLoadProfile = useCallback(async () => {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      router.push("/auth");
-      return;
-    }
-    setUser(currentUser);
-
+  const loadProfile = useCallback(async () => {
     // Load profile from database
-    const profile = await getUserProfile();
+    if (!user) return;
+    const profile = await getUserProfile(user.id);
     if (profile) {
       setSelectedIcon(profile.avatar_icon || "person");
       setDisplayName(profile.display_name || "");
@@ -68,28 +62,36 @@ export default function SettingsPage() {
       const color = AVATAR_COLORS.find((c) => c.value === profile.avatar_color);
       if (color) setSelectedColor(color);
     }
-
-    setLoading(false);
-  }, [router]);
+  }, [user]);
 
   useEffect(() => {
-    checkUserAndLoadProfile();
-  }, [checkUserAndLoadProfile]);
+    if (user) {
+      loadProfile();
+    }
+  }, [user, loadProfile]);
+
+
 
   async function handleSave() {
-    setSaving(true);
+    if (!user) return;
     try {
-      await updateUserProfile({
-        display_name: displayName,
-        avatar_icon: selectedIcon,
-        avatar_color: selectedColor.value,
-      });
+      setSaving(true);
 
-      setSaved(true);
+      const updates: UpdateProfileData = {
+        display_name: displayName,
+        avatar_color: selectedColor.value, // Changed from avatarColor to selectedColor.value
+      };
+
+      if (selectedIcon) { // Changed from avatarIcon to selectedIcon
+        updates.avatar_icon = selectedIcon; // Changed from avatarIcon to selectedIcon
+      }
+
+      await updateUserProfile(user.id, updates);
+      setSaved(true); // Re-added setSaved(true) as it was likely an oversight in the instruction
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
       console.error("Failed to save profile:", error);
-      alert("Failed to save settings. Please try again.");
+      toast.error("Failed to save settings. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -97,17 +99,11 @@ export default function SettingsPage() {
 
   async function handleSignOut() {
     await signOut();
-    router.push("/");
+    router.push("/auth");
   }
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
-      {/* Background Grid - Consistent for both loading and content */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-bauhaus-blue/5 rounded-full blur-[100px] delay-1000"></div>
-      </div>
 
       {loading ? (
         <div className="p-6 md:p-8 lg:p-12 animate-pulse relative z-10">
@@ -115,7 +111,7 @@ export default function SettingsPage() {
             {/* Header Skeleton */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="size-8 bg-white/10 backdrop-blur-sm rounded-sm" />
+                <div className="size-8 bg-white/10 backdrop-blur-sm rounded-none" />
                 <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-32" />
               </div>
             </div>
@@ -127,10 +123,10 @@ export default function SettingsPage() {
             {/* Settings Content Skeleton */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-4">
-                <div className="bg-white/5 backdrop-blur-md p-8 rounded-sm border border-white/10 h-96" />
+                <div className="bg-white/5 backdrop-blur-md p-8 rounded-none border border-white/10 h-96" />
               </div>
               <div className="lg:col-span-8 space-y-6">
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-sm h-64" />
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-none h-64" />
               </div>
             </div>
           </div>
@@ -138,7 +134,7 @@ export default function SettingsPage() {
       ) : (
         <div className="flex-1 flex flex-col animate-reveal-simple relative z-10">
           {/* Navigation */}
-          <GlobalHeader />
+          <AppHeader variant="app" />
 
           {/* Main Content */}
           <main className="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">
@@ -159,7 +155,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Left Column: Preview */}
               <div className="lg:col-span-4">
-                <div className="bg-[#1a1a1a]/60 backdrop-blur-xl p-8 rounded-sm border-l-4 border-primary border-y border-r border-white/5 sticky top-24 shadow-2xl will-change-transform">
+                <div className="bg-surface/60 backdrop-blur-xl p-8 rounded-none border-l-4 border-primary border-y border-r border-white/5 sticky top-24 shadow-2xl will-change-transform">
                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Live Preview</h3>
                   <div className="flex flex-col items-center gap-6">
                     <div
@@ -177,13 +173,13 @@ export default function SettingsPage() {
                     </div>
                     <div className="w-full h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
                     <div className="grid grid-cols-3 gap-3 w-full">
-                      <div className="bg-bauhaus-blue/20 p-3 rounded-sm text-center">
+                      <div className="bg-bauhaus-blue/20 p-3 rounded-none text-center">
                         <span className="material-symbols-outlined text-bauhaus-blue text-2xl">upload</span>
                       </div>
-                      <div className="bg-bauhaus-red/20 p-3 rounded-sm text-center">
+                      <div className="bg-bauhaus-red/20 p-3 rounded-none text-center">
                         <span className="material-symbols-outlined text-bauhaus-red text-2xl">download</span>
                       </div>
-                      <div className="bg-primary/20 p-3 rounded-sm text-center">
+                      <div className="bg-primary/20 p-3 rounded-none text-center">
                         <span className="material-symbols-outlined text-primary text-2xl">link</span>
                       </div>
                     </div>
@@ -194,7 +190,7 @@ export default function SettingsPage() {
               {/* Right Column: Settings Forms */}
               <div className="lg:col-span-8 space-y-6">
                 {/* Profile Section */}
-                <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
+                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
                   <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                     <span className="material-symbols-outlined text-bauhaus-blue text-3xl">person</span>
                     Profile
@@ -203,28 +199,30 @@ export default function SettingsPage() {
                   <div className="space-y-6">
                     {/* Display Name */}
                     <div>
-                      <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                      <label htmlFor="settings-display-name" className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
                         Display Name
                       </label>
                       <input
+                        id="settings-display-name"
                         type="text"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
                         placeholder={user?.email?.split("@")[0] || "Enter your name"}
-                        className="w-full bg-white/10 backdrop-blur-sm/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors rounded-sm"
+                        className="w-full bg-white/10 backdrop-blur-sm/40 border-2 border-white/10 focus:border-primary text-white px-4 py-3 focus:outline-none transition-colors rounded-none"
                       />
                     </div>
 
                     {/* Email (read-only) */}
                     <div>
-                      <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                      <label htmlFor="settings-email" className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
                         Email Address
                       </label>
                       <input
+                        id="settings-email"
                         type="email"
                         value={user?.email || ""}
                         disabled
-                        className="w-full bg-white/10 backdrop-blur-sm/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed rounded-sm"
+                        className="w-full bg-white/10 backdrop-blur-sm/20 border-2 border-white/5 text-gray-500 px-4 py-3 cursor-not-allowed rounded-none"
                       />
                       <p className="text-xs text-gray-600 mt-2">Email cannot be changed from settings</p>
                     </div>
@@ -232,7 +230,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Avatar Icon Section */}
-                <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-primary border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
+                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-primary border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
                   <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                     <span className="material-symbols-outlined text-primary text-3xl">emoji_emotions</span>
                     Avatar Icon
@@ -242,7 +240,7 @@ export default function SettingsPage() {
                       <button
                         key={icon}
                         onClick={() => setSelectedIcon(icon)}
-                        className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 active:scale-95 rounded-sm text-white relative overflow-hidden ${selectedIcon === icon
+                        className={`size-16 flex items-center justify-center border-2 transition-all hover:scale-110 active:scale-95 rounded-none text-white relative overflow-hidden ${selectedIcon === icon
                           ? "border-primary bg-primary/20"
                           : "border-white/10 hover:border-white/30 bg-white/10 backdrop-blur-sm/20"
                           }`}
@@ -255,7 +253,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Avatar Color Section */}
-                <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-bauhaus-red border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
+                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-red border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
                   <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                     <span className="material-symbols-outlined text-bauhaus-red text-3xl">palette</span>
                     Avatar Color
@@ -265,7 +263,7 @@ export default function SettingsPage() {
                       <button
                         key={color.value}
                         onClick={() => setSelectedColor(color)}
-                        className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 active:scale-[0.98] rounded-sm relative overflow-hidden ${selectedColor.value === color.value
+                        className={`flex items-center gap-3 p-4 border-2 transition-all hover:scale-105 active:scale-[0.98] rounded-none relative overflow-hidden ${selectedColor.value === color.value
                           ? "border-white bg-white/5"
                           : "border-white/10 hover:border-white/30"
                           }`}
@@ -281,7 +279,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Account Actions */}
-                <section className="bg-[#1a1a1a]/60 backdrop-blur-xl border-l-4 border-white border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
+                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-white border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
                   <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
                     <span className="material-symbols-outlined text-white text-3xl">admin_panel_settings</span>
                     Account
@@ -289,14 +287,14 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Link
                       href="/status"
-                      className="bg-white/10 backdrop-blur-sm/50 hover:bg-white/10 backdrop-blur-sm border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm"
+                      className="bg-white/10 backdrop-blur-sm/50 hover:bg-white/10 backdrop-blur-sm border-2 border-gray-700 hover:border-primary text-white font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-none"
                     >
                       <span className="material-symbols-outlined">radar</span>
                       Network Status
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-sm relative overflow-hidden"
+                      className="bg-red-900/30 hover:bg-red-900/50 border-2 border-red-900/50 hover:border-red-500 text-red-400 font-bold py-4 px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-3 uppercase tracking-wider text-sm rounded-none relative overflow-hidden"
                     >
                       <span className="material-symbols-outlined relative z-10">logout</span>
                       <span className="relative z-10">Sign Out</span>
@@ -310,7 +308,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 rounded-sm text-sm shadow-lg relative overflow-hidden"
+                    className="bg-primary hover:bg-yellow-400 text-black font-bold py-4 px-12 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 rounded-none text-sm shadow-lg relative overflow-hidden"
                   >
                     <span className="material-symbols-outlined text-xl relative z-10">save</span>
                     <span className="relative z-10">{saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}</span>
@@ -321,14 +319,7 @@ export default function SettingsPage() {
             </div>
           </main>
 
-          {/* Footer: Tri-Color Strip */}
-          <footer className="mt-auto relative z-20">
-            <div className="flex h-2 w-full">
-              <div className="flex-1 bg-bauhaus-blue"></div>
-              <div className="flex-1 bg-bauhaus-red"></div>
-              <div className="flex-1 bg-primary"></div>
-            </div>
-          </footer>
+
         </div>
       )}
     </div>

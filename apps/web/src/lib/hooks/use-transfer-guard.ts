@@ -18,6 +18,7 @@ export function useTransferGuard(
   const transferIdRef = useRef(transferId);
   const isActiveRef = useRef(isActive);
   const cleanedUpRef = useRef(false); // Prevent duplicate cleanup calls
+  const guardPushedRef = useRef(false); // EDGE-002: Prevent history stack leak
   const [showBackModal, setShowBackModal] = useState(false);
 
   // Keep refs in sync so the cleanup closure always has latest values
@@ -36,7 +37,7 @@ export function useTransferGuard(
     if (!isActiveRef.current || !transferIdRef.current) return;
     cleanedUpRef.current = true;
     // Fire-and-forget: page may unload before completion
-    updateTransferStatus(transferIdRef.current, "failed").catch(() => {});
+    updateTransferStatus(transferIdRef.current, "failed").catch(() => { });
   }, []);
 
   // Browser beforeunload — warns on tab close / reload (browser-native, can't customize)
@@ -76,8 +77,13 @@ export function useTransferGuard(
     }
 
     // Push an extra history entry so we can intercept the first back press
-    if (isActive) {
+    // EDGE-002: Only push once per transfer to prevent history stack leak
+    if (isActive && !guardPushedRef.current) {
       window.history.pushState(null, "", window.location.href);
+      guardPushedRef.current = true;
+    }
+    if (!isActive) {
+      guardPushedRef.current = false;
     }
 
     window.addEventListener("popstate", handlePopState);

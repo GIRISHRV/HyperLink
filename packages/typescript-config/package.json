@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "main": "index.js",
+  "exports": {
+    "./base.json": "./base.json",
+    "./nextjs.json": "./nextjs.json",
+    "./node.json": "./node.json"
+  },
   "files": [
     "base.json",
     "nextjs.json",

@@ -1,65 +1,47 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { getCurrentUser } from "@/lib/services/auth-service";
+import { useState, useEffect } from "react";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
-import type { User } from "@supabase/supabase-js";
-import { formatFileSize } from "@repo/utils";
+import { useRequireAuth } from "@/lib/hooks/use-require-auth";
+import { formatFileSize, STATUS_CONFIG } from "@repo/utils";
+import type { StatusConfigKey } from "@repo/utils";
 import TransferDetailsModal from "@/components/transfer-details-modal";
 import { DataMovedCard } from "@/components/stats/data-moved-card";
 import { EmptyState } from "@/components/empty-state";
 import { Ripple } from "@/components/ripple";
 import type { Transfer } from "@repo/types";
-import GlobalHeader from "@/components/global-header";
+import AppHeader from "@/components/app-header";
+import { ListSkeleton } from "@/components/skeletons";
 
 export default function HistoryPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [showClearAll, setShowClearAll] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
 
-  const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh } = useUserTransfersRealtime();
+  const { transfers, loading: transfersLoading, removeMultipleTransfers, refresh, loadMore, hasMore } = useUserTransfersRealtime(20);
 
-
-  const checkUser = useCallback(async () => {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      router.push("/auth");
-      return;
-    }
-    setUser(currentUser);
-    setLoading(false);
-  }, [router]);
+  const { user, loading } = useRequireAuth();
 
   useEffect(() => {
-    checkUser();
-
     // App Badging API - Clear badge when entering history
-    if ('clearAppBadge' in navigator) {
-      (navigator as any).clearAppBadge().catch(console.error);
+    if ('clearAppBadge' in navigator && typeof (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge === 'function') {
+      (navigator as Navigator & { clearAppBadge: () => Promise<void> }).clearAppBadge().catch(console.error);
     }
-  }, [checkUser]);
+  }, []);
 
   if (loading) {
     return (
       <div className="min-h-screen p-6 md:p-8 lg:p-12 animate-reveal relative overflow-hidden flex flex-col">
-        {/* Skeleton Background Graph */}
-        <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
-        </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col h-full">
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3 animate-pulse">
-              <div className="size-8 bg-white/10 backdrop-blur-sm rounded-sm" />
+              <div className="size-8 bg-white/10 backdrop-blur-sm rounded-none" />
               <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-32" />
             </div>
             <div className="flex items-center gap-3 animate-pulse">
-              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
-              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
+              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-none" />
+              <div className="size-10 bg-white/10 backdrop-blur-sm rounded-none" />
               <div className="size-10 bg-white/10 backdrop-blur-sm rounded-full" />
             </div>
           </header>
@@ -68,18 +50,7 @@ export default function HistoryPage() {
               <div className="h-10 bg-white/10 backdrop-blur-sm rounded w-64 mb-4" />
               <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-96" />
             </div>
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 border-l-[4px] border-l-primary rounded-sm p-6 shadow-2xl mask-container">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4 py-4 border-b border-white/5 last:border-0 animate-pulse">
-                  <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-48" />
-                    <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-24" />
-                  </div>
-                  <div className="h-6 bg-white/10 backdrop-blur-sm rounded-full w-20" />
-                </div>
-              ))}
-            </div>
+            <ListSkeleton />
           </main>
         </div>
       </div>
@@ -141,20 +112,16 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent text-white relative overflow-x-hidden animate-reveal">
-      {/* Background Grid */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
-      </div>
 
       {/* Navigation */}
-      <GlobalHeader />
+      <AppHeader variant="app" />
 
       {/* Main Content */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-6 py-10">
 
         {/* Stats Section */}
         <div className="mb-8">
-          <DataMovedCard />
+          <DataMovedCard userId={user?.id || ""} />
         </div>
 
         {/* Header Section */}
@@ -172,7 +139,7 @@ export default function HistoryPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilter("all")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "all"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-none transition-all active:scale-95 relative overflow-hidden ${filter === "all"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -183,7 +150,7 @@ export default function HistoryPage() {
 
             <button
               onClick={() => setFilter("sent")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "sent"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-none transition-all active:scale-95 relative overflow-hidden ${filter === "sent"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -193,7 +160,7 @@ export default function HistoryPage() {
             </button>
             <button
               onClick={() => setFilter("received")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "received"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-none transition-all active:scale-95 relative overflow-hidden ${filter === "received"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -204,7 +171,7 @@ export default function HistoryPage() {
 
             <button
               onClick={() => setFilter("complete")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "complete"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-none transition-all active:scale-95 relative overflow-hidden ${filter === "complete"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -214,7 +181,7 @@ export default function HistoryPage() {
             </button>
             <button
               onClick={() => setFilter("failed")}
-              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-sm transition-all active:scale-95 relative overflow-hidden ${filter === "failed"
+              className={`px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-none transition-all active:scale-95 relative overflow-hidden ${filter === "failed"
                 ? "bg-primary text-black"
                 : "bg-transparent border border-gray-700 text-gray-300 hover:border-primary hover:text-primary"
                 }`}
@@ -231,14 +198,14 @@ export default function HistoryPage() {
                     <span className="text-xs text-gray-400">Clear {deletableTransfers.length} finished transfers?</span>
                     <button
                       onClick={handleClearAll}
-                      className="px-3 py-1.5 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/40 transition-all active:scale-95 rounded-sm relative overflow-hidden"
+                      className="px-3 py-1.5 text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/40 transition-all active:scale-95 rounded-none relative overflow-hidden"
                     >
                       <span className="relative z-10">Confirm</span>
                       <Ripple color="rgba(239, 68, 68, 0.3)" />
                     </button>
                     <button
                       onClick={() => setShowClearAll(false)}
-                      className="px-3 py-1.5 text-xs font-bold uppercase text-gray-400 border border-white/10 hover:border-white/30 transition-all active:scale-95 rounded-sm relative overflow-hidden"
+                      className="px-3 py-1.5 text-xs font-bold uppercase text-gray-400 border border-white/10 hover:border-white/30 transition-all active:scale-95 rounded-none relative overflow-hidden"
                     >
                       <span className="relative z-10">Cancel</span>
                       <Ripple />
@@ -247,7 +214,7 @@ export default function HistoryPage() {
                 ) : (
                   <button
                     onClick={() => setShowClearAll(true)}
-                    className="px-4 py-2 uppercase text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all active:scale-95 flex items-center gap-1.5 rounded-sm relative overflow-hidden"
+                    className="px-4 py-2 uppercase text-xs font-bold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all active:scale-95 flex items-center gap-1.5 rounded-none relative overflow-hidden"
                   >
                     <span className="material-symbols-outlined text-sm relative z-10">delete_sweep</span>
                     <span className="relative z-10">Clear All</span>
@@ -260,7 +227,7 @@ export default function HistoryPage() {
         </div>
 
         {/* Table Container */}
-        <div className="w-full overflow-x-auto border border-white/10 rounded-sm bg-white/5 backdrop-blur-md shadow-2xl">
+        <div className="w-full overflow-x-auto border border-white/10 rounded-none bg-white/5 backdrop-blur-md shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/10 bg-white/5">
@@ -288,7 +255,7 @@ export default function HistoryPage() {
                     <tr key={i} className="border-b border-white/5 animate-pulse">
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="size-10 bg-white/10 backdrop-blur-sm rounded-sm" />
+                          <div className="size-10 bg-white/10 backdrop-blur-sm rounded-none" />
                           <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-48" />
                         </div>
                       </td>
@@ -336,44 +303,17 @@ export default function HistoryPage() {
                   ];
                   const peerColor = peerColors[index % peerColors.length];
 
-                  const statusConfig = {
-                    complete: {
-                      bg: "bg-[#2E9AFE]/10",
-                      border: "border-[#2E9AFE]/20",
-                      text: "text-[#2E9AFE]",
-                      icon: "check_circle",
-                    },
-                    failed: {
-                      bg: "bg-[#FF4D4D]/10",
-                      border: "border-[#FF4D4D]/20",
-                      text: "text-[#FF4D4D]",
-                      icon: "error",
-                    },
-                    transferring: {
-                      bg: "bg-primary/10",
-                      border: "border-primary/20",
-                      text: "text-primary",
-                      icon: "hourglass_top",
-                    },
-                    pending: {
-                      bg: "bg-primary/10",
-                      border: "border-primary/20",
-                      text: "text-primary",
-                      icon: "hourglass_top",
-                    },
-                  };
-
-                  const style = statusConfig[transfer.status as keyof typeof statusConfig] || statusConfig.pending;
+                  const style = STATUS_CONFIG[transfer.status as StatusConfigKey] || STATUS_CONFIG.pending;
 
                   return (
                     <tr
                       key={transfer.id}
                       onClick={() => setSelectedTransfer(transfer)}
-                      className="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-[#222] transition-all duration-150 ease-out cursor-pointer"
+                      className="group border-l-[3px] border-l-transparent hover:border-l-primary hover:bg-surface-elevated transition-all duration-150 ease-out cursor-pointer"
                     >
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="size-10 bg-white/10 backdrop-blur-sm flex items-center justify-center rounded-sm text-gray-300 group-hover:text-primary group-hover:bg-white/10 backdrop-blur-sm transition-colors">
+                          <div className="size-10 bg-white/10 backdrop-blur-sm flex items-center justify-center rounded-none text-gray-300 group-hover:text-primary group-hover:bg-white/10 backdrop-blur-sm transition-colors">
                             <span className="material-symbols-outlined">{getFileIcon(transfer.filename)}</span>
                           </div>
                           <span className="font-bold text-white group-hover:text-primary transition-colors truncate max-w-[300px]">
@@ -384,7 +324,7 @@ export default function HistoryPage() {
                       <td className="py-5 px-6 font-mono text-sm text-gray-400">{formatFileSize(transfer.file_size)}</td>
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-2">
-                          <div className={`size-6 ${peerColor.bg} rounded-full flex items-center justify-center text-[10px] font-bold ${peerColor.text}`}>
+                          <div className={`size-6 ${peerColor.bg} rounded-full flex items-center justify-center text-xs font-bold ${peerColor.text}`}>
                             {peerLetter}
                           </div>
                           <span className="text-sm font-medium text-gray-300">Peer-{transfer.id.slice(0, 3).toUpperCase()}</span>
@@ -392,7 +332,7 @@ export default function HistoryPage() {
                       </td>
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${style.bg} ${style.text} text-[10px] font-black uppercase tracking-wider border ${style.border}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${style.bg} ${style.text} text-xs font-black uppercase tracking-wider border ${style.border}`}>
                             <span className={`material-symbols-outlined text-[14px] ${transfer.status === "transferring" ? "animate-spin" : ""}`}>
                               {style.icon}
                             </span>
@@ -417,13 +357,23 @@ export default function HistoryPage() {
               )}
             </tbody>
           </table>
+
+          {hasMore && !transfersLoading && filteredTransfers.length > 0 && filter === "all" && (
+            <div className="p-6 border-t border-white/10 flex justify-center bg-white/5 backdrop-blur-md">
+              <button
+                onClick={() => loadMore()}
+                className="px-8 py-3 bg-surface border border-white/20 text-white text-xs font-bold uppercase tracking-wider hover:border-primary hover:text-primary transition-colors flex items-center gap-2 rounded-none active:scale-95 duration-200"
+              >
+                <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                Load More Archive
+                <Ripple />
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-[#6b6644]/20 py-8 text-center mt-auto">
-        <p className="text-xs text-gray-600 uppercase tracking-widest">Encrypted. Decentralized. Direct.</p>
-      </footer>
+
 
       {/* Transfer Details Modal */}
       {selectedTransfer && (

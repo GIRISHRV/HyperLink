@@ -6,10 +6,18 @@ export class PeerManager {
   private peer: Peer | null = null;
   private connections: Map<string, DataConnection> = new Map();
   private connectionState: ConnectionState = "disconnected";
-  private eventListeners: Map<string, Set<Function>> = new Map();
+  private eventListeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
 
   private isDestroyed: boolean = false;
   private initializationPromise: Promise<string> | null = null;
+
+  // Reconnection state
+  private static readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private static readonly BASE_DELAY_MS = 1000;
+  private static readonly MAX_DELAY_MS = 30000;
+  private reconnectAttempts: number = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private isReconnecting: boolean = false;
 
   constructor(private config: PeerConfig) { }
 
@@ -35,7 +43,7 @@ export class PeerManager {
           ...options,
           config: {
             ...options.config,
-            iceServers: options.config?.iceServers?.map((s: any) => ({ ...s, credential: '***' }))
+            iceServers: options.config?.iceServers?.map((s) => ({ ...s, credential: '***' }))
           }
         }, "[PeerManager] Initializing with config");
 
@@ -51,6 +59,15 @@ export class PeerManager {
             return;
           }
           this.connectionState = "connected";
+
+          // If this was a reconnection, emit reconnected event
+          if (this.isReconnecting) {
+            this.isReconnecting = false;
+            this.reconnectAttempts = 0;
+            logger.info({ peerId: id }, "[PeerManager] Reconnected to signaling server");
+            this.emit("reconnected", id);
+          }
+
           this.emit("state-change", "connected");
           resolve(id);
         });
@@ -69,6 +86,10 @@ export class PeerManager {
         this.peer.on("disconnected", () => {
           this.connectionState = "disconnected";
           this.emit("state-change", "disconnected");
+          // Auto-reconnect if not intentionally destroyed
+          if (!this.isDestroyed) {
+            this.attemptReconnect();
+          }
         });
 
         this.peer.on("close", () => {
@@ -81,6 +102,36 @@ export class PeerManager {
     });
 
     return this.initializationPromise;
+  }
+
+  /**
+   * Attempt to reconnect to signaling server with exponential backoff
+   */
+  private attemptReconnect(): void {
+    if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
+    if (this.reconnectAttempts >= PeerManager.MAX_RECONNECT_ATTEMPTS) {
+      logger.error({ attempts: this.reconnectAttempts }, "[PeerManager] Max reconnection attempts reached");
+      this.emit("reconnect-failed");
+      return;
+    }
+
+    this.isReconnecting = true;
+    this.reconnectAttempts++;
+
+    // Exponential backoff with jitter: 1s, 2s, 4s, 8s... capped at 30s
+    const delay = Math.min(
+      PeerManager.BASE_DELAY_MS * Math.pow(2, this.reconnectAttempts - 1) + Math.random() * 500,
+      PeerManager.MAX_DELAY_MS
+    );
+
+    logger.info({ attempt: this.reconnectAttempts, delayMs: Math.round(delay) }, "[PeerManager] Scheduling reconnection");
+    this.emit("reconnecting", { attempt: this.reconnectAttempts, maxAttempts: PeerManager.MAX_RECONNECT_ATTEMPTS });
+
+    this.reconnectTimer = setTimeout(() => {
+      if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
+      logger.info({ attempt: this.reconnectAttempts }, "[PeerManager] Attempting reconnection...");
+      this.peer.reconnect();
+    }, delay);
   }
 
   /**
@@ -132,14 +183,19 @@ export class PeerManager {
     });
 
     // Monitor ICE connection state for debugging
-    const pc = (conn as any).peerConnection as RTCPeerConnection | undefined;
+    // PeerJS internally exposes the underlying RTCPeerConnection as .peerConnection.
+    // Using a local type alias avoids a raw `as any`.
+    type PeerJSDataConnectionInternal = { peerConnection?: RTCPeerConnection };
+    const pc = (conn as unknown as PeerJSDataConnectionInternal).peerConnection;
     if (pc) {
       pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
           const type = event.candidate.type; // 'host', 'srflx' (STUN), or 'relay' (TURN)
           const protocol = event.candidate.protocol;
-          const address = event.candidate.address || (event.candidate as any).ip;
-          logger.info({ type, protocol, address }, "[ICE] Candidate gathered");
+          // .address is the standard property; .ip is the legacy alias declared in global.d.ts
+          const address = event.candidate.address ?? event.candidate.ip;
+          const safeAddress = process.env.NODE_ENV === 'production' ? '[REDACTED]' : address;
+          logger.info({ type, protocol, address: safeAddress }, "[ICE] Candidate gathered");
         } else {
           logger.info("[ICE] All local candidates gathered");
         }
@@ -228,14 +284,14 @@ export class PeerManager {
   /**
    * Event listener management
    */
-  on(event: string, callback: Function): void {
+  on(event: string, callback: (...args: unknown[]) => void): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)!.add(callback);
   }
 
-  off(event: string, callback: Function): void {
+  off(event: string, callback: (...args: unknown[]) => void): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.delete(callback);
@@ -255,6 +311,13 @@ export class PeerManager {
   destroy(): void {
     this.isDestroyed = true;
     this.initializationPromise = null;
+    // Clear any pending reconnection timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.isReconnecting = false;
+    this.reconnectAttempts = 0;
     this.connections.forEach((conn) => conn.close());
     this.connections.clear();
     if (this.peer) {

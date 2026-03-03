@@ -68,12 +68,4 @@ export async function getCurrentUser() {
   return user;
 }
 
-/**
- * Get current session
- */
-export async function getSession() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session;
-}
+

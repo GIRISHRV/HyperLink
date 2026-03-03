@@ -3,14 +3,14 @@
 import { useTransferStats } from "@/lib/hooks/use-transfer-stats";
 import { formatFileSize } from "@repo/utils";
 
-export function DataMovedCard() {
-    const { totalBytes, totalTransfers, isLoading } = useTransferStats();
+export function DataMovedCard({ userId }: { userId: string }) {
+    const { totalBytes, totalTransfers, isLoading } = useTransferStats(userId);
 
     if (isLoading) {
         return (
-            <div className="bg-[#1a1a1a] border border-[#333] p-6 rounded-sm animate-pulse min-h-[120px]">
-                <div className="h-4 w-24 bg-[#333] mb-4 rounded"></div>
-                <div className="h-8 w-32 bg-[#333] rounded"></div>
+            <div className="bg-surface border border-subtle p-6 rounded-none animate-pulse min-h-[120px]">
+                <div className="h-4 w-24 bg-subtle mb-4 rounded"></div>
+                <div className="h-8 w-32 bg-subtle rounded"></div>
             </div>
         );
     }
@@ -22,12 +22,12 @@ export function DataMovedCard() {
     const unit = parts.length > 1 ? parts[1] : "";
 
     return (
-        <div className="bg-[#1a1a1a] border border-[#333] p-6 rounded-sm relative overflow-hidden group hover:border-primary/50 transition-colors duration-500">
+        <div className="bg-surface border border-subtle p-6 rounded-none relative overflow-hidden group hover:border-primary/50 transition-colors duration-500">
             {/* Background Effect */}
             <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,234,46,0.02)_50%,transparent_75%)] bg-[length:250%_250%] animate-[gradient_15s_ease_infinite]" />
 
             <div className="relative z-10 flex flex-col gap-1">
-                <h3 className="text-[#bcb89a] text-xs font-mono uppercase tracking-widest mb-1 flex items-center gap-2">
+                <h3 className="text-muted text-xs font-mono uppercase tracking-widest mb-1 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">database</span>
                     Total Data Moved
                 </h3>
@@ -40,7 +40,7 @@ export function DataMovedCard() {
                     </span>
                 </div>
                 <div className="mt-2 text-xs font-mono text-gray-500 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[10px]">scuba_diving</span>
+                    <span className="material-symbols-outlined text-xs">scuba_diving</span>
                     Across {totalTransfers} successful transfers
                 </div>
             </div>

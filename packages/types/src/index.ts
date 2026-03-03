@@ -43,7 +43,11 @@ export interface PeerConfig {
   path: string;
   secure?: boolean;
   debug?: number;
-  config?: any; // RTCConfiguration
+  config?: {
+    iceServers?: Array<{ urls: string | string[]; username?: string; credential?: string }>;
+    iceTransportPolicy?: string;
+    iceCandidatePoolSize?: number;
+  };
 }
 
 /**
@@ -78,6 +82,7 @@ export type PeerMessageType =
   | "transfer-pause"
   | "transfer-resume"
   | "receiver-busy"
+  | "resume-from"
   | "chat-message";
 
 /**

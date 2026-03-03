@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
 
 interface PasswordModalProps {
     isOpen: boolean;
@@ -19,6 +20,7 @@ export default function PasswordModal({
 }: PasswordModalProps) {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onCancel);
 
     if (!isOpen) return null;
 
@@ -34,8 +36,8 @@ export default function PasswordModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] border border-[#333] p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+        <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-surface border border-subtle p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="bg-primary/10 p-2 rounded-full border border-primary/20">
                         <span className="material-symbols-outlined text-primary text-2xl">lock</span>
@@ -49,10 +51,11 @@ export default function PasswordModal({
 
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-primary uppercase tracking-wider">
+                        <label htmlFor="password-modal-input" className="text-xs font-bold text-primary uppercase tracking-wider">
                             {isCreation ? "Set Password" : "Enter Password"}
                         </label>
                         <input
+                            id="password-modal-input"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -74,7 +77,7 @@ export default function PasswordModal({
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 h-12 bg-primary hover:bg-[#ffea2e] text-black font-bold uppercase tracking-wider text-sm transition-colors shadow-lg shadow-primary/20"
+                            className="flex-1 h-12 bg-primary hover:bg-primary-hover text-black font-bold uppercase tracking-wider text-sm transition-colors shadow-lg shadow-primary/20"
                         >
                             {isCreation ? "Set Password" : "Decrypt"}
                         </button>

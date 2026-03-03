@@ -10,17 +10,18 @@
     "lint": "eslint src/ --ext .ts"
   },
   "dependencies": {
-    "peer": "^1.0.2",
+    "@repo/types": "*",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "@repo/types": "*"
+    "express-rate-limit": "^8.2.1",
+    "peer": "^1.0.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@repo/typescript-config": "*",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@repo/typescript-config": "*",
-    "typescript": "^5.3.3",
-    "tsx": "^4.7.0"
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }

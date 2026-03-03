@@ -1,28 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import AppHeader from "@/components/app-header";
+import { Button } from "@/components/ui/button";
 
 export default function AboutPage() {
     return (
-        <div className="bg-[#121212] min-h-screen text-white">
-            {/* Header/Nav */}
-            <nav className="w-full flex flex-col md:flex-row border-b border-[#333]">
-                <div className="bg-primary text-[#121212] px-8 py-6 flex items-center justify-center md:justify-start min-w-[200px]">
-                    <Link href="/" className="font-black text-4xl tracking-tighter uppercase">
-                        HYPER
-                    </Link>
-                </div>
-                <div className="flex-1 bg-[#121212] flex items-center justify-between px-8 py-4 md:py-0">
-                    <Link href="/" className="font-black text-4xl tracking-tighter uppercase text-white">
-                        LINK
-                    </Link>
-                    <Link href="/dashboard">
-                        <button className="h-12 px-6 bg-primary text-black text-sm font-bold uppercase tracking-wide hover:bg-yellow-400 transition-colors">
-                            Dashboard
-                        </button>
-                    </Link>
-                </div>
-            </nav>
+        <div className="bg-background-dark min-h-screen text-white">
+            <AppHeader variant="landing" />
 
             {/* Hero Section */}
             <div className="max-w-5xl mx-auto px-6 py-20">
@@ -45,7 +30,7 @@ export default function AboutPage() {
             </div>
 
             {/* How It Works - Step by Step */}
-            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-[#333]">
+            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-subtle">
                 <h2 className="text-4xl font-black uppercase tracking-tight mb-12">
                     The Transfer <span className="text-bauhaus-blue">Process</span>
                 </h2>
@@ -110,13 +95,13 @@ export default function AboutPage() {
             </div>
 
             {/* Technology Stack */}
-            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-[#333]">
+            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-subtle">
                 <h2 className="text-4xl font-black uppercase tracking-tight mb-12">
                     Technology <span className="text-bauhaus-blue">Stack</span>
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="bg-[#1a1a1a] border border-[#333] p-6">
+                    <div className="bg-surface border border-subtle p-6">
                         <div className="w-12 h-12 rounded bg-bauhaus-blue flex items-center justify-center mb-4">
                             <span className="material-symbols-outlined text-2xl text-white">hub</span>
                         </div>
@@ -127,7 +112,7 @@ export default function AboutPage() {
                         </p>
                     </div>
 
-                    <div className="bg-[#1a1a1a] border border-[#333] p-6">
+                    <div className="bg-surface border border-subtle p-6">
                         <div className="w-12 h-12 rounded bg-primary flex items-center justify-center mb-4">
                             <span className="material-symbols-outlined text-2xl text-black">encrypted</span>
                         </div>
@@ -138,7 +123,7 @@ export default function AboutPage() {
                         </p>
                     </div>
 
-                    <div className="bg-[#1a1a1a] border border-[#333] p-6">
+                    <div className="bg-surface border border-subtle p-6">
                         <div className="w-12 h-12 rounded bg-bauhaus-red flex items-center justify-center mb-4">
                             <span className="material-symbols-outlined text-2xl text-white">memory</span>
                         </div>
@@ -152,7 +137,7 @@ export default function AboutPage() {
             </div>
 
             {/* Security & Privacy */}
-            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-[#333]">
+            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-subtle">
                 <h2 className="text-4xl font-black uppercase tracking-tight mb-12">
                     Security & <span className="text-bauhaus-red">Privacy</span>
                 </h2>
@@ -200,7 +185,7 @@ export default function AboutPage() {
             </div>
 
             {/* FAQ */}
-            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-[#333]">
+            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-subtle">
                 <h2 className="text-4xl font-black uppercase tracking-tight mb-12">
                     Frequently Asked <span className="text-primary">Questions</span>
                 </h2>
@@ -241,7 +226,7 @@ export default function AboutPage() {
             </div>
 
             {/* CTA */}
-            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-[#333]">
+            <div className="max-w-5xl mx-auto px-6 py-16 border-t border-subtle">
                 <div className="bg-gradient-to-br from-bauhaus-blue/20 to-bauhaus-red/20 border-2 border-primary/30 p-12 text-center">
                     <h2 className="text-4xl font-black uppercase tracking-tight mb-4">
                         Ready to Transfer?
@@ -251,27 +236,27 @@ export default function AboutPage() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Link href="/send">
-                            <button className="h-14 px-8 bg-bauhaus-blue hover:bg-blue-600 text-white font-bold uppercase tracking-wider transition-colors">
+                            <Button size="lg" className="bg-bauhaus-blue hover:bg-blue-600 text-white w-full sm:w-auto">
                                 Send a File
-                            </button>
+                            </Button>
                         </Link>
                         <Link href="/receive">
-                            <button className="h-14 px-8 bg-bauhaus-red hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-colors">
+                            <Button size="lg" variant="destructive" className="w-full sm:w-auto">
                                 Receive a File
-                            </button>
+                            </Button>
                         </Link>
                     </div>
                 </div>
             </div>
 
             {/* Footer */}
-            <footer className="mt-auto border-t border-[#333]">
-                <div className="flex h-3 w-full">
+            <footer className="mt-auto border-t border-subtle">
+                <div className="flex h-2 w-full">
                     <div className="flex-1 bg-bauhaus-blue" />
                     <div className="flex-1 bg-bauhaus-red" />
                     <div className="flex-1 bg-primary" />
                 </div>
-                <div className="bg-[#0f0f0f] py-8 px-8">
+                <div className="bg-surface-preview py-8 px-8">
                     <div className="max-w-5xl mx-auto flex justify-between items-center">
                         <div className="flex items-center gap-1">
                             <span className="font-black text-xl tracking-tighter uppercase text-white">HYPER</span>

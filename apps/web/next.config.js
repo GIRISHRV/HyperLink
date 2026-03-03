@@ -8,6 +8,14 @@ const withPWA = withPWAInit({
   disable: false,
 });
 
+// Build peer server origin for CSP connect-src from env vars
+const peerHost = process.env.NEXT_PUBLIC_PEER_SERVER_HOST || "localhost";
+const peerPort = process.env.NEXT_PUBLIC_PEER_SERVER_PORT || "9000";
+const isLocalPeer = peerHost === "localhost" || peerHost === "127.0.0.1";
+const peerConnectSrc = isLocalPeer
+  ? `http://${peerHost}:${peerPort} ws://${peerHost}:${peerPort}`
+  : `https://${peerHost} wss://${peerHost}`;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -32,6 +40,36 @@ const nextConfig = {
       },
     ];
   },
+  // SEC-006: Security headers — CSP, framing protection, MIME sniffing prevention
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=()" },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob:",
+              "media-src 'self' blob:",
+              `connect-src 'self' ${peerConnectSrc} https://*.supabase.co wss://*.supabase.co https://*.sentry.io`,
+              "worker-src 'self' blob:",
+              "frame-src 'none'",
+              "object-src 'none'",
+              "base-uri 'self'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 import { withSentryConfig } from "@sentry/nextjs";
@@ -44,8 +82,8 @@ export default withSentryConfig(
 
     // Suppresses source map uploading logs during bundling
     silent: true,
-    org: "hyperlink-p2p",
-    project: "web-app",
+    org: process.env.SENTRY_ORG || "hyperlink-p2p",
+    project: process.env.SENTRY_PROJECT || "web-app",
   },
   {
     // For all available options, see:
@@ -55,7 +93,7 @@ export default withSentryConfig(
     widenClientFileUpload: true,
 
     // Transpiles SDK to be compatible with IE11 (increases bundle size)
-    transpileClientSDK: true,
+    // FINDING-044: Removed transpileClientSDK: true
 
     // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers (increases server load)
     tunnelRoute: "/monitoring",

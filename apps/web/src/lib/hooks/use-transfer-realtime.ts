@@ -76,51 +76,60 @@ export function useTransferRealtime(transferId: string | null) {
 /**
  * Subscribe to all transfers for the current user
  */
-export function useUserTransfersRealtime() {
+export function useUserTransfersRealtime(initialLimit = 20) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const userIdRef = useRef<string | null>(null);
 
-  const fetchTransfers = useCallback(async (userId: string) => {
+  const fetchTransfers = useCallback(async (userId: string, targetPage = 0, append = false) => {
+    const offset = targetPage * initialLimit;
     const { data } = await supabase
       .from("transfers")
       .select("*")
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + initialLimit - 1);
 
     if (data) {
+      if (data.length < initialLimit) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+
       // Filter to only show final statuses (completed, failed, cancelled)
       const finalTransfers = data.filter((t) =>
         t.status === "complete" || t.status === "failed" || t.status === "cancelled"
       );
 
-      // Deduplicate transfers - if there are two entries with the same ID
-      // (one where user is sender, one where user is receiver),
-      // keep only one (prefer the one where user is sender for display)
+      // Deduplicate transfers
       const seen = new Map<string, Transfer>();
       for (const transfer of finalTransfers) {
-        const existingTransfer = seen.get(transfer.id);
-
-        if (!existingTransfer) {
-          // First time seeing this transfer ID
-          seen.set(transfer.id, transfer);
-        } else {
-          // Already have a transfer with this ID
-          // Prefer the one where current user is the sender
-          if (transfer.sender_id === userId && existingTransfer.sender_id !== userId) {
-            seen.set(transfer.id, transfer);
-          }
-          // If both have user as sender or both have user as receiver, keep the first one
-        }
+        seen.set(transfer.id, transfer);
       }
 
-      setTransfers(Array.from(seen.values()));
+      const newTransfers = Array.from(seen.values());
+
+      if (append) {
+        setTransfers((prev) => {
+          const combined = new Map<string, Transfer>();
+          prev.forEach(t => combined.set(t.id, t));
+          newTransfers.forEach(t => combined.set(t.id, t));
+          return Array.from(combined.values()).sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        });
+      } else {
+        setTransfers(newTransfers);
+      }
     }
-  }, []);
+  }, [initialLimit]);
 
   useEffect(() => {
-    const instanceId = Math.random().toString(36).slice(2, 8);
+    const instanceId = crypto.randomUUID();
 
     async function setupRealtimeSubscription() {
       const {
@@ -238,11 +247,20 @@ export function useUserTransfersRealtime() {
    */
   const refresh = useCallback(async () => {
     if (userIdRef.current) {
-      await fetchTransfers(userIdRef.current);
+      setPage(0);
+      await fetchTransfers(userIdRef.current, 0, false);
     }
   }, [fetchTransfers]);
 
-  return { transfers, loading, removeTransfer, removeMultipleTransfers, refresh };
+  const loadMore = useCallback(async () => {
+    if (userIdRef.current && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      await fetchTransfers(userIdRef.current, nextPage, true);
+    }
+  }, [fetchTransfers, page, hasMore]);
+
+  return { transfers, loading, removeTransfer, removeMultipleTransfers, refresh, loadMore, hasMore };
 }
 
 /**
