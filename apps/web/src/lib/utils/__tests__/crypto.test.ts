@@ -21,17 +21,16 @@ import {
   base64ToArrayBuffer,
 } from "../crypto";
 
-// Polyfill window.crypto for test environment if needed
+// Always override with Node's native webcrypto — jsdom ships a partial
+// @peculiar/webcrypto implementation that rejects plain `new Uint8Array()` buffers
+// in some operations. Node's native crypto.webcrypto is fully spec-compliant.
 beforeAll(() => {
-  if (typeof globalThis.crypto === "undefined" || !globalThis.crypto.subtle) {
-    // Node 20+ ships webcrypto on globalThis.crypto
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nodeCrypto = require("node:crypto");
-    Object.defineProperty(globalThis, "crypto", { value: nodeCrypto.webcrypto });
-  }
-  // Ensure window.crypto aliases globalThis.crypto (jsdom quirk)
-  if (typeof window !== "undefined" && !window.crypto?.subtle) {
-    Object.defineProperty(window, "crypto", { value: globalThis.crypto });
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodeCrypto = require("node:crypto");
+  const wc = nodeCrypto.webcrypto;
+  Object.defineProperty(globalThis, "crypto", { value: wc, configurable: true, writable: true });
+  if (typeof window !== "undefined") {
+    Object.defineProperty(window, "crypto", { value: wc, configurable: true, writable: true });
   }
 });
 
