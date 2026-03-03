@@ -13,14 +13,14 @@ const KEY_LENGTH = 256; // bits (AES-256)
  * Generate a random salt for key derivation.
  */
 export function generateSalt(): Uint8Array {
-    return window.crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+    return globalThis.crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
 }
 
 /**
  * Generate a random 12-byte IV for AES-GCM.
  */
 export function generateIV(): Uint8Array {
-    return window.crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+    return globalThis.crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 }
 
 /**
@@ -28,7 +28,7 @@ export function generateIV(): Uint8Array {
  */
 export async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
     const enc = new TextEncoder();
-    const keyMaterial = await window.crypto.subtle.importKey(
+    const keyMaterial = await globalThis.crypto.subtle.importKey(
         "raw",
         enc.encode(password),
         { name: "PBKDF2" },
@@ -36,7 +36,7 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
         ["deriveKey"]
     );
 
-    return window.crypto.subtle.deriveKey(
+    return globalThis.crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
             salt: salt as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
@@ -57,7 +57,7 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
  */
 export async function encryptChunk(data: ArrayBuffer, key: CryptoKey): Promise<ArrayBuffer> {
     const iv = generateIV();
-    const ciphertext = await window.crypto.subtle.encrypt(
+    const ciphertext = await globalThis.crypto.subtle.encrypt(
         {
             name: "AES-GCM",
             iv: iv as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
@@ -82,7 +82,7 @@ export async function decryptChunk(data: ArrayBuffer, key: CryptoKey): Promise<A
     const iv = data.slice(0, IV_LENGTH);
     const ciphertext = data.slice(IV_LENGTH);
 
-    return window.crypto.subtle.decrypt(
+    return globalThis.crypto.subtle.decrypt(
         {
             name: "AES-GCM",
             iv: new Uint8Array(iv) as unknown as BufferSource, // Cast needed: TS strict mode ArrayBufferLike vs ArrayBuffer
@@ -102,14 +102,14 @@ export function arrayBufferToBase64(buffer: Uint8Array): string {
     for (let i = 0; i < len; i++) {
         binary += String.fromCharCode(bytes[i]);
     }
-    return window.btoa(binary);
+    return globalThis.btoa(binary);
 }
 
 /**
  * Helper to convert Base64 to Uint8Array (for receiving salt)
  */
 export function base64ToArrayBuffer(base64: string): Uint8Array {
-    const binary_string = window.atob(base64);
+    const binary_string = globalThis.atob(base64);
     const len = binary_string.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {

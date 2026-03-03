@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Phase 1 — Cryptography (apps/web/src/lib/utils/crypto.ts)
  *
@@ -7,8 +8,8 @@
  * Security focus: PBKDF2 strength, AES-GCM authentication, IV management,
  * round-trip integrity, tamper/wrong-key detection.
  *
- * NOTE: jsdom exposes a subset of Web Crypto. We use the real API where
- * available, falling back to Node's built-in `crypto.subtle` via globalThis.
+ * Runs in Node environment to use Node's native Web Crypto (fully spec-compliant).
+ * jsdom's @peculiar/webcrypto rejects Buffer-backed ArrayBuffers from TextEncoder.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import {
@@ -21,18 +22,7 @@ import {
   base64ToArrayBuffer,
 } from "../crypto";
 
-// Always override with Node's native webcrypto — jsdom ships a partial
-// @peculiar/webcrypto implementation that rejects plain `new Uint8Array()` buffers
-// in some operations. Node's native crypto.webcrypto is fully spec-compliant.
-beforeAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const nodeCrypto = require("node:crypto");
-  const wc = nodeCrypto.webcrypto;
-  Object.defineProperty(globalThis, "crypto", { value: wc, configurable: true, writable: true });
-  if (typeof window !== "undefined") {
-    Object.defineProperty(window, "crypto", { value: wc, configurable: true, writable: true });
-  }
-});
+// Node environment has globalThis.crypto as native Web Crypto — no polyfill needed.
 
 // ─── Helper ────────────────────────────────────────────────────────────────
 
