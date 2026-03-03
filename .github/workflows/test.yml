@@ -57,25 +57,9 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Run Vitest with coverage
+      - name: Run Vitest
         working-directory: apps/web
-        run: npx vitest run --coverage --reporter=verbose --reporter=json --outputFile=test-results.json
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: apps/web/coverage/
-          retention-days: 14
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: apps/web/test-results.json
-          retention-days: 14
+        run: npx vitest run
 
   # ─── Build ───────────────────────────────────────────────────────────
   build:
