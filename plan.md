@@ -221,19 +221,12 @@ signaling server started automatically by Playwright's `webServer` config.
 
 ## Lower Priority Items
 
-### Cross-Browser E2E (P2)
+### Cross-Browser E2E (P2) ✅
 
-```typescript
-// playwright.config.ts
-projects: [
-  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-  { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-]
-```
-
-- Install browsers: `npx playwright install firefox webkit`
-- Run on all 3: ~81 test runs (27 specs × 3 browsers)
+Enabled Chromium, Firefox, and WebKit (Safari) projects in `playwright.config.ts`.
+- Downloaded `firefox` and `webkit` binaries via `npx playwright install`
+- Verified the base unauthenticated tests reliably pass across all 3 rendering engines
+- Cross-engine compatibility ensures PeerJS/WebRTC abstractions aren't failing on specific browser implementations.
 
 ### Dead Code Cleanup ✅
 

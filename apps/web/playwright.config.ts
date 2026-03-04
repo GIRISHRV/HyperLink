@@ -48,9 +48,20 @@ export default defineConfig({
     },
 
     // 3. Unauthenticated tests — existing specs in e2e/ root (no session)
+    // Runs on Chromium, Firefox, and WebKit to ensure foundational P2P works everywhere
     {
-      name: "unauthenticated",
+      name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
       testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
     },
   ],
