@@ -65,11 +65,11 @@ export default defineConfig({
     },
     {
       // Local PeerJS signaling server — matches NEXT_PUBLIC_PEER_SERVER_* in .env.local
-      command: "npm start",
+      command: "npm run build && npm start",
       cwd: path.resolve(__dirname, "../../apps/signaling"),
       url: "http://localhost:9000/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 15_000,
+      timeout: 30_000,
     },
   ],
 });
