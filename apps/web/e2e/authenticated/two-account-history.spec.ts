@@ -92,9 +92,12 @@ test("history records correct sender and receiver identities", async () => {
         // Opening details modal to get exact transfer hashes if they exist
         await senderRow.click();
         const senderModalId = await senderPage.getByTestId("transfer-id").textContent();
+        await senderPage.keyboard.press("Escape");
+        await senderPage.waitForTimeout(500);
 
         await receiverRow.click();
         const receiverModalId = await receiverPage.getByTestId("transfer-id").textContent();
+        await receiverPage.keyboard.press("Escape");
 
         if (senderModalId && receiverModalId) {
             expect(senderModalId).toEqual(receiverModalId);

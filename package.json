@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "prebuild": "if [ \"$CI\" = \"true\" ] || [ \"$RAILWAY_ENVIRONMENT\" != \"\" ]; then npm ci; fi",
+    "prebuild": "if [ \"$CI\" = \"true\" ]; then npm ci; fi",
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",

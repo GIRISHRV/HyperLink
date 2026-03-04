@@ -9,6 +9,11 @@ node_modules/
 dist/
 build/
 out/
+.reference
+test-results
+playwright-report
+playwright
+coverage
 
 # Environment variables
 .env

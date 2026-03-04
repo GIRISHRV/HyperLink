@@ -62,40 +62,10 @@ docker run -p 9000:9000 -p 9001:9001 \
 
 *Note: Free tier spins down after inactivity.*
 
-## 🚂 Railway Deployment
-
-1. **Create New Project** in Railway dashboard
-
-2. **Connect Repository**
-   - Link your GitHub repository
-   - Select `apps/signaling` as the root directory
-
-3. **Set Environment Variables**
-
-   ```
-   PORT=9000
-   ALLOWED_ORIGINS=https://your-frontend.vercel.app,https://hyperlink-staging.vercel.app
-   ```
-
-4. **Deploy**
-   - Railway will automatically detect the `Dockerfile`
-   - Build and deploy will start automatically
-
-5. **Get WebSocket URL**
-   - Railway will provide a public URL like: `hyperlink-signaling.railway.app`
-   - Your WebSocket endpoint: `wss://hyperlink-signaling.railway.app/myapp`
-
-6. **Update Frontend Environment Variables**
-   - In `apps/web/.env.local`:
-   ```env
-   NEXT_PUBLIC_PEER_SERVER_HOST=hyperlink-signaling.railway.app
-   NEXT_PUBLIC_PEER_SERVER_PORT=443
-   NEXT_PUBLIC_PEER_SERVER_PATH=/myapp
-   ```
-
 ## 🔒 CORS Configuration
 
 Update `ALLOWED_ORIGINS` to include your deployed frontend URLs:
+
 
 ```env
 ALLOWED_ORIGINS=https://hyperlink.vercel.app,https://hyperlink-staging.vercel.app
@@ -136,15 +106,9 @@ This signaling server:
 - Does NOT handle file data (that's P2P!)
 - Stateful WebSocket connections (requires persistent hosting)
 
-**Why Railway?**
+**Deployment Note**
 
-- Persistent WebSocket connections
-- Docker support
-- Auto-deploy from GitHub
-- Free tier available
+- Persistent WebSocket connections are required.
+- Docker support is recommended.
+- PeerServer requires a persistent process.
 
-**Why NOT Vercel/Netlify?**
-
-- They are serverless/stateless
-- WebSocket connections would be terminated
-- PeerServer requires persistent process
