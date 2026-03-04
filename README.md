@@ -57,7 +57,7 @@ NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
 
 ## 📦 Project Structure
 
-```
+```text
 hyperlink/
 ├── apps/
 │   ├── web/              # Next.js frontend
@@ -85,6 +85,7 @@ hyperlink/
 ## 🛠️ Development
 
 ### Logging
+
 The project uses a centralized `logger` from `@repo/utils`. Avoid using `console.log`. Use `logger.info`, `logger.warn`, or `logger.error` which are properly structured for production monitoring.
 
 ```bash
