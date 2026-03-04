@@ -39,17 +39,12 @@ setup("authenticate sender", async ({ page }) => {
 });
 
 setup("authenticate receiver", async ({ page }) => {
-    // Generate derived credentials for the receiver
-    const baseEmail = process.env.E2E_TEST_EMAIL || "";
-    const password = process.env.E2E_TEST_PASSWORD;
+    const email = process.env.E2E_RECEIVER_EMAIL;
+    const password = process.env.E2E_RECEIVER_PASSWORD;
 
-    if (!baseEmail || !password) {
-        throw new Error("E2E_TEST_EMAIL and E2E_TEST_PASSWORD must be set");
+    if (!email || !password) {
+        throw new Error("E2E_RECEIVER_EMAIL and E2E_RECEIVER_PASSWORD must be set in the environment");
     }
-
-    // Create a deterministic receiver email by injecting "-receiver"
-    const [user, domain] = baseEmail.split("@");
-    const email = `${user}-receiver@${domain}`;
 
     await page.goto("/auth");
     await expect(page.locator("#auth-email")).toBeVisible();
