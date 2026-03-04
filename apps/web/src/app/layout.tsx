@@ -27,6 +27,8 @@ import { ClipboardListener } from "@/components/clipboard-listener";
 import { Toaster } from "sonner";
 import { GlobalFooter } from "@/components/global-footer";
 
+import { Analytics } from "@vercel/analytics/react";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
@@ -42,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div id="main-content" className="relative z-10 flex-1 flex flex-col">{children}</div>
         <BackgroundGrid />
         <ClipboardListener />
+        <Analytics />
         <Toaster />
         <GlobalFooter />
       </body>

@@ -428,11 +428,9 @@ export class FileSender {
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.safeSend(cancelMessage);
-    } catch (e) {
+    this.safeSend(cancelMessage).catch(e => {
       logger.warn({ e }, "[SENDER] Failed to send cancel message");
-    }
+    });
     this.rejectTransfer?.(new Error("Transfer cancelled by sender"));
   }
 
@@ -448,11 +446,9 @@ export class FileSender {
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.safeSend(pauseMessage);
-    } catch (e) {
+    this.safeSend(pauseMessage).catch(e => {
       logger.warn({ e }, "[SENDER] Failed to send pause message");
-    }
+    });
     logger.info("[SENDER] Transfer paused");
   }
 
@@ -468,11 +464,9 @@ export class FileSender {
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.safeSend(resumeMessage);
-    } catch (e) {
+    this.safeSend(resumeMessage).catch(e => {
       logger.warn({ e }, "[SENDER] Failed to send resume message");
-    }
+    });
     logger.info("[SENDER] Transfer resumed, pumping...");
     this.pump();
   }
