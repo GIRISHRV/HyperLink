@@ -134,3 +134,39 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx turbo build --filter=@hyperlink/web
+
+  # ─── Deploy to Vercel ──────────────────────────────────────────────────
+  # Deploys only after ALL CI jobs pass.
+  # Production deploy on push to master; preview deploy on PRs / v_next.
+  # Requires secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+  # IMPORTANT: Disable "Automatically deploy on push" in Vercel project
+  #            settings (Settings > Git > Deploy Hooks) to avoid duplicates.
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment info
+        run: vercel pull --yes --environment=${{ github.ref == 'refs/heads/master' && 'production' || 'preview' }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build with Vercel
+        run: vercel build ${{ github.ref == 'refs/heads/master' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt ${{ github.ref == 'refs/heads/master' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$URL" >> "$GITHUB_OUTPUT"
+          echo "🚀 Deployed to: $URL"
