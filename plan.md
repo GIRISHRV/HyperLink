@@ -245,13 +245,14 @@ projects: [
 - [x] Lighthouse CI workflow created.
 - [x] Error tracking (Sentry) completely configured in `instrumentation.ts` and `next.config.js`.
 - [x] Analytics (`@vercel/analytics`) added to the root layout.
+- [x] Speed Insights (`@vercel/speed-insights`) added to the root layout for Web Vitals tracking.
 
-### Two-Account Transfer History Verification (Future)
+### Two-Account Transfer History Verification ✅
 
-Create a second E2E test account (e.g. `playwright-receiver@hyperlink.app`) and verify that:
-- Sender's history shows the file as "sent" to the correct peer
-- Receiver's history shows the file as "received" from the correct peer
-- Transfer IDs match between both accounts' history pages
+Created a secondary E2E test account (`playwright-test-receiver@hyperlink.app`). The `two-account-history.spec.ts` script successfully verifies:
+- Sender's history shows the file as "Sent"
+- Receiver's history shows the file as "Received"
+- Both users have the exact same Transfer ID recorded for the transaction
 
 ---
 

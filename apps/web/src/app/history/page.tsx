@@ -237,6 +237,9 @@ export default function HistoryPage() {
                 <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px]">
                   Size
                 </th>
+                <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px]">
+                  Direction
+                </th>
                 <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-widest w-[180px]">
                   Peer
                 </th>
@@ -261,6 +264,9 @@ export default function HistoryPage() {
                       </td>
                       <td className="py-5 px-6">
                         <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-16" />
+                      </td>
+                      <td className="py-5 px-6">
+                        <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-16" />
                       </td>
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-2">
@@ -322,6 +328,19 @@ export default function HistoryPage() {
                         </div>
                       </td>
                       <td className="py-5 px-6 font-mono text-sm text-gray-400">{formatFileSize(transfer.file_size)}</td>
+                      <td className="py-5 px-6">
+                        {transfer.sender_id === user?.id ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-blue-900/30 text-blue-400 text-xs font-black uppercase tracking-wider border border-blue-500/30">
+                            <span className="material-symbols-outlined text-[14px]">upload</span>
+                            Sent
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-purple-900/30 text-purple-400 text-xs font-black uppercase tracking-wider border border-purple-500/30">
+                            <span className="material-symbols-outlined text-[14px]">download</span>
+                            Received
+                          </span>
+                        )}
+                      </td>
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-2">
                           <div className={`size-6 ${peerColor.bg} rounded-full flex items-center justify-center text-xs font-bold ${peerColor.text}`}>

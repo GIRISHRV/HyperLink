@@ -1,0 +1,7 @@
+HyperLink E2E Transfer Test File
+==================================
+This file is used by the Playwright full-transfer E2E suite.
+It verifies that a file can be sent from one browser context to another
+through the local PeerJS signaling server and WebRTC data channel.
+
+Content hash check: abc123-e2e-hyperlink
