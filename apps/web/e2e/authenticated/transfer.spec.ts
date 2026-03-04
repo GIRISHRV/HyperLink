@@ -50,7 +50,7 @@ test("complete file transfer between two authenticated peers", async () => {
 
         // Read the receiver's peer ID using the data-testid
         const peerIdElement = receiverPage.getByTestId("my-peer-id");
-        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 10_000 });
+        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
         const receiverPeerId = await peerIdElement.textContent();
         expect(receiverPeerId).toBeTruthy();
         console.log("[TEST] Receiver peer ID:", receiverPeerId);

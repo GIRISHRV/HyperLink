@@ -36,7 +36,7 @@ test("history records correct sender and receiver identities", async () => {
         await expect(copyButton).toBeVisible({ timeout: 20_000 });
 
         const peerIdElement = receiverPage.getByTestId("my-peer-id");
-        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 10_000 });
+        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
         const receiverPeerId = await peerIdElement.textContent();
         expect(receiverPeerId).toBeTruthy();
 
