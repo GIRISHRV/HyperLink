@@ -1,5 +1,7 @@
 # HyperLink
 
+[![CI - Tests](https://github.com/GIRISHRV/HyperLink/actions/workflows/test.yml/badge.svg)](https://github.com/GIRISHRV/HyperLink/actions/workflows/test.yml)
+
 > **High-Speed P2P File Engine using WebRTC and IndexedDB**
 
 A decentralized file-sharing application capable of transferring 10GB+ files between peers without crashing the browser, using a hybrid cloud architecture.

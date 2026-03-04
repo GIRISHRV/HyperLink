@@ -44,7 +44,7 @@ coverage/
 .agent/
 .gemini/
 .antigravity/
-FEATURE_ROADMAP.md
+tomorrow.md
 
 # Playwright
 test-results/

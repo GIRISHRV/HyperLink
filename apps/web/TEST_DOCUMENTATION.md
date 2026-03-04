@@ -1,7 +1,7 @@
 # HyperLink — Test Suite Documentation
 
-> **313 tests** across **16 test files** covering **20+ modules**
-> Framework: Vitest 4.x + jsdom + @testing-library/react
+> **689 unit/component tests** across **55 test files** + **27 E2E tests** across **7 spec files**
+> Framework: Vitest 4.x + jsdom + @testing-library/react + @testing-library/user-event + Playwright 1.x
 
 ---
 
@@ -16,27 +16,76 @@ apps/web/src/
 │   └── middleware.test.ts    # Next.js middleware auth tests
 ├── app/api/__tests__/
 │   └── routes.test.ts        # API route handler tests
+├── components/__tests__/
+│   ├── app-header.test.tsx          # AppHeader (landing/app/transfer variants)
+│   ├── background-grid.test.tsx     # Decorative overlay (SSR guard)
+│   ├── clipboard-listener.test.tsx  # Clipboard paste toast
+│   ├── confirm-cancel-modal.test.tsx
+│   ├── confirm-leave-modal.test.tsx
+│   ├── empty-state.test.tsx
+│   ├── file-offer-prompt.test.tsx
+│   ├── file-preview-modal.test.tsx
+│   ├── global-footer.test.tsx
+│   ├── password-modal.test.tsx
+│   ├── progress-bar.test.tsx
+│   ├── qr-code-modal.test.tsx
+│   ├── qr-scanner-modal.test.tsx
+│   ├── ripple.test.tsx
+│   ├── skeletons.test.tsx
+│   └── transfer-details-modal.test.tsx
+├── components/transfer/__tests__/
+│   ├── incoming-offer-card.test.tsx
+│   ├── peer-id-card.test.tsx
+│   ├── selected-file-card.test.tsx
+│   ├── transfer-complete-state.test.tsx
+│   └── transfer-failed-state.test.tsx
+├── components/stats/__tests__/
+│   └── data-moved-card.test.tsx
 ├── lib/
 │   ├── hooks/__tests__/
 │   │   ├── use-transfer-state.test.ts     # FSM reducer tests
-│   │   └── use-modal-accessibility.test.ts # A11y hook tests
+│   │   ├── use-modal-accessibility.test.ts # A11y hook tests
+│   │   ├── use-chat.test.ts
+│   │   ├── use-clipboard-file.test.ts
+│   │   ├── use-haptics.test.ts
+│   │   ├── use-wake-lock.test.ts
+│   │   ├── use-transfer-realtime.test.ts
+│   │   ├── use-file-selection.test.ts
+│   │   ├── use-send-transfer.test.ts
+│   │   ├── use-receive-transfer.test.ts
+│   │   ├── use-require-auth.test.ts
+│   │   └── use-transfer-stats.test.ts
 │   ├── services/__tests__/
-│   │   ├── auth-service.test.ts           # Auth service tests
-│   │   ├── transfer-service.test.ts       # Transfer CRUD tests
-│   │   └── profile-service.test.ts        # Profile CRUD tests
+│   │   ├── auth-service.test.ts
+│   │   ├── transfer-service.test.ts
+│   │   └── profile-service.test.ts
 │   ├── storage/__tests__/
-│   │   └── idb-manager.test.ts            # IndexedDB storage tests
+│   │   └── idb-manager.test.ts
+│   ├── supabase/__tests__/
+│   │   └── client.test.ts
 │   ├── transfer/__tests__/
-│   │   ├── sender.test.ts                 # FileSender class tests
-│   │   └── receiver.test.ts               # FileReceiver class tests
+│   │   ├── sender.test.ts
+│   │   └── receiver.test.ts
 │   ├── utils/__tests__/
-│   │   ├── index.test.ts                  # Shared utility functions
-│   │   ├── crypto.test.ts                 # AES-256-GCM + PBKDF2 tests
-│   │   ├── peer-message-validator.test.ts # WebRTC message validation
-│   │   ├── with-retry.test.ts             # Retry logic w/ backoff
-│   │   └── mime.test.ts                   # MIME type lookup
-│   └── webrtc/
-│       └── peer-manager.test.ts           # PeerManager class tests
+│   │   ├── index.test.ts
+│   │   ├── crypto.test.ts
+│   │   ├── auth-redirect.test.ts
+│   │   ├── peer-message-validator.test.ts
+│   │   ├── with-retry.test.ts
+│   │   └── mime.test.ts
+│   └── webrtc/__tests__/
+│       └── peer-manager.test.ts
+├── test-utils/
+│   └── render-with-providers.tsx   # RTL wrapper (mocked navigation + auth)
+e2e/
+├── landing.spec.ts           # Hero headline, features, SEND/RECEIVE blocks
+├── auth.spec.ts              # Login form, inputs, heading
+├── protected-routes.spec.ts  # Auth redirect for 5 protected paths
+├── about.spec.ts             # About page heading, WebRTC text, header logo
+├── navigation.spec.ts        # Link navigation (About, Status, Login)
+├── not-found.spec.ts         # 404 page text, button
+└── offline.spec.ts           # Offline page branding, connection text
+playwright.config.ts              # Playwright config (Chromium, webServer)
 ```
 
 ---
@@ -175,6 +224,106 @@ apps/web/src/
 | MA-002 | `use-modal-accessibility` | ESC | Closes on Escape | Med | Unit |
 | MA-003 | `use-modal-accessibility` | Restore focus | Returns focus on close | Med | Unit |
 
+### Phase 2c — Modal Components (~70 tests)
+
+| TestID | Component | Scenario | Risk | Type |
+| ------ | --------- | -------- | ---- | ---- |
+| CM-001 | `PasswordModal` | Hidden when `isOpen=false` | Med | RTL |
+| CM-002 | `PasswordModal` | Default/custom title & description | Low | RTL |
+| CM-003 | `PasswordModal` | `isCreation` label variants | Low | RTL |
+| CM-004 | `PasswordModal` | Empty-password validation error | Med | RTL |
+| CM-005 | `PasswordModal` | `onSubmit` called with typed value | High | RTL |
+| CM-006 | `PasswordModal` | Input clears after submit | Med | RTL |
+| CM-007 | `PasswordModal` | `onCancel` on Cancel click | Med | RTL |
+| CM-008 | `ConfirmCancelModal` | Hidden when closed | Med | RTL |
+| CM-009 | `ConfirmCancelModal` | sending/receiving copy variants | Low | RTL |
+| CM-010 | `ConfirmCancelModal` | `onConfirm` / `onCancel` buttons | High | RTL |
+| CM-011 | `ConfirmCancelModal` | Backdrop click calls `onCancel` | Med | RTL |
+| CM-012 | `ConfirmLeaveModal` | Hidden when closed | Med | RTL |
+| CM-013 | `ConfirmLeaveModal` | Stay/Leave buttons | High | RTL |
+| CM-014 | `ConfirmLeaveModal` | Backdrop click calls `onCancel` | Med | RTL |
+| CM-015 | `QRCodeModal` | Mocked `QRCodeSVG` renders | Med | RTL |
+| CM-016 | `QRCodeModal` | `peerId` text displayed | High | RTL |
+| CM-017 | `QRCodeModal` | Close button calls `onClose` | Med | RTL |
+| CM-018 | `QRScannerModal` | `Html5Qrcode` mocked (no camera) | High | RTL |
+| CM-019 | `QRScannerModal` | `#qr-reader` container rendered | Med | RTL |
+| CM-020 | `QRScannerModal` | Cancel button rendered | Low | RTL |
+| CM-021 | `FilePreviewModal` | Hidden when closed | Med | RTL |
+| CM-022 | `FilePreviewModal` | `<img>` for image MIME / `<video>` for video | High | RTL |
+| CM-023 | `FilePreviewModal` | Fallback "Preview not available" | Med | RTL |
+| CM-024 | `FilePreviewModal` | Download link has correct `download` attr | Med | RTL |
+| CM-025 | `FilePreviewModal` | `URL.createObjectURL` called with file | High | RTL |
+| CM-026 | `TransferDetailsModal` | Status badges (Complete/Pending/Failed…) | High | RTL |
+| CM-027 | `TransferDetailsModal` | Cancel Transfer for active transfer | High | RTL |
+| CM-028 | `TransferDetailsModal` | Delete Record for inactive transfer | Med | RTL |
+| CM-029 | `TransferDetailsModal` | Ephemeral file notice when no blob | Med | RTL |
+| CM-030 | `TransferDetailsModal` | Close buttons call `onClose` | Med | RTL |
+
+### Phase 2d — Complex & Transfer Components (~65 tests)
+
+| TestID | Component | Scenario | Risk | Type |
+| ------ | --------- | -------- | ---- | ---- |
+| CD-001 | `FileOfferPrompt` | Hidden when `isOpen=false` | Med | RTL |
+| CD-002 | `FileOfferPrompt` | Filename, type, extension badge | Low | RTL |
+| CD-003 | `FileOfferPrompt` | Accept / Decline buttons + callbacks | High | RTL |
+| CD-004 | `FileOfferPrompt` | P2P no-server notice | Low | RTL |
+| CD-005 | `Skeletons` | `CardSkeleton` renders with `animate-pulse` | Low | RTL |
+| CD-006 | `Skeletons` | `TableRowSkeleton` renders `<tr>` | Low | RTL |
+| CD-007 | `Skeletons` | `ListSkeleton` renders 3 items | Low | RTL |
+| CD-008 | `PeerIdCard` | Displays peerId / "Loading..." fallback | High | RTL |
+| CD-009 | `PeerIdCard` | Copy ID button → `onCopy` | Med | RTL |
+| CD-010 | `PeerIdCard` | Show QR disabled when peerId empty | Med | RTL |
+| CD-011 | `SelectedFileCard` | Filename displayed | High | RTL |
+| CD-012 | `SelectedFileCard` | Remove File → `onRemove` | Med | RTL |
+| CD-013 | `TransferCompleteState` | "Transfer Complete!" + filename | High | RTL |
+| CD-014 | `TransferCompleteState` | Send Another File → `onReset` | Med | RTL |
+| CD-015 | `TransferFailedState` | Error message / "Unknown error" fallback | High | RTL |
+| CD-016 | `TransferFailedState` | Try Again → `onRetry` | High | RTL |
+| CD-017 | `TransferFailedState` | Return to Home → `router.push("/dashboard")` | Med | RTL |
+| CD-018 | `TransferFailedState` | Diagnostic rows (SECURE_CONTEXT, NETWORK) | Med | RTL |
+| CD-019 | `IncomingOfferCard` | "Incoming Transmission" + filename | High | RTL |
+| CD-020 | `IncomingOfferCard` | Action Required badge + SECURE LINK | Med | RTL |
+| CD-021 | `DataMovedCard` | Loading skeleton when `isLoading=true` | Low | RTL |
+| CD-022 | `DataMovedCard` | Formatted bytes + unit displayed | High | RTL |
+| CD-023 | `DataMovedCard` | Transfer count message | Med | RTL |
+| CD-024 | `ClipboardListener` | Renders null before any paste | Med | RTL |
+| CD-025 | `ClipboardListener` | Toast shown after file paste | High | RTL |
+| CD-026 | `ClipboardListener` | Pasted filename in toast | Med | RTL |
+| CD-027 | `ClipboardListener` | Go to Send → `router.push("/send")` | High | RTL |
+| CD-028 | `ClipboardListener` | Dismiss hides toast | Med | RTL |
+
+### Phase 3 — Playwright E2E (27 tests)
+
+| TestID | Spec | Scenario | Risk | Type |
+| ------ | ---- | -------- | ---- | ---- |
+| E2E-001 | `landing.spec` | Hero headline contains Secure / Direct / Fast | Med | E2E |
+| E2E-002 | `landing.spec` | WebRTC Ready status indicator visible | Med | E2E |
+| E2E-003 | `landing.spec` | SEND and RECEIVE blocks visible | High | E2E |
+| E2E-004 | `landing.spec` | Three feature cards rendered | Low | E2E |
+| E2E-005 | `landing.spec` | SEND links to /auth for unauthenticated | High | E2E |
+| E2E-006 | `landing.spec` | RECEIVE links to /auth for unauthenticated | High | E2E |
+| E2E-007 | `auth.spec` | Email input visible | High | E2E |
+| E2E-008 | `auth.spec` | Password input visible | High | E2E |
+| E2E-009 | `auth.spec` | Authenticate submit button | Med | E2E |
+| E2E-010 | `auth.spec` | Authentication Portal label | Low | E2E |
+| E2E-011 | `auth.spec` | Access Network heading | Low | E2E |
+| E2E-012 | `protected-routes.spec` | /dashboard redirects to /auth | Critical | E2E |
+| E2E-013 | `protected-routes.spec` | /history redirects to /auth | Critical | E2E |
+| E2E-014 | `protected-routes.spec` | /settings redirects to /auth | Critical | E2E |
+| E2E-015 | `protected-routes.spec` | /send redirects to /auth | Critical | E2E |
+| E2E-016 | `protected-routes.spec` | /receive redirects to /auth | Critical | E2E |
+| E2E-017 | `about.spec` | How It Works heading | Low | E2E |
+| E2E-018 | `about.spec` | WebRTC/peer-to-peer explanation text | Low | E2E |
+| E2E-019 | `about.spec` | AppHeader HyperLink logo in header | Low | E2E |
+| E2E-020 | `navigation.spec` | Landing → About via How it Works | Med | E2E |
+| E2E-021 | `navigation.spec` | Landing → Status via Status link | Med | E2E |
+| E2E-022 | `navigation.spec` | Landing → Auth via Login link | Med | E2E |
+| E2E-023 | `not-found.spec` | 404 heading for nonexistent route | Med | E2E |
+| E2E-024 | `not-found.spec` | Route Not Found label | Low | E2E |
+| E2E-025 | `not-found.spec` | Go Home button visible | Low | E2E |
+| E2E-026 | `offline.spec` | HyperLink branding on offline page | Low | E2E |
+| E2E-027 | `offline.spec` | Offline/connection content shown | Med | E2E |
+
 ---
 
 ## Risk Distribution
@@ -193,20 +342,21 @@ apps/web/src/
 | Module Category | Target | Status |
 | --------------- | ------ | ------ |
 | `lib/utils/` (crypto, validation, retry, mime) | 95%+ | ✅ |
-| `lib/hooks/` (FSM, a11y) | 90%+ | ✅ |
+| `lib/hooks/` (FSM, a11y, use-chat, use-clipboard…) | 90%+ | ✅ |
 | `lib/services/` (auth, transfer, profile) | 85%+ | ✅ |
 | `lib/storage/` (IDB) | 85%+ | ✅ |
 | `lib/transfer/` (sender, receiver) | 80%+ | ✅ |
 | `lib/webrtc/` (peer-manager) | 75%+ | ✅ |
 | `app/api/` (route handlers) | 90%+ | ✅ |
 | `middleware.ts` | 95%+ | ✅ |
+| `components/` (UI, modals, transfer, stats) | 75%+ | ✅ |
 
 ---
 
 ## Running Tests
 
 ```bash
-# All tests
+# All unit/component tests
 cd apps/web && npx vitest run
 
 # Watch mode
@@ -220,18 +370,28 @@ npx vitest run src/lib/utils/__tests__/crypto.test.ts
 
 # Pattern match
 npx vitest run --reporter=verbose -t "encryptChunk"
+
+# All E2E tests (builds & starts Next.js automatically)
+npx playwright test
+
+# E2E with UI mode
+npx playwright test --ui
+
+# Single E2E spec
+npx playwright test e2e/landing.spec.ts
 ```
 
 ---
 
-## Phase 3 — Roadmap (Not Yet Implemented)
+## Phase 3 — Roadmap
 
-| Area | Description | Priority |
-| ---- | ----------- | -------- |
-| E2E Sender→Receiver | Full transfer flow with two PeerManager instances | P0 |
-| Component Tests | React component rendering with @testing-library/react | P1 |
-| Performance Benchmarks | Chunk throughput, encryption overhead, IDB latency | P1 |
-| Security Fuzzing | Random payloads to crypto/validator, prototype pollution | P2 |
-| Cross-Browser | Playwright matrix (Chrome, Firefox, Safari, Edge) | P2 |
-| Offline/PWA | Service worker caching, offline transfer resume | P2 |
-| Load Testing | Concurrent transfers, memory profiling | P3 |
+| Area | Description | Priority | Status |
+| ---- | ----------- | -------- | ------ |
+| E2E Navigation & UI | Playwright standalone UI tests (Option A) | P0 | ✅ Done (27 tests) |
+| E2E Sender→Receiver | Full transfer flow with two PeerManager instances | P1 | ⏳ |
+| Component Tests | React component rendering with @testing-library/react | P1 | ✅ Done (689 tests) |
+| Performance Benchmarks | Chunk throughput, encryption overhead, IDB latency | P1 | ⏳ |
+| Security Fuzzing | Random payloads to crypto/validator, prototype pollution | P2 | ⏳ |
+| Cross-Browser | Playwright matrix (Chrome, Firefox, Safari, Edge) | P2 | ⏳ |
+| Offline/PWA | Service worker caching, offline transfer resume | P2 | ⏳ |
+| Load Testing | Concurrent transfers, memory profiling | P3 | ⏳ |

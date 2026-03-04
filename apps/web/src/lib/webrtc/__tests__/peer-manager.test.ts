@@ -4,7 +4,7 @@
  * Tests for: initialize, connectToPeer, event emission, destroy, reconnection.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PeerManager } from './peer-manager';
+import { PeerManager } from '../peer-manager';
 
 vi.mock('peerjs', () => {
     class MockDataConnection {
