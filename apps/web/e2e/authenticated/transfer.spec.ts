@@ -7,6 +7,7 @@ const __dirname = path.dirname(__filename);
 
 const FIXTURE_FILE = path.resolve(__dirname, "../fixtures/test-file-10mb.bin");
 const AUTH_FILE = path.resolve(__dirname, "../.auth/user.json");
+const RECEIVER_AUTH_FILE = path.resolve(__dirname, "../.auth/receiver.json");
 
 /**
  * Full two-browser transfer E2E test.
@@ -28,7 +29,7 @@ test("complete file transfer between two authenticated peers", async () => {
     const browser = await chromium.launch();
 
     const receiverContext = await browser.newContext({
-        storageState: AUTH_FILE,
+        storageState: RECEIVER_AUTH_FILE,
         baseURL: "http://localhost:3000",
     });
     const senderContext = await browser.newContext({

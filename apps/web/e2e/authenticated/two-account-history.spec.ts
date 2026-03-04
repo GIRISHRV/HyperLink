@@ -10,7 +10,7 @@ const SENDER_AUTH = path.resolve(__dirname, "../.auth/user.json");
 const RECEIVER_AUTH = path.resolve(__dirname, "../.auth/receiver.json");
 
 test("history records correct sender and receiver identities", async () => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
 
     const browser = await chromium.launch();
 

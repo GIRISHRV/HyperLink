@@ -220,9 +220,7 @@ function SendPageContent() {
                 <span className="material-symbols-outlined text-sm">lock</span>
                 <span>/secure_channel/send</span>
                 <span className={`w-2 h-2 rounded-full ${isPeerReady ? "bg-green-500 animate-pulse" : "bg-red-500"} ml-2`}></span>
-                <span className={isPeerReady ? "text-green-500" : "text-red-500"}>
-                  {isPeerReady ? "WEBRTC_READY" : "INITIALIZING"}
-                </span>
+                <span className={isPeerReady ? "text-green-500" : "text-red-500"}>{isPeerReady ? "WEBRTC_READY" : "INITIALIZING"}</span>
                 {swStatus !== "active" && (
                   <span className="ml-2 text-xs px-1.5 py-0.5 border border-bauhaus-red text-bauhaus-red animate-pulse">
                     SW_WAITING: REFRESH AGAIN

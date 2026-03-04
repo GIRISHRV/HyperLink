@@ -61,6 +61,13 @@ test.describe("Settings Page (authenticated)", () => {
     });
 
     test("Sign Out button redirects to /auth", async ({ page }) => {
+        // Stub the Supabase sign-out endpoint to prevent actual session revocation.
+        // If the real logout API is called it would invalidate the shared test session
+        // in user.json, causing transfer.spec.ts and two-account-history.spec.ts to fail
+        // because those tests load the same session tokens via chromium.launch() + storageState.
+        await page.route("**/auth/v1/logout**", (route) =>
+            route.fulfill({ status: 200, body: "{}", contentType: "application/json" })
+        );
         await page.getByRole("button", { name: /sign out/i }).click();
         await expect(page).toHaveURL("/auth", { timeout: 10_000 });
     });

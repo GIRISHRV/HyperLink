@@ -194,7 +194,7 @@ export default function TransferDetailsModal({
                         )}
                         <div>
                             <p className="text-gray-500 mb-1">Transfer ID</p>
-                            <p className="text-white font-mono text-xs truncate">{transfer.id}</p>
+                            <p data-testid="transfer-id" className="text-white font-mono text-xs truncate">{transfer.id}</p>
                         </div>
                     </div>
 
