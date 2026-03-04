@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { vi, describe, it, expect } from "vitest";
 import IncomingOfferCard from "@/components/transfer/incoming-offer-card";
+import type { PendingOffer } from "@/lib/hooks/use-receive-transfer";
 
 vi.mock("@repo/utils", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@repo/utils")>();
@@ -12,7 +13,10 @@ describe("IncomingOfferCard", () => {
     const pendingOffer = {
         filename: "backup.zip",
         fileSize: 2048,
-    };
+        fileType: "application/zip",
+        connection: {} as any,
+        message: {} as any,
+    } satisfies PendingOffer;
 
     it("renders without throwing", () => {
         const { container } = render(<IncomingOfferCard pendingOffer={pendingOffer} />);
