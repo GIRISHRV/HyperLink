@@ -21,8 +21,13 @@ const peerConnectSrc = isLocalPeer
   ? `http://${peerHost}:${peerPort} ws://${peerHost}:${peerPort}`
   : `https://${peerHost} wss://${peerHost}`;
 
+import packageJson from "./package.json" assert { type: "json" };
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+  },
   reactStrictMode: true,
   webpack: (config) => {
     // WebRTC peer connections require these polyfills

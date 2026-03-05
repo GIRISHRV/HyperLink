@@ -15,8 +15,13 @@ export function GlobalFooter() {
                         <span className="font-black text-sm tracking-tighter uppercase text-white/50">HYPER</span>
                         <span className="font-black text-sm tracking-tighter uppercase text-white/20">LINK</span>
                     </div>
-                    <div className="text-xs text-white/30 font-mono">
-                        E2E ENCRYPTED P2P TRANSFER
+                    <div className="flex flex-col md:items-end">
+                        <div className="text-xs text-white/30 font-mono tracking-widest">
+                            E2E ENCRYPTED P2P TRANSFER
+                        </div>
+                        <div className="text-[10px] text-white/20 font-mono mt-1">
+                            v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
+                        </div>
                     </div>
                 </div>
             </div>
