@@ -1,6 +1,6 @@
 {
   "name": "hyperlink",
-  "version": "0.1.0",
+  "version": "1.00.000",
   "private": true,
   "description": "HyperLink: High-Speed P2P File Engine using WebRTC and IndexedDB",
   "workspaces": [
@@ -20,8 +20,8 @@
     "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web"
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
     "prettier": "^3.2.5",
+    "turbo": "^2.0.0",
     "typescript": "^5.3.3"
   },
   "engines": {
