@@ -36,7 +36,7 @@ export default function TransferProgressPanel({
         <div className="flex items-center gap-3">
           <div className="relative">
             <div
-              className={`w-12 h-12 ${isUplink ? "bg-[#2d2b1f]" : "bg-[#2d1f1f]"} rounded-full flex items-center justify-center border border-primary/30`}
+              className={`w-12 h-12 ${isUplink ? "bg-surface-inset" : "bg-red-950/30"} rounded-full flex items-center justify-center border border-primary/30`}
             >
               <span className="material-symbols-outlined text-primary">
                 {isUplink ? "hub" : "satellite_alt"}
@@ -101,11 +101,10 @@ export default function TransferProgressPanel({
         <div className="grid grid-cols-2 gap-3 mt-auto z-10">
           <button
             onClick={onPauseResume}
-            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${
-              isPaused
+            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${isPaused
                 ? "bg-primary text-black border-primary hover:bg-white"
                 : "bg-transparent text-white border-white/20 hover:border-white hover:bg-white/5"
-            }`}
+              }`}
           >
             <span className="material-symbols-outlined !text-[18px]">
               {isPaused ? "play_arrow" : "pause"}

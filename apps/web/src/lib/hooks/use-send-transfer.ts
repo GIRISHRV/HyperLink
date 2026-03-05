@@ -87,14 +87,8 @@ export function useSendTransfer({
         "Insecure Context: WebRTC is likely blocked. Please use HTTPS."
       );
     }
-    if (
-      "clearAppBadge" in navigator &&
-      typeof (navigator as Navigator & { clearAppBadge?: () => Promise<void> })
-        .clearAppBadge === "function"
-    ) {
-      (
-        navigator as Navigator & { clearAppBadge: () => Promise<void> }
-      ).clearAppBadge().catch(console.error);
+    if ("clearAppBadge" in navigator) {
+      navigator.clearAppBadge().catch((err: unknown) => logger.error({ err }, "[SEND] clearAppBadge failed:"));
     }
   }, []);
 
@@ -349,11 +343,11 @@ export function useSendTransfer({
           if (
             Math.floor(progressData.percentage) % 10 === 0 &&
             Math.floor(progressData.percentage) !==
-              Math.floor(
-                ((progressData.bytesTransferred - 16384) /
-                  progressData.totalBytes) *
-                  100
-              )
+            Math.floor(
+              ((progressData.bytesTransferred - 16384) /
+                progressData.totalBytes) *
+              100
+            )
           ) {
             addLog(
               `> Progress: ${progressData.percentage.toFixed(0)}%`
@@ -367,21 +361,9 @@ export function useSendTransfer({
           playSuccessSound();
           if (dbTransferId)
             updateTransferStatus(dbTransferId, "complete");
-          if (
-            "setAppBadge" in navigator &&
-            typeof (
-              navigator as Navigator & {
-                setAppBadge?: (count: number) => Promise<void>;
-              }
-            ).setAppBadge === "function"
-          ) {
-            (
-              navigator as Navigator & {
-                setAppBadge: (count: number) => Promise<void>;
-              }
-            )
-              .setAppBadge(1)
-              .catch(console.error);
+          if ("setAppBadge" in navigator) {
+            navigator.setAppBadge(1)
+              .catch((err: unknown) => logger.error({ err }, "[SEND] setAppBadge failed:"));
           }
         })
         .catch((err) => {
@@ -397,7 +379,7 @@ export function useSendTransfer({
             return;
           }
           addLog(`✗ Transfer failed: ${err.message}`);
-          console.error("[SEND] Transfer failed:", err);
+          logger.error({ err }, "[SEND] Transfer failed:");
           dispatchTransfer({
             type: "FAIL",
             error: "Transfer failed: " + err.message,
@@ -407,7 +389,7 @@ export function useSendTransfer({
         });
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("Transfer failed:", err);
+      logger.error({ err }, "Transfer failed:");
       if (errMsg.includes("peer-unavailable")) {
         dispatchTransfer({
           type: "FAIL",

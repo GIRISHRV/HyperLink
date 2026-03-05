@@ -43,6 +43,11 @@ vi.mock("@repo/utils", () => ({
   validateFileSize: (...args: unknown[]) =>
     mocks.validateFileSizeMock(...args),
   formatFileSize: (...args: unknown[]) => mocks.formatFileSizeMock(...args),
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+  },
 }));
 
 // ──────────────────────────────────────────────────────────────

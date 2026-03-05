@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Transfer } from "@repo/types";
-import { formatFileSize } from "@repo/utils";
+import { formatFileSize, logger } from "@repo/utils";
 import { updateTransferStatus, deleteTransfer } from "@/lib/services/transfer-service";
 import { getFile } from "@/lib/storage/idb-manager";
 import Image from "next/image";
@@ -33,7 +33,7 @@ export default function TransferDetailsModal({
                     setFileBlob(blob || null);
                 })
                 .catch(err => {
-                    console.error("Failed to check file availability:", err);
+                    logger.error({ err }, "Failed to check file availability:");
                     setFileBlob(null);
                 })
                 .finally(() => setIsCheckingFile(false));

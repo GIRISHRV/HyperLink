@@ -11,6 +11,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: { id: "test-user" } }, error: null })),
+    },
+  })),
+}));
+
 // ─── Health endpoint ────────────────────────────────────────────────────
 
 describe("GET /api/health", () => {

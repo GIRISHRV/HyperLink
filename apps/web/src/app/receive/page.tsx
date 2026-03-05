@@ -66,7 +66,7 @@ export default function ReceivePage() {
   });
 
   return (
-    <div className="bg-transparent min-h-screen text-[#121212] dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
       <AppHeader
         variant="transfer"
         isPeerReady={!!myPeerId}
@@ -91,7 +91,7 @@ export default function ReceivePage() {
                   <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white uppercase">
                     Secure Transfer <span className="text-primary">Downlink</span>
                   </h1>
-                  <div className="flex items-center gap-2 text-[#bcb89a] font-mono text-sm">
+                  <div className="flex items-center gap-2 text-muted font-mono text-sm">
                     <span className="material-symbols-outlined text-sm">lock</span>
                     <span>/secure_channel/receive</span>
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2"></span>
@@ -123,7 +123,7 @@ export default function ReceivePage() {
                     <h1 className="text-5xl md:text-6xl font-black tracking-tighter uppercase leading-none">
                       Receive <span className="text-primary">Files</span>
                     </h1>
-                    <p className="text-[#bcb89a] text-lg font-medium max-w-md">
+                    <p className="text-muted text-lg font-medium max-w-md">
                       Securely receive encrypted files directly to your device via WebRTC.
                     </p>
                   </div>
@@ -136,11 +136,11 @@ export default function ReceivePage() {
                   />
 
                   {/* Instructions */}
-                  <div className="p-6 border border-dashed border-[#3a3827] flex gap-4 items-start">
+                  <div className="p-6 border border-dashed border-subtle-bauhaus flex gap-4 items-start">
                     <span className="material-symbols-outlined text-primary text-2xl">info</span>
                     <div className="flex flex-col gap-1">
                       <h4 className="text-white font-bold uppercase text-sm">How it works</h4>
-                      <p className="text-[#bcb89a] text-sm leading-relaxed">
+                      <p className="text-muted text-sm leading-relaxed">
                         Share your Peer ID with the sender. Keep this tab open. The transfer will start automatically once connected.
                       </p>
                     </div>
@@ -148,7 +148,7 @@ export default function ReceivePage() {
 
                   {/* Incoming Queue */}
                   <div className="flex flex-col gap-4">
-                    <h3 className="text-[#bcb89a] text-xs font-bold uppercase tracking-wider border-b border-[#3a3827] pb-2">
+                    <h3 className="text-muted text-xs font-bold uppercase tracking-wider border-b border-subtle-bauhaus pb-2">
                       Incoming Queue
                     </h3>
 
@@ -158,7 +158,7 @@ export default function ReceivePage() {
                           <span className="material-symbols-outlined text-4xl opacity-50">wifi_tethering</span>
                         </div>
                         <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-1">Receiver Active</h3>
-                        <p className="font-mono text-xs text-[#bcb89a]">Awaiting incoming secure handshake...</p>
+                        <p className="font-mono text-xs text-muted">Awaiting incoming secure handshake...</p>
                       </div>
                     )}
 
@@ -178,7 +178,7 @@ export default function ReceivePage() {
                     )}
 
                     {transferState.status === "cancelled" && (
-                      <div className="bg-[#1a1a1a] p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+                      <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
                             <div className="bg-white/5 p-2">

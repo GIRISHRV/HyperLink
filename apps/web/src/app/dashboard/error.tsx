@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@repo/utils";
 
 /**
  * FINDING-041: Route-level Error Boundary for the Dashboard quadrant.
@@ -15,7 +16,7 @@ export default function DashboardError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error("Dashboard error boundary caught:", error);
+        logger.error({ error }, "Dashboard error boundary caught:");
     }, [error]);
 
     return (

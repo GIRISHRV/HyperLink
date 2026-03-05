@@ -29,6 +29,7 @@ import { GlobalFooter } from "@/components/global-footer";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { SwUpdateWatcher } from "@/components/sw-update-watcher";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SpeedInsights />
         <Toaster />
         <GlobalFooter />
+        <SwUpdateWatcher />
       </body>
     </html>
   );

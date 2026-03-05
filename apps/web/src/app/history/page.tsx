@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 import { useRequireAuth } from "@/lib/hooks/use-require-auth";
-import { formatFileSize, STATUS_CONFIG } from "@repo/utils";
+import { formatFileSize, STATUS_CONFIG, logger } from "@repo/utils";
 import type { StatusConfigKey } from "@repo/utils";
 import TransferDetailsModal from "@/components/transfer-details-modal";
 import { DataMovedCard } from "@/components/stats/data-moved-card";
@@ -24,8 +24,8 @@ export default function HistoryPage() {
 
   useEffect(() => {
     // App Badging API - Clear badge when entering history
-    if ('clearAppBadge' in navigator && typeof (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge === 'function') {
-      (navigator as Navigator & { clearAppBadge: () => Promise<void> }).clearAppBadge().catch(console.error);
+    if ('clearAppBadge' in navigator) {
+      navigator.clearAppBadge().catch((e: unknown) => logger.error({ e }, "[HISTORY] clearAppBadge failed:"));
     }
   }, []);
 
@@ -77,7 +77,7 @@ export default function HistoryPage() {
     try {
       await removeMultipleTransfers(ids);
     } catch (err) {
-      console.error("[HISTORY] Clear all failed:", err);
+      logger.error({ err }, "[HISTORY] Clear all failed:");
     }
     setShowClearAll(false);
   }

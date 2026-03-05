@@ -23,6 +23,7 @@ import ChatFAB from "@/components/transfer/chat-fab";
 import DragOverlay from "@/components/transfer/drag-overlay";
 
 import { openDB } from "idb";
+import { logger } from "@repo/utils";
 
 const DB_NAME = "hyperlink-pwa-share";
 const STORE_NAME = "shared-files";
@@ -138,7 +139,7 @@ function SendPageContent() {
             await db.delete(STORE_NAME, "latest");
           }
         } catch {
-          console.error("Failed to load shared data");
+          logger.error({}, "Failed to load shared data");
         }
       })();
     } else if (title || text || url) {

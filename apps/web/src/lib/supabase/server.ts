@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { logger } from "@repo/utils";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -17,9 +18,7 @@ export async function createClient() {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
             // Server Component cookie operations may fail; log for debugging
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('[Supabase Server] Cookie operation failed:', error);
-            }
+            logger.warn({ error }, '[Supabase Server] Cookie operation failed:');
           }
         },
         remove(name: string, options: CookieOptions) {

@@ -43,17 +43,17 @@ export const initDB = async () => {
       }
     },
     blocked() {
-      console.warn("[IDB] DB Open Blocked: Close other tabs with this app open!");
+      logger.warn({}, "[IDB] DB Open Blocked: Close other tabs with this app open!");
     },
     blocking() {
-      console.warn("[IDB] DB Open Blocking: Closing connection to allow upgrade in other tab");
+      logger.warn({}, "[IDB] DB Open Blocking: Closing connection to allow upgrade in other tab");
       if (dbInstance) {
         dbInstance.close();
         dbInstance = null;
       }
     },
     terminated() {
-      console.error("[IDB] DB Connection Terminated");
+      logger.error({}, "[IDB] DB Connection Terminated");
     },
   });
 };

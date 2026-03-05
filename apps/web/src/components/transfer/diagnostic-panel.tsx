@@ -23,7 +23,7 @@ export default function DiagnosticPanel({
 
       {/* Hide diagnostic details for simple incorrect password errors */}
       {error !== "Incorrect password. The transfer was cancelled." && (
-        <div className="text-left font-mono text-[9px] text-[#bcb89a] space-y-1 bg-black/40 p-3">
+        <div className="text-left font-mono text-xs text-muted space-y-1 bg-black/40 p-3">
           <p className="text-primary font-bold uppercase mb-2">
             Diagnostic Data
           </p>
@@ -51,7 +51,7 @@ export default function DiagnosticPanel({
               {peerManagerRef.current?.getState()?.toUpperCase() || "UNKNOWN"}
             </p>
           </div>
-          <p className="mt-3 text-[8px] text-white/30 italic">
+          <p className="mt-3 text-xs text-white/30 italic">
             Tip: Safari/iOS prevents WebRTC on HTTP. Ensure both sides are
             using HTTPS.
           </p>
@@ -60,7 +60,7 @@ export default function DiagnosticPanel({
 
       <button
         onClick={onClear}
-        className="w-full py-2 bg-bauhaus-red/20 hover:bg-bauhaus-red/40 text-bauhaus-red text-[10px] font-bold uppercase tracking-widest transition-colors"
+        className="w-full py-2 bg-bauhaus-red/20 hover:bg-bauhaus-red/40 text-bauhaus-red text-xs font-bold uppercase tracking-widest transition-colors"
       >
         Clear Error
       </button>

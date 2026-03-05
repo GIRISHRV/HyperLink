@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/app-header";
 import { signIn, signUp, signInWithMagicLink, resetPassword } from "@/lib/services/auth-service";
 import { getSafeRedirect } from "@/lib/utils/auth-redirect";
+import { logger } from "@repo/utils";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_FAILED_ATTEMPTS = 5;
@@ -125,7 +126,7 @@ export default function AuthPage() {
       }
       setFailedAttempts(0);
     } catch (err: unknown) {
-      console.error("Auth error:", err);
+      logger.error({ err }, "Auth error:");
       // SEC-004: Exponential backoff after repeated failures
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);

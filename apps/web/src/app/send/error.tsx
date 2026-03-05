@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@repo/utils";
 
 export default function SendError({
     error,
@@ -11,7 +12,7 @@ export default function SendError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error("Send route error caught:", error);
+        logger.error({ error }, "Send route error caught:");
     }, [error]);
 
     return (

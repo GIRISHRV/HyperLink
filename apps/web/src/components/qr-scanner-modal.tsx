@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useModalAccessibility } from "@/lib/hooks/use-modal-accessibility";
+import { logger } from "@repo/utils";
 
 interface QRScannerModalProps {
     isOpen: boolean;
@@ -29,7 +30,7 @@ export default function QRScannerModal({ isOpen, onScan, onClose }: QRScannerMod
                 scannerRef.current.clear();
             } catch (err) {
                 // Silently handle cleanup errors (common in React strict mode)
-                console.warn("QR Scanner cleanup warning:", err);
+                logger.warn({ err }, "QR Scanner cleanup warning:");
             }
             scannerRef.current = null;
         }
@@ -60,9 +61,10 @@ export default function QRScannerModal({ isOpen, onScan, onClose }: QRScannerMod
                     // Ignore individual frame errors
                 }
             );
-        } catch (err: any) {
-            console.error("QR Scanner error:", err);
-            setError(err.message || "Failed to access camera. Please check permissions.");
+        } catch (err: unknown) {
+            logger.error({ err }, "QR Scanner error:");
+            const message = err instanceof Error ? err.message : "Failed to access camera. Please check permissions.";
+            setError(message);
             setIsScanning(false);
         }
     }, [onScan, onClose, cleanup]);

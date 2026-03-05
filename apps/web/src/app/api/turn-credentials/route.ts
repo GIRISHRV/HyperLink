@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * FINDING-015: TURN credentials served server-side so they never ship in the
@@ -11,12 +12,10 @@ import { NextResponse } from "next/server";
  * baked into the bundle.
  */
 export async function GET() {
-    // Optionally require auth — uncomment if you want to restrict TURN to
-    // signed-in users only (recommended once you move to a paid provider).
-    //
-    // const supabase = createClient();
-    // const { data: { user } } = await supabase.auth.getUser();
-    // if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Restrict TURN credentials to authenticated users to prevent anonymous abuse.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const iceServers: RTCIceServer[] = [
         // Always include at least two STUN servers

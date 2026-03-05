@@ -357,7 +357,7 @@ export function useReceiveTransfer({
           }
         );
       } catch (err: unknown) {
-        console.error("[RECEIVE] Initialization failed:", err);
+        logger.error({ err }, "[RECEIVE] Initialization failed:");
         if (isMountedCheck()) {
           const errMsg =
             err instanceof Error ? err.message : String(err);
@@ -438,7 +438,7 @@ export function useReceiveTransfer({
           title: cleanName,
         });
       } catch (e) {
-        console.error("Failed to pre-prepare share data:", e);
+        logger.error({ e }, "Failed to pre-prepare share data:");
       }
 
       dispatchTransfer({ type: "COMPLETE" });
@@ -447,21 +447,9 @@ export function useReceiveTransfer({
       notifyTransferComplete("received", pendingOffer.filename);
       if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
 
-      if (
-        "setAppBadge" in navigator &&
-        typeof (
-          navigator as Navigator & {
-            setAppBadge?: (count: number) => Promise<void>;
-          }
-        ).setAppBadge === "function"
-      ) {
-        (
-          navigator as Navigator & {
-            setAppBadge: (count: number) => Promise<void>;
-          }
-        )
-          .setAppBadge(1)
-          .catch(console.error);
+      if ("setAppBadge" in navigator) {
+        navigator.setAppBadge(1)
+          .catch((err: unknown) => logger.error({ err }, "[RECEIVE] setAppBadge failed:"));
       }
     });
 
@@ -626,7 +614,7 @@ export function useReceiveTransfer({
       const shareError = err as Error;
       if (shareError.name === "AbortError") return;
 
-      console.error("[Share] Failed:", shareError);
+      logger.error({ shareError }, "[Share] Failed:");
       logger.error(`✗ Share Error: ${shareError.name}`);
 
       setShowShareFallback(true);

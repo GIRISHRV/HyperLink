@@ -60,42 +60,42 @@ export default function ReceivedFileView({
               />
             </div>
           ) : /* Video Preview */
-          /\.(mp4|webm|ogg)$/i.test(receivedFile.name) ? (
-            <video
-              src={URL.createObjectURL(receivedFile.blob)}
-              controls
-              className="max-h-80 w-full rounded-sm relative z-10"
-            />
-          ) : /* PDF Preview */
-          /\.pdf$/i.test(receivedFile.name) ? (
-            <div
-              className="w-full h-80 bg-surface rounded-sm overflow-hidden relative group cursor-pointer border border-white/5 hover:border-primary/30 transition-colors"
-              onClick={onDownload}
-            >
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 group-hover:text-primary transition-colors z-10">
-                <span className="material-symbols-outlined text-7xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  picture_as_pdf
-                </span>
-                <span className="text-sm font-mono mt-2 uppercase tracking-widest text-white/50 group-hover:text-primary">
-                  PDF Document
-                </span>
-                <span className="text-[10px] mt-2 bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                  Click to Open
-                </span>
-              </div>
-              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-            </div>
-          ) : (
-            /* Generic File Icon */
-            <div className="h-40 w-full flex flex-col items-center justify-center text-gray-500 relative z-10">
-              <span className="material-symbols-outlined text-6xl opacity-50">
-                draft
-              </span>
-              <span className="text-xs font-mono mt-4 uppercase tracking-widest opacity-40">
-                Preview not available
-              </span>
-            </div>
-          )}
+            /\.(mp4|webm|ogg)$/i.test(receivedFile.name) ? (
+              <video
+                src={URL.createObjectURL(receivedFile.blob)}
+                controls
+                className="max-h-80 w-full rounded-sm relative z-10"
+              />
+            ) : /* PDF Preview */
+              /\.pdf$/i.test(receivedFile.name) ? (
+                <div
+                  className="w-full h-80 bg-surface rounded-sm overflow-hidden relative group cursor-pointer border border-white/5 hover:border-primary/30 transition-colors"
+                  onClick={onDownload}
+                >
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 group-hover:text-primary transition-colors z-10">
+                    <span className="material-symbols-outlined text-7xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                      picture_as_pdf
+                    </span>
+                    <span className="text-sm font-mono mt-2 uppercase tracking-widest text-white/50 group-hover:text-primary">
+                      PDF Document
+                    </span>
+                    <span className="text-xs mt-2 bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                      Click to Open
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+                </div>
+              ) : (
+                /* Generic File Icon */
+                <div className="h-40 w-full flex flex-col items-center justify-center text-gray-500 relative z-10">
+                  <span className="material-symbols-outlined text-6xl opacity-50">
+                    draft
+                  </span>
+                  <span className="text-xs font-mono mt-4 uppercase tracking-widest opacity-40">
+                    Preview not available
+                  </span>
+                </div>
+              )}
         </div>
       )}
 
@@ -114,11 +114,10 @@ export default function ReceivedFileView({
           <div className="flex flex-col gap-2">
             <button
               onClick={onShare}
-              className={`h-14 px-6 border transition-all active:scale-[0.95] flex items-center justify-center z-10 ${
-                showShareFallback
-                  ? "bg-surface border-white/10 text-white/50"
-                  : "bg-[#2d2b1f] border-primary/30 text-primary hover:bg-primary/10"
-              }`}
+              className={`h-14 px-6 border transition-all active:scale-[0.95] flex items-center justify-center z-10 ${showShareFallback
+                ? "bg-surface border-white/10 text-white/50"
+                : "bg-surface-inset border-primary/30 text-primary hover:bg-primary/10"
+                }`}
               title="Share Locally"
             >
               <span className="material-symbols-outlined">share</span>
@@ -127,7 +126,7 @@ export default function ReceivedFileView({
             {showShareFallback && (
               <button
                 onClick={onTextShareFallback}
-                className="h-10 px-4 bg-primary/20 border border-primary/40 text-primary text-[10px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-2"
+                className="h-10 px-4 bg-primary/20 border border-primary/40 text-primary text-xs font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-2"
               >
                 Share as Link
               </button>

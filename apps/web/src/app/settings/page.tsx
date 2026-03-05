@@ -9,6 +9,7 @@ import { Ripple } from "@/components/ripple";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
 import { toast } from "sonner";
+import { logger } from "@repo/utils";
 
 const AVATAR_ICONS = [
   "person",
@@ -90,7 +91,7 @@ export default function SettingsPage() {
       setSaved(true); // Re-added setSaved(true) as it was likely an oversight in the instruction
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {
-      console.error("Failed to save profile:", error);
+      logger.error({ error }, "Failed to save profile:");
       toast.error("Failed to save settings. Please try again.");
     } finally {
       setSaving(false);

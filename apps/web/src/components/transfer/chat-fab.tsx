@@ -9,7 +9,7 @@ export default function ChatFAB({ hasUnread, onClick }: ChatFABProps) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-6 right-6 z-40 bg-primary text-black p-4 rounded-full shadow-xl hover:scale-110 transition-transform flex items-center justify-center border-2 border-[#121212]"
+      className="fixed bottom-6 right-6 z-40 bg-primary text-black p-4 rounded-full shadow-xl hover:scale-110 transition-transform flex items-center justify-center border-2 border-background-dark"
     >
       <span className="material-symbols-outlined text-2xl">forum</span>
       {hasUnread && (

@@ -128,7 +128,7 @@ export class FileSender {
       // Sanity check
       if (this.totalChunks <= 0) {
         cleanup();
-        this.sendComplete().catch(console.error);
+        this.sendComplete().catch(err => logger.error({ err }, "[SENDER] sendComplete failed"));
         resolve();
         return;
       }
@@ -219,10 +219,10 @@ export class FileSender {
 
     // While we have chunks left AND window has space
     while (this.currentChunk < this.totalChunks && this.activeChunks < WINDOW_SIZE) {
-      // Check backpressure - if PeerJS buffer is too full, stop pushing
-      // @ts-ignore - bufferedAmount exists on DataConnection but might be missing in types
-      const conn = this.connection as unknown as { dataChannel: { bufferedAmount: number } };
-      const bufferedAmount = conn.dataChannel?.bufferedAmount || 0;
+      // Check backpressure — stop pushing if the WebRTC DataChannel buffer is saturated.
+      // PeerJS exposes dataChannel on DataConnection at runtime; we cast to access it.
+      const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
+      const bufferedAmount = peerConn.dataChannel?.bufferedAmount ?? 0;
 
       if (bufferedAmount > MAX_BUFFERED_AMOUNT) {
         // Wait for buffer to drain (simple retry via timeout or just wait for next ACK)
@@ -256,7 +256,7 @@ export class FileSender {
       arrayBuffer = await this.file.slice(start, end).arrayBuffer();
     } catch (e) {
       logger.error({ e, chunkIndex }, "[SENDER] File read error");
-      this.sendError("File read error").catch(console.error);
+      this.sendError("File read error").catch(err => logger.error({ err }, "[SENDER] sendError failed"));
       this.rejectTransfer?.(new Error("File read error"));
       return;
     }

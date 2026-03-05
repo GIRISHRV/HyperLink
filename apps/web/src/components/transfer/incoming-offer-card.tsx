@@ -33,7 +33,7 @@ export default function IncomingOfferCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className="text-[10px] font-bold bg-bauhaus-blue/20 text-bauhaus-blue px-2 py-1 uppercase tracking-wider border border-bauhaus-blue/30">
+          <span className="text-xs font-bold bg-bauhaus-blue/20 text-bauhaus-blue px-2 py-1 uppercase tracking-wider border border-bauhaus-blue/30">
             Action Required
           </span>
         </div>

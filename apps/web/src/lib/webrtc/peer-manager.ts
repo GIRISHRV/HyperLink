@@ -222,16 +222,18 @@ export class PeerManager {
         } else if (state === "connected" || state === "completed") {
           // Log the selected candidate pair to see if TURN was used
           pc.getStats(null).then((stats: RTCStatsReport) => {
-            stats.forEach((report: any) => {
-              if (report.type === "candidate-pair" && report.state === "succeeded") {
-                logger.info({
-                  local: report.localCandidateId,
-                  remote: report.remoteCandidateId,
-                  report
-                }, "[ICE] Connected using candidate pair");
+            stats.forEach((report: RTCStats) => {
+              if (report.type === "candidate-pair") {
+                const pair = report as RTCIceCandidatePairStats;
+                if (pair.state === "succeeded") {
+                  logger.info({
+                    local: pair.localCandidateId,
+                    remote: pair.remoteCandidateId,
+                  }, "[ICE] Connected using candidate pair");
+                }
               }
             });
-          });
+          }).catch((e: unknown) => logger.error({ e }, "[ICE] getStats failed"));
         }
       });
 

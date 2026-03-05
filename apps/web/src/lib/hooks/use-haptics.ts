@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { logger } from '@repo/utils';
 
 type HapticPattern = 'success' | 'error' | 'warning' | 'heavy' | 'medium' | 'light';
 
@@ -43,7 +44,7 @@ export function useHaptics() {
             navigator.vibrate(vibrationPattern);
         } catch (e) {
             // Ignore errors (some browsers might block it)
-            console.error('Haptic feedback failed:', e);
+            logger.error({ e }, 'Haptic feedback failed:');
         }
     }, []);
 

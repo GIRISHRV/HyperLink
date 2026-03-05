@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/lib/services/auth-service";
+import { logger } from "@repo/utils";
 import type { User } from "@supabase/supabase-js";
 
 /**
@@ -28,7 +29,7 @@ export function useRequireAuth() {
                 setLoading(false);
             })
             .catch(err => {
-                console.error("Auth check failed", err);
+                logger.error({ err }, "Auth check failed");
                 if (mounted) {
                     setLoading(false);
                 }

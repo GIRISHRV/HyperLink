@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { formatFileSize, validateFileSize } from "@repo/utils";
+import { formatFileSize, validateFileSize, logger } from "@repo/utils";
 import { zipFiles, getFilesFromDataTransferItems } from "@/lib/utils/zip-helper";
 import { useClipboardFile } from "@/lib/hooks/use-clipboard-file";
 
@@ -67,7 +67,7 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
           );
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          console.error("Zipping failed:", err);
+          logger.error({ err }, "Zipping failed:");
           setError("Failed to zip files. Browser memory might be full.");
           addLog(`✗ Zipping error: ${message}`);
         } finally {

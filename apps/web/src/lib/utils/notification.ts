@@ -1,9 +1,10 @@
 /**
  * Notification utilities for transfer completion
  */
+import { logger } from "@repo/utils";
 
 const createAudioContext = () => {
-  return new (window.AudioContext || (window as any).webkitAudioContext)();
+  return new (window.AudioContext || window.webkitAudioContext)();
 };
 
 const playTone = (
@@ -46,7 +47,7 @@ export function playSuccessSound(): void {
 
     setTimeout(() => ctx.close(), 500);
   } catch (e) {
-    console.warn("Could not play success sound:", e);
+    logger.warn({ e }, "Could not play success sound:");
   }
 }
 
@@ -64,7 +65,7 @@ export function playErrorSound(): void {
 
     setTimeout(() => ctx.close(), 600);
   } catch (e) {
-    console.warn("Could not play error sound:", e);
+    logger.warn({ e }, "Could not play error sound:");
   }
 }
 
@@ -81,7 +82,7 @@ export function playConnectionSound(): void {
 
     setTimeout(() => ctx.close(), 200);
   } catch (e) {
-    console.warn("Could not play connection sound:", e);
+    logger.warn({ e }, "Could not play connection sound:");
   }
 }
 
@@ -139,7 +140,7 @@ export function showTransferNotification(
       notification.close();
     };
   } catch (e) {
-    console.warn("Could not show notification:", e);
+    logger.warn({ e }, "Could not show notification:");
   }
 }
 

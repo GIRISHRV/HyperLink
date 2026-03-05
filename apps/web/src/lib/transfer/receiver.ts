@@ -318,7 +318,7 @@ export class FileReceiver {
       this.status = "cancelled";
       this.cancelCallback?.();
       // Clean up partial chunks from IndexedDB
-      clearTransfer(this.transferId).catch(console.error);
+      clearTransfer(this.transferId).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed"));
       return true;
     }
 
@@ -357,7 +357,7 @@ export class FileReceiver {
       logger.warn({ e }, "[RECEIVER] Failed to send cancel message");
     }
     // Clean up partial chunks from IndexedDB
-    clearTransfer(this.storageId || this.transferId).catch(console.error);
+    clearTransfer(this.storageId || this.transferId).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
     logger.info("[RECEIVER] Transfer cancelled");
   }
 

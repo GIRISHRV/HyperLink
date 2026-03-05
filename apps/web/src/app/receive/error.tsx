@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@repo/utils";
 
 export default function ReceiveError({
     error,
@@ -11,7 +12,7 @@ export default function ReceiveError({
     reset: () => void;
 }) {
     useEffect(() => {
-        console.error("Receive route error caught:", error);
+        logger.error({ error }, "Receive route error caught:");
     }, [error]);
 
     return (

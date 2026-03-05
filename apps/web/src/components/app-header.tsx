@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, getCurrentUser } from "@/lib/services/auth-service";
 import { useEffect, useState } from "react";
 import { getUserProfile } from "@/lib/services/profile-service";
-import { AVATAR_COLOR_MAP, DEFAULT_AVATAR_COLOR } from "@repo/utils";
+import { AVATAR_COLOR_MAP, DEFAULT_AVATAR_COLOR, logger } from "@repo/utils";
 import { Ripple } from "@/components/ripple";
 
 type HeaderVariant = "landing" | "app" | "transfer";
@@ -39,7 +39,7 @@ export default function AppHeader({ variant = "app", isPeerReady = false, status
         if (variant === "landing") {
             getCurrentUser().then(user => {
                 if (user) setIsAuthenticated(true);
-            }).catch(e => console.error("Failed to check auth for landing", e));
+            }).catch(e => logger.error({ e }, "Failed to check auth for landing"));
             return;
         }
 
@@ -53,14 +53,16 @@ export default function AppHeader({ variant = "app", isPeerReady = false, status
                             setAvatarColor(AVATAR_COLOR_MAP[profile.avatar_color] || DEFAULT_AVATAR_COLOR);
                         }
                     }
-                }).catch(e => console.error("Failed to load profile for header", e));
+                }).catch(e => logger.error({ e }, "Failed to load profile for header"));
             });
         }
 
         if (variant === "transfer") {
-            getCurrentUser().then(user => {
-                if (user?.email) setEmail(user.email);
-            });
+            getCurrentUser()
+                .then(user => {
+                    if (user?.email) setEmail(user.email);
+                })
+                .catch((e: unknown) => logger.error({ e }, "Failed to load user for transfer header"));
         }
     }, [variant]);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getUserTransferStats } from "@/lib/services/transfer-service";
+import { logger } from "@repo/utils";
 
 export interface TransferStats {
     totalBytes: number;
@@ -37,7 +38,7 @@ export function useTransferStats(userId?: string) {
                     setStats((prev) => ({ ...prev, isLoading: false }));
                 }
             } catch (error) {
-                console.error("Failed to fetch transfer stats", error);
+                logger.error({ error }, "Failed to fetch transfer stats");
                 setStats((prev) => ({ ...prev, isLoading: false }));
             }
         }
