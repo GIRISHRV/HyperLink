@@ -23,7 +23,7 @@ test.describe('Send Flow & Hooks Regressions', () => {
         // Note: E2E data mock needed for testing the DB completion hook (we fixed this in `use-send-transfer`)
     });
 
-    test('Transfer Status: Completes cleanly', async ({ page }) => {
+    test('Transfer Status: Completes cleanly', async () => {
         // Regression check for the `awaited` DB updates logic making it stick on "transferring"
         // E2E mock placeholder
     });

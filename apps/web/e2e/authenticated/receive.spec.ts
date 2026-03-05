@@ -17,7 +17,7 @@ test.describe('Receive Flow & Hooks Regressions', () => {
         expect(peerBubbles).toBe(1); // Should just be the receiver itself
     });
 
-    test('Transfer Status: Accepts connection and claims ownership', async ({ page }) => {
+    test('Transfer Status: Accepts connection and claims ownership', async () => {
         // Regression check for `claimTransferAsReceiver` being strictly awaited before WebRTC begins
         // E2E mock placeholder 
     });
