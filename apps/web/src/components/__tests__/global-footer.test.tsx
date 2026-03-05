@@ -5,14 +5,9 @@ import { render, screen } from "@testing-library/react";
 import { GlobalFooter } from "@/components/global-footer";
 
 describe("GlobalFooter", () => {
-    it("renders the HYPER brand text", () => {
+    it("renders the HYPERLINK brand text", () => {
         render(<GlobalFooter />);
-        expect(screen.getByText("HYPER")).toBeInTheDocument();
-    });
-
-    it("renders the LINK brand text", () => {
-        render(<GlobalFooter />);
-        expect(screen.getByText("LINK")).toBeInTheDocument();
+        expect(screen.getByText("HYPERLINK")).toBeInTheDocument();
     });
 
     it("renders the tagline", () => {

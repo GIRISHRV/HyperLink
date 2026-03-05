@@ -68,7 +68,7 @@ export default function TransferVisualizer({
           {isUplink ? "Uplink Active" : "Downlink Active"}
         </span>
         <span className="text-xs font-mono text-white/50">
-          CHANNEL_SECURE
+          E2E_ENCRYPTED
         </span>
       </div>
 
@@ -77,8 +77,8 @@ export default function TransferVisualizer({
           {isPaused
             ? "TRANSMISSION HALTED"
             : isUplink
-              ? "PACKETS_OUTBOUND..."
-              : "PACKETS_INBOUND..."}
+              ? "DATA_STREAM_OUT"
+              : "DATA_STREAM_IN"}
         </p>
         <div className="flex justify-end gap-1 mt-1">
           {[...Array(5)].map((_, i) => (

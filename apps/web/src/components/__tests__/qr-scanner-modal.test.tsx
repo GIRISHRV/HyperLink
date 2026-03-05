@@ -6,12 +6,12 @@ import QRScannerModal from "@/components/qr-scanner-modal";
 // Mock Html5Qrcode to avoid real camera access
 vi.mock("html5-qrcode", () => {
     return {
-        Html5Qrcode: vi.fn().mockImplementation(() => ({
-            start: vi.fn().mockResolvedValue(undefined),
-            stop: vi.fn().mockResolvedValue(undefined),
-            clear: vi.fn(),
-            getState: vi.fn().mockResolvedValue(1), // 1 = NOT_STARTED
-        })),
+        Html5Qrcode: vi.fn().mockImplementation(function (this: any) {
+            this.start = vi.fn().mockResolvedValue(undefined);
+            this.stop = vi.fn().mockResolvedValue(undefined);
+            this.clear = vi.fn();
+            this.getState = vi.fn().mockResolvedValue(1); // 1 = NOT_STARTED
+        }),
     };
 });
 

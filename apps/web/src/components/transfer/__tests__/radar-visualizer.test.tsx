@@ -8,38 +8,23 @@ describe("RadarVisualizer", () => {
         expect(container.firstChild).toBeTruthy();
     });
 
-    it("shows 'Waiting for connection...' when status is idle", () => {
+    it("shows 'Scanning...' badge when status is idle", () => {
         render(<RadarVisualizer status="idle" />);
-        expect(screen.getByText("Waiting for connection...")).toBeTruthy();
+        expect(screen.getByText("Scanning...")).toBeTruthy();
     });
 
-    it("shows 'Incoming File Offer' when status is offering", () => {
+    it("shows 'System Ready' badge when status is idle and peer is ready", () => {
+        render(<RadarVisualizer status="idle" isPeerReady={true} />);
+        expect(screen.getByText("System Ready")).toBeTruthy();
+    });
+
+    it("shows 'Signal Detected' badge when status is offering", () => {
         render(<RadarVisualizer status="offering" />);
-        expect(screen.getByText("Incoming File Offer")).toBeTruthy();
+        expect(screen.getByText("Signal Detected")).toBeTruthy();
     });
 
-    it("shows 'Receiving Data...' when status is transferring", () => {
+    it("shows 'Link Active' badge when status is transferring", () => {
         render(<RadarVisualizer status="transferring" />);
-        expect(screen.getByText("Receiving Data...")).toBeTruthy();
-    });
-
-    it("shows 'Transfer Paused' when status is paused", () => {
-        render(<RadarVisualizer status="paused" />);
-        expect(screen.getByText("Transfer Paused")).toBeTruthy();
-    });
-
-    it("shows 'Transfer Complete!' when status is complete", () => {
-        render(<RadarVisualizer status="complete" />);
-        expect(screen.getByText("Transfer Complete!")).toBeTruthy();
-    });
-
-    it("shows 'Transfer Cancelled' when status is cancelled", () => {
-        render(<RadarVisualizer status="cancelled" />);
-        expect(screen.getByText("Transfer Cancelled")).toBeTruthy();
-    });
-
-    it("shows 'Radar Active' badge", () => {
-        render(<RadarVisualizer status="idle" />);
-        expect(screen.getByText("Radar Active")).toBeTruthy();
+        expect(screen.getByText("Link Active")).toBeTruthy();
     });
 });

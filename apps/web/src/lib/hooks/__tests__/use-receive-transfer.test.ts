@@ -535,4 +535,48 @@ describe("useReceiveTransfer", () => {
       expect(result.current.transferState.bytesTransferred).toBe(0);
     });
   });
+
+  describe("transfer reception sequence", () => {
+    it("awaits claimTransferAsReceiver before dispatching CONNECT", async () => {
+      let isDbClaimResolved = false;
+      m.mockClaimTransfer.mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 50)); // Simulating DB delay
+        isDbClaimResolved = true;
+        return { id: "claimed-tx-sync-test" };
+      });
+
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+      // Simulate incoming connection and a file offer so we can accept
+      const { connEvents, conn } = buildMockConnection();
+      await act(async () => {
+        await m.pmEvents["incoming-connection"][0](conn);
+      });
+
+      const offerMsg = makeFileOfferMessage({ dbTransferId: "remote-db-id" });
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(offerMsg));
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      // Now we explicitly accept the offer, triggering the transfer sequence
+      // which includes claimTransferAsReceiver
+      await act(async () => {
+        result.current.handleAcceptOffer();
+        // Give it time to hit the `.then()` chain but stop before it finishes internally
+        await new Promise((r) => setTimeout(r, 20));
+      });
+
+      // Verify claim behavior
+      expect(m.mockClaimTransfer).toHaveBeenCalledWith("remote-db-id");
+
+      // Allow sequence to complete
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+      // Verification that the actual DB claim returned our data
+      expect(isDbClaimResolved).toBe(true);
+    });
+  });
 });

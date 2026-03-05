@@ -26,15 +26,17 @@ test("complete file transfer between two authenticated peers", async () => {
     test.setTimeout(90_000);
 
     // Create two independent browser contexts from the same saved auth session
-    const browser = await chromium.launch();
+    const browser = await chromium.launch({ slowMo: 1000 });
 
     const receiverContext = await browser.newContext({
         storageState: RECEIVER_AUTH_FILE,
         baseURL: "http://localhost:3000",
+        recordVideo: { dir: "test-results/transfer-videos/receiver/" }
     });
     const senderContext = await browser.newContext({
         storageState: AUTH_FILE,
         baseURL: "http://localhost:3000",
+        recordVideo: { dir: "test-results/transfer-videos/sender/" }
     });
 
     const receiverPage = await receiverContext.newPage();
@@ -61,7 +63,7 @@ test("complete file transfer between two authenticated peers", async () => {
         // Wait for WebRTC to initialize on sender side too
         const statusSpan = senderPage
             .locator("span")
-            .filter({ hasText: /^(WEBRTC_READY|INITIALIZING)$/ })
+            .filter({ hasText: /^System Ready$/ })
             .first();
         await expect(statusSpan).toBeVisible({ timeout: 20_000 });
 

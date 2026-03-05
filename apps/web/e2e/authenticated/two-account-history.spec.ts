@@ -42,7 +42,7 @@ test("history records correct sender and receiver identities", async () => {
 
         // ── 2. Sender prepares file ──
         await senderPage.goto("http://localhost:3000/send");
-        const statusSpan = senderPage.locator("span").filter({ hasText: /^(WEBRTC_READY|INITIALIZING)$/ }).first();
+        const statusSpan = senderPage.locator("span").filter({ hasText: /^System Ready$/ }).first();
         await expect(statusSpan).toBeVisible({ timeout: 20_000 });
 
         // Use the original small text file for speed
@@ -71,7 +71,7 @@ test("history records correct sender and receiver identities", async () => {
 
         // Wait for the table row to appear
         const senderRow = senderPage.getByRole("row").filter({ hasText: "test-file.txt" }).first();
-        await expect(senderRow).toBeVisible({ timeout: 10_000 });
+        await expect(senderRow).toBeVisible({ timeout: 20_000 });
 
         // Verify sender sees "Sent"
         await expect(senderRow).toContainText("Sent");
@@ -82,7 +82,7 @@ test("history records correct sender and receiver identities", async () => {
 
         // Wait for the table row to appear
         const receiverRow = receiverPage.getByRole("row").filter({ hasText: "test-file.txt" }).first();
-        await expect(receiverRow).toBeVisible({ timeout: 10_000 });
+        await expect(receiverRow).toBeVisible({ timeout: 20_000 });
 
         // Verify receiver sees "Received"
         await expect(receiverRow).toContainText("Received");

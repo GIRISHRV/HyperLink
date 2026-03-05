@@ -331,8 +331,6 @@ export function useSendTransfer({
               type: "START_TRANSFER",
               totalBytes: file.size,
             });
-            if (dbTransferId)
-              updateTransferStatus(dbTransferId, "transferring");
           }
           dispatchTransfer({
             type: "PROGRESS",
@@ -354,13 +352,13 @@ export function useSendTransfer({
             );
           }
         })
-        .then(() => {
+        .then(async () => {
           addLog("✓ Transfer complete");
           dispatchTransfer({ type: "COMPLETE" });
           vibrate("success");
           playSuccessSound();
           if (dbTransferId)
-            updateTransferStatus(dbTransferId, "complete");
+            await updateTransferStatus(dbTransferId, "complete");
           if ("setAppBadge" in navigator) {
             navigator.setAppBadge(1)
               .catch((err: unknown) => logger.error({ err }, "[SEND] setAppBadge failed:"));

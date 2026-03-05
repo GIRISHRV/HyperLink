@@ -28,14 +28,19 @@ describe("TransferVisualizer", () => {
         expect(screen.getByText("TRANSMISSION HALTED")).toBeTruthy();
     });
 
-    it("shows 'PACKETS_OUTBOUND...' when uplink active", () => {
+    it("shows 'DATA_STREAM_OUT' when uplink active", () => {
         render(<TransferVisualizer isPaused={false} direction="uplink" />);
-        expect(screen.getByText("PACKETS_OUTBOUND...")).toBeTruthy();
+        expect(screen.getByText("DATA_STREAM_OUT")).toBeTruthy();
     });
 
-    it("shows 'PACKETS_INBOUND...' when downlink active", () => {
+    it("shows 'DATA_STREAM_IN' when downlink active", () => {
         render(<TransferVisualizer isPaused={false} direction="downlink" />);
-        expect(screen.getByText("PACKETS_INBOUND...")).toBeTruthy();
+        expect(screen.getByText("DATA_STREAM_IN")).toBeTruthy();
+    });
+
+    it("shows 'E2E_ENCRYPTED' explicitly", () => {
+        render(<TransferVisualizer isPaused={false} direction="downlink" />);
+        expect(screen.getByText("E2E_ENCRYPTED")).toBeTruthy();
     });
 
     it("shows upload icon for uplink", () => {

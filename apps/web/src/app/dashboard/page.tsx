@@ -55,7 +55,7 @@ export default function DashboardPage() {
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
         </div>
 
-        <div className="max-w-[1600px] mx-auto relative z-10">
+        <div className="max-w-7xl mx-auto relative z-10">
           {/* Header Skeleton */}
           <div className="flex items-center justify-between mb-8 animate-pulse">
             <div className="flex items-center gap-3">
@@ -138,7 +138,7 @@ export default function DashboardPage() {
       <AppHeader variant="app" />
 
       {/* Main Dashboard */}
-      <main className="relative z-10 flex-1 w-full max-w-[1600px] mx-auto p-6 md:p-8 lg:p-12">
+      <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto p-6 md:p-8 lg:p-12">
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* LEFT COLUMN (Actions) - Spans 8 cols */}
@@ -159,13 +159,13 @@ export default function DashboardPage() {
                     <span className="material-symbols-outlined text-bauhaus-blue text-3xl">cloud_upload</span>
                     <span className="text-sm">P2P encrypted transfer ready</span>
                   </div>
-                  <Link href="/send">
-                    <Button className="relative overflow-hidden" size="lg">
+                  <Button className="relative overflow-hidden" size="lg">
+                    <Link href="/send">
                       <span className="relative z-10">Go to Send</span>
                       <span className="material-symbols-outlined text-lg relative z-10">arrow_forward</span>
                       <Ripple color="rgba(0,0,0,0.2)" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -178,12 +178,12 @@ export default function DashboardPage() {
                   <p className="text-gray-400 text-sm">Enter the secure key provided by the sender to establish connection.</p>
                 </div>
                 <div className="flex-1 w-full flex justify-end">
-                  <Link href="/receive">
-                    <Button variant="outline" className="relative overflow-hidden whitespace-nowrap" size="lg">
+                  <Button variant="outline" className="relative overflow-hidden whitespace-nowrap" size="lg">
+                    <Link href="/receive">
                       <span className="relative z-10">Go to Receive</span>
                       <Ripple />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -195,11 +195,11 @@ export default function DashboardPage() {
             <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-primary relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Lifetime Data</h3>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Data Moved</h3>
                   <span className="material-symbols-outlined text-primary">analytics</span>
                 </div>
-                <p className="font-black text-5xl text-white uppercase tracking-tight">
-                  {(totalShared / 1e9).toFixed(1)} <span className="text-2xl text-gray-500 font-normal ml-1">GB</span>
+                <p data-testid="data-moved-value" className="font-black text-5xl text-white uppercase tracking-tight">
+                  {formatFileSize(totalShared)}
                 </p>
                 <div className="mt-4 flex items-center gap-2 text-xs text-green-400">
                   <span className="material-symbols-outlined text-sm">trending_up</span>
@@ -230,13 +230,13 @@ export default function DashboardPage() {
           <div className="lg:col-span-12 mt-4">
             <div className="flex items-end justify-between mb-6 border-b border-white/10 pb-2">
               <h3 className="font-black text-xl text-white uppercase tracking-tight">Recent Activity</h3>
-              <Link href="/history">
-                <Button variant="ghost" size="sm" className="relative overflow-hidden">
+              <Button variant="ghost" size="sm" className="relative overflow-hidden text-gray-400 hover:text-white">
+                <Link href="/history">
                   <span className="relative z-10">View All History</span>
                   <span className="material-symbols-outlined text-sm relative z-10">arrow_right_alt</span>
                   <Ripple />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
             <div className="bg-surface-elevated rounded-none overflow-hidden">
               {/* Table Header */}

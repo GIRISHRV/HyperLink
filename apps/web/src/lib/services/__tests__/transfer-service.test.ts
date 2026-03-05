@@ -258,13 +258,17 @@ describe("Transfer Service", () => {
   // ─── getUserTransferStats ─────────────────────────────────────────────
 
   describe("getUserTransferStats", () => {
-    it("returns stats from RPC", async () => {
+    it("returns stats from RPC and is called with NO parameters (SEC-007)", async () => {
       mockSupabase.rpc.mockResolvedValue({
         data: [{ total_transfers: 5, total_bytes_sent: 1048576 }],
         error: null,
       });
 
       const stats = await getUserTransferStats();
+      expect(mockSupabase.rpc).toHaveBeenCalledWith("get_user_transfer_stats");
+      // Check it was called with exactly 1 argument (the function name), enforcing IDOR mitigation
+      expect(mockSupabase.rpc.mock.calls[0].length).toBe(1);
+
       expect(stats.totalTransfers).toBe(5);
       expect(stats.totalBytesSent).toBe(1048576);
     });

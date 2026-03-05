@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRequireAuth } from "@/lib/hooks/use-require-auth";
 import { useReceiveTransfer } from "@/lib/hooks/use-receive-transfer";
 import { useChat } from "@/lib/hooks/use-chat";
@@ -16,6 +16,7 @@ import TransferProgressPanel from "@/components/transfer/transfer-progress-panel
 import TransferVisualizer from "@/components/transfer/transfer-visualizer";
 import PeerIdCard from "@/components/transfer/peer-id-card";
 import RadarVisualizer from "@/components/transfer/radar-visualizer";
+import TerminalLog from "@/components/transfer/terminal-log";
 import ReceivedFileView from "@/components/transfer/received-file-view";
 import IncomingOfferCard from "@/components/transfer/incoming-offer-card";
 import DiagnosticPanel from "@/components/transfer/diagnostic-panel";
@@ -29,6 +30,15 @@ export default function ReceivePage() {
 
   // --- Chat hook ---
   const chat = useChat(user?.id);
+
+  const [logs, setLogs] = useState<string[]>([
+    "[SYS] Terminal initialized",
+    "[SYS] Awaiting incoming connection",
+  ]);
+
+  const addLog = useCallback((message: string) => {
+    setLogs((prev) => [...prev, message]);
+  }, []);
 
   // --- Receive transfer hook ---
   const {
@@ -63,7 +73,15 @@ export default function ReceivePage() {
   } = useReceiveTransfer({
     user,
     onData: chat.handleIncomingData,
+    onLog: addLog,
   });
+
+  // Auto-close QR Modal if an offer or password prompt comes in
+  useEffect(() => {
+    if (transferState.status === "offering" || showPasswordModal) {
+      setShowMyQRModal(false);
+    }
+  }, [transferState.status, showPasswordModal]);
 
   return (
     <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
@@ -94,8 +112,6 @@ export default function ReceivePage() {
                   <div className="flex items-center gap-2 text-muted font-mono text-sm">
                     <span className="material-symbols-outlined text-sm">lock</span>
                     <span>/secure_channel/receive</span>
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2"></span>
-                    <span className="text-green-500">WEBRTC_ACTIVE</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -115,13 +131,13 @@ export default function ReceivePage() {
               </div>
             ) : (
               /* === IDLE / OFFERING / COMPLETE / CANCELLED / ERROR (Standard Grid) === */
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 w-full flex-1">
                 {/* Left Column */}
-                <section className="lg:col-span-5 flex flex-col gap-8">
+                <section className="flex flex-col gap-8">
                   {/* Header */}
                   <div className="space-y-2">
                     <h1 className="text-5xl md:text-6xl font-black tracking-tighter uppercase leading-none">
-                      Receive <span className="text-primary">Files</span>
+                      Ready to <span className="text-primary">Receive</span>
                     </h1>
                     <p className="text-muted text-lg font-medium max-w-md">
                       Securely receive encrypted files directly to your device via WebRTC.
@@ -146,7 +162,11 @@ export default function ReceivePage() {
                     </div>
                   </div>
 
-                  {/* Incoming Queue */}
+                  <RadarVisualizer status={transferState.status} isPeerReady={!!myPeerId} className="flex-1" />
+                </section>
+
+                {/* Right Column */}
+                <section className="flex flex-col gap-8 h-full">
                   <div className="flex flex-col gap-4">
                     <h3 className="text-muted text-xs font-bold uppercase tracking-wider border-b border-subtle-bauhaus pb-2">
                       Incoming Queue
@@ -209,10 +229,9 @@ export default function ReceivePage() {
                       />
                     )}
                   </div>
-                </section>
 
-                {/* Right Column: Radar Visualizer */}
-                <RadarVisualizer status={transferState.status} />
+                  <TerminalLog logs={logs} className="flex-1 min-h-[250px]" />
+                </section>
               </div>
             )}
           </div>
@@ -261,21 +280,23 @@ export default function ReceivePage() {
         peerId={activeConnectionRef.current?.peer || "sender"}
       />
 
-      {transferState.status !== "idle" && (
-        <ChatFAB
-          hasUnread={chat.hasUnread}
-          onClick={() => {
-            chat.setIsChatOpen(true);
-            chat.setHasUnread(false);
-          }}
-        />
-      )}
+      {
+        transferState.status !== "idle" && (
+          <ChatFAB
+            hasUnread={chat.hasUnread}
+            onClick={() => {
+              chat.setIsChatOpen(true);
+              chat.setHasUnread(false);
+            }}
+          />
+        )
+      }
 
       <QRCodeModal
         isOpen={showMyQRModal}
         peerId={myPeerId}
         onClose={() => setShowMyQRModal(false)}
       />
-    </div>
+    </div >
   );
 }

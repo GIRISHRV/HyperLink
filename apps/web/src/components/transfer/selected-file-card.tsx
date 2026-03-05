@@ -56,32 +56,32 @@ export default function SelectedFileCard({
       </div>
 
       <style jsx>{`
-        .corner-fold {
-          clip-path: polygon(
-            0 0,
-            calc(100% - 48px) 0,
-            100% 48px,
-            100% 100%,
-            0 100%
+  .corner - fold {
+  clip - path: polygon(
+    0 0,
+    calc(100 % - 48px) 0,
+    100 % 48px,
+    100 % 100 %,
+    0 100 %
           );
-          position: relative;
-        }
-        .corner-fold::after {
-          content: "";
-          position: absolute;
-          top: 0;
-          right: 0;
-          width: 48px;
-          height: 48px;
-          background: linear-gradient(
-            to bottom left,
-            transparent 50%,
-            rgba(255, 255, 255, 0.15) 50%,
-            rgba(0, 0, 0, 0.3) 100%
+  position: relative;
+}
+        .corner - fold::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  background: linear - gradient(
+    to bottom left,
+    transparent 50 %,
+    rgba(255, 255, 255, 0.15) 50 %,
+    rgba(0, 0, 0, 0.3) 100 %
           );
-          pointer-events: none;
-        }
-      `}</style>
+  pointer - events: none;
+}
+`}</style>
     </div>
   );
 }

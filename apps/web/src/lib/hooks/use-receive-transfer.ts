@@ -41,11 +41,13 @@ export interface PendingOffer {
 interface UseReceiveTransferOptions {
   user: { id: string } | null;
   onData?: (data: unknown) => void;
+  onLog?: (msg: string) => void;
 }
 
 export function useReceiveTransfer({
   user,
   onData,
+  onLog,
 }: UseReceiveTransferOptions) {
   const {
     state: transferState,
@@ -263,6 +265,7 @@ export function useReceiveTransfer({
             dispatchTransfer({ type: "CONNECT" });
             setError("");
             setProgress(null);
+            onLog?.("[SYS] Peer connected");
             logger.info(
               "[CONNECTION] Incoming peer connection detected"
             );
@@ -303,6 +306,7 @@ export function useReceiveTransfer({
               const message = data as PeerMessage;
 
               if (message.type === "file-offer") {
+                onLog?.("[SYS] File offer received");
                 logger.info(
                   { message },
                   "[RECEIVE] 🎯 FILE-OFFER received"
@@ -408,7 +412,7 @@ export function useReceiveTransfer({
       setProgress(progressData);
     });
 
-    receiver.onComplete((blob) => {
+    receiver.onComplete(async (blob) => {
       setReceivedFile({
         name: pendingOffer.filename,
         size: pendingOffer.fileSize,
@@ -445,20 +449,22 @@ export function useReceiveTransfer({
       vibrate("success");
       playSuccessSound();
       notifyTransferComplete("received", pendingOffer.filename);
-      if (dbTransferId) updateTransferStatus(dbTransferId, "complete");
+      if (dbTransferId) await updateTransferStatus(dbTransferId, "complete");
 
       if ("setAppBadge" in navigator) {
         navigator.setAppBadge(1)
           .catch((err: unknown) => logger.error({ err }, "[RECEIVE] setAppBadge failed:"));
       }
+      onLog?.("[SYS] Transfer complete");
     });
 
-    receiver.onCancel(() => {
+    receiver.onCancel(async () => {
       dispatchTransfer({ type: "CANCEL" });
       logger.info("[CANCEL] Transfer cancelled by sender");
+      onLog?.("[SYS] Transfer cancelled by peer");
       vibrate("error");
       playErrorSound();
-      if (dbTransferId) updateTransferStatus(dbTransferId, "cancelled");
+      if (dbTransferId) await updateTransferStatus(dbTransferId, "cancelled");
     });
 
     receiver.onPauseChange((paused) => {
@@ -474,10 +480,12 @@ export function useReceiveTransfer({
     receiver.onError((recvError) => {
       if (recvError === "DECRYPTION_FAILED") {
         setError("Incorrect password. The transfer was cancelled.");
+        onLog?.("[ERR] Decryption failed. Incorrect password.");
       } else {
         const msg =
           typeof recvError === "string" ? recvError : recvError.message;
         setError(`Transfer error: ${msg}`);
+        onLog?.(`[ERR] ${msg}`);
       }
     });
 
@@ -510,6 +518,18 @@ export function useReceiveTransfer({
     });
     setPendingOffer(null);
 
+    // If we have existing chunks from a prior crash, tell sender to skip ahead
+    fileReceiverRef.current?.sendResumeFrom();
+
+    if (senderDbId) {
+      const claimed = await claimTransferAsReceiver(senderDbId);
+      if (claimed) {
+        dbTransferId = claimed.id;
+        setTransferId(claimed.id);
+        await updateTransferStatus(claimed.id, "transferring");
+      }
+    }
+
     // Give the receiver a moment to fully initialize before sending acceptance
     await new Promise((resolve) => setTimeout(resolve, 100));
     logger.info(
@@ -524,18 +544,6 @@ export function useReceiveTransfer({
     };
     connection.send(acceptMessage);
     logger.info("[RECEIVE PAGE] file-accept message sent");
-
-    // If we have existing chunks from a prior crash, tell sender to skip ahead
-    fileReceiverRef.current?.sendResumeFrom();
-
-    if (senderDbId) {
-      const claimed = await claimTransferAsReceiver(senderDbId);
-      if (claimed) {
-        dbTransferId = claimed.id;
-        setTransferId(claimed.id);
-        await updateTransferStatus(claimed.id, "transferring");
-      }
-    }
   }
 
   async function handleAcceptOffer() {

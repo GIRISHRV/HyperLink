@@ -285,7 +285,7 @@ export default function HistoryPage() {
                 </>
               ) : filteredTransfers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12">
+                  <td colSpan={6} className="py-12">
                     <div className="flex justify-center">
                       <EmptyState
                         title="No Transfers Found"

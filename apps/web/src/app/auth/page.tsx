@@ -8,12 +8,19 @@ import { getSafeRedirect } from "@/lib/utils/auth-redirect";
 import { logger } from "@repo/utils";
 
 const MIN_PASSWORD_LENGTH = 8;
-const MAX_FAILED_ATTEMPTS = 5;
 
 /** SEC-005: Normalize Supabase error messages to prevent user enumeration */
 function normalizeAuthError(message: string): string {
   const lower = message.toLowerCase();
-  if (lower.includes("invalid login credentials") || lower.includes("invalid email or password")) {
+  if (
+    lower.includes("invalid login credentials") ||
+    lower.includes("invalid email or password") ||
+    lower.includes("invalid login") ||
+    lower.includes("invalid_credentials") ||
+    lower.includes("invalid_grant") ||
+    lower.includes("authentication failed") ||
+    lower.includes('"error_code":"invalid_credentials"') // for stringified error objects
+  ) {
     return "Invalid email or password.";
   }
   if (lower.includes("email not confirmed")) {
@@ -45,8 +52,8 @@ export default function AuthPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // SEC-004: Client-side rate limiting
-  const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState(0);
+  const [lockoutCountdown] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -106,36 +113,65 @@ export default function AuthPage() {
 
     try {
       if (showForgotPassword) {
-        const { error } = await resetPassword(email);
-        if (error) throw error;
+        await resetPassword(email);
         setSuccess("Password reset link sent to your email!");
         setShowForgotPassword(false);
       } else if (useMagicLink) {
-        const { error } = await signInWithMagicLink(email);
-        if (error) throw error;
+        await signInWithMagicLink(email);
         setSuccess("Check your email for the magic link!");
       } else if (isSignUp) {
-        const { error } = await signUp(email, password);
-        if (error) throw error;
+        const { data, error } = await signUp(email, password);
+        if (error || !data?.user) {
+          setError(normalizeAuthError(error?.message ?? ""));
+          setLoading(false);
+          return;
+        }
         setSuccess("Account created! Redirecting...");
         router.replace(getRedirect());
       } else {
-        const { error } = await signIn(email, password);
-        if (error) throw error;
+        const { data, error } = await signIn(email, password);
+        if (error || !data?.user) {
+          setError(normalizeAuthError(error?.message ?? ""));
+          setLoading(false);
+          return;
+        }
         router.replace(getRedirect());
       }
-      setFailedAttempts(0);
+      setLockoutUntil(0); // Reset lockout after successful login
     } catch (err: unknown) {
       logger.error({ err }, "Auth error:");
+      // Debug: log the raw error object to console for normalization tuning
+      // eslint-disable-next-line no-console
+      console.log('Supabase error (raw):', err);
       // SEC-004: Exponential backoff after repeated failures
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      if (newAttempts >= MAX_FAILED_ATTEMPTS) {
-        const backoffMs = Math.min(1000 * Math.pow(2, newAttempts - MAX_FAILED_ATTEMPTS), 60000);
+      // Remove failedAttempts logic, just set lockout
+      if (lockoutUntil === 0) {
+        setLockoutUntil(Date.now() + 3000); // Initial lockout duration
+      } else {
+        const backoffMs = Math.min((lockoutUntil - Date.now()) * 2, 60000);
         setLockoutUntil(Date.now() + backoffMs);
       }
-      // SEC-005: Normalize error messages
-      const message = err instanceof Error ? err.message : "Authentication failed";
+      // SEC-005: Normalize error messages — robustly extract message from thrown Supabase error objects
+      let message = "Authentication failed";
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (err && typeof err === "object") {
+        // Supabase returns error objects with a `message` property; handle that shape
+        const maybe = err as { message?: unknown };
+        if (maybe.message && typeof maybe.message === "string") {
+          message = maybe.message;
+        } else {
+          // Fall back to stringifying the whole object so normalization can inspect it
+          try {
+            message = JSON.stringify(err);
+          } catch {
+            message = String(err);
+          }
+        }
+      } else if (typeof err === "string") {
+        message = err;
+      }
+
       setError(normalizeAuthError(message));
     } finally {
       setLoading(false);
@@ -247,6 +283,9 @@ export default function AuthPage() {
               {error && (
                 <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 px-4 py-3">
                   <p className="text-sm text-bauhaus-red font-medium">{error}</p>
+                  {lockoutCountdown > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">Locked out for {lockoutCountdown}s</p>
+                  )}
                 </div>
               )}
               {success && (
@@ -257,10 +296,10 @@ export default function AuthPage() {
 
               {/* Submit Button */}
               <button
-                className="w-full bg-bauhaus-blue hover:bg-blue-600 text-white font-bold h-14 flex items-center justify-center gap-3 group transition-all duration-300 uppercase tracking-wider text-sm relative overflow-hidden"
+                className={`w-full bg-bauhaus-blue hover:bg-blue-600 text-white font-bold h-14 flex items-center justify-center gap-3 group transition-all duration-300 uppercase tracking-wider text-sm relative overflow-hidden${lockoutUntil > Date.now() ? ' opacity-60 cursor-not-allowed' : ''}`}
                 type="submit"
-                disabled={loading}
-              >
+                disabled={loading || lockoutUntil > Date.now()}
+            >
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
                 <span className="relative z-10">
                   {loading

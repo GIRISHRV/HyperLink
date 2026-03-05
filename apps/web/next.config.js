@@ -21,7 +21,7 @@ const peerConnectSrc = isLocalPeer
   ? `http://${peerHost}:${peerPort} ws://${peerHost}:${peerPort}`
   : `https://${peerHost} wss://${peerHost}`;
 
-import packageJson from "./package.json" assert { type: "json" };
+import packageJson from "./package.json" with { type: "json" };
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
