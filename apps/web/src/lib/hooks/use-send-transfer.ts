@@ -389,7 +389,6 @@ export function useSendTransfer({
           }
         })
         .catch((err) => {
-          console.log("DEBUG_ERROR_INNER", err);
           const errorMsg = err instanceof Error ? err.message : String(err);
           if (
             errorMsg === "Transfer cancelled by receiver" ||
@@ -412,7 +411,6 @@ export function useSendTransfer({
             updateTransferStatus(dbTransferId, "failed");
         });
     } catch (err: unknown) {
-      console.log("DEBUG_ERROR_OUTER", err);
       const errMsg = err instanceof Error ? err.message : "Unknown error occurred";
       logger.error({ err }, "Transfer failed:");
       if (errMsg.includes("peer-unavailable")) {

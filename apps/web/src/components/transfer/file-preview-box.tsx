@@ -11,11 +11,6 @@ export default function FilePreviewBox({ file }: FilePreviewBoxProps) {
   const [textFilePreview, setTextFilePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    // Revoke previous URL to avoid memory leaks
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
     setPreviewUrl(null);
     setTextFilePreview(null);
 
