@@ -159,7 +159,10 @@ export function useUserTransfersRealtime(initialLimit = 20) {
             filter: `sender_id=eq.${user.id}`,
           },
           (payload) => {
-            setTransfers((prev) => [payload.new as Transfer, ...prev]);
+            const newTransfer = payload.new as Transfer;
+            if (["complete", "failed", "cancelled"].includes(newTransfer.status)) {
+              setTransfers((prev) => [newTransfer, ...prev]);
+            }
           }
         )
         .on(
@@ -171,7 +174,10 @@ export function useUserTransfersRealtime(initialLimit = 20) {
             filter: `receiver_id=eq.${user.id}`,
           },
           (payload) => {
-            setTransfers((prev) => [payload.new as Transfer, ...prev]);
+            const newTransfer = payload.new as Transfer;
+            if (["complete", "failed", "cancelled"].includes(newTransfer.status)) {
+              setTransfers((prev) => [newTransfer, ...prev]);
+            }
           }
         )
         .on(
@@ -182,9 +188,27 @@ export function useUserTransfersRealtime(initialLimit = 20) {
             table: "transfers",
           },
           (payload) => {
-            setTransfers((prev) =>
-              prev.map((t) => (t.id === payload.new.id ? (payload.new as Transfer) : t))
-            );
+            const updatedTransfer = payload.new as Transfer;
+            const isFinal = ["complete", "failed", "cancelled"].includes(updatedTransfer.status);
+
+            setTransfers((prev) => {
+              const exists = prev.some((t) => t.id === updatedTransfer.id);
+
+              if (exists) {
+                if (isFinal) {
+                  return prev.map((t) => (t.id === updatedTransfer.id ? updatedTransfer : t));
+                } else {
+                  // If it was there and now isn't final (shouldn't happen often in history), remove it
+                  return prev.filter((t) => t.id !== updatedTransfer.id);
+                }
+              } else if (isFinal) {
+                // If it wasn't there but is now final, add it at the top
+                return [updatedTransfer, ...prev].sort((a, b) =>
+                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+              }
+              return prev;
+            });
           }
         )
         .on(

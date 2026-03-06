@@ -8,7 +8,6 @@ export async function signUp(email: string, password: string) {
     email,
     password,
   });
-
   return { data, error };
 }
 
@@ -20,7 +19,6 @@ export async function signIn(email: string, password: string) {
     email,
     password,
   });
-
   return { data, error };
 }
 
@@ -34,7 +32,6 @@ export async function signInWithMagicLink(email: string) {
       emailRedirectTo: `${window.location.origin}/dashboard`,
     },
   });
-
   return { data, error };
 }
 
@@ -46,7 +43,7 @@ export async function resetPassword(email: string) {
     redirectTo: `${window.location.origin}/auth`,
   });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message ?? JSON.stringify(error));
   return { data, error };
 }
 

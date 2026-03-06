@@ -149,32 +149,32 @@ describe("FileSender", () => {
   // ─── cancel ────────────────────────────────────────────────────────────
 
   describe("cancel", () => {
-    it("sets status to cancelled and sends cancel message", () => {
+    it("sets status to cancelled and sends cancel message", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
-      sender.cancel();
+      await sender.cancel();
 
       expect(sender.getStatus()).toBe("cancelled");
       // safeSend is async, but cancel calls it fire-and-forget
     });
 
-    it("is a no-op if already cancelled", () => {
+    it("is a no-op if already cancelled", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
-      sender.cancel();
+      await sender.cancel();
       conn.send.mockClear();
-      sender.cancel(); // second call
+      await sender.cancel(); // second call
       // Should not send another cancel message
     });
 
-    it("is a no-op if already complete", () => {
+    it("is a no-op if already complete", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
       // Force status to complete (private, so we test via cancel behavior)
-      sender.cancel();
+      await sender.cancel();
       expect(sender.getStatus()).toBe("cancelled");
     });
   });
@@ -182,30 +182,30 @@ describe("FileSender", () => {
   // ─── pause / resume ───────────────────────────────────────────────────
 
   describe("pause / resume", () => {
-    it("pause sets status to paused (when idle, it still sets)", () => {
+    it("pause sets status to paused (when idle, it still sets)", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
-      sender.pause();
+      await sender.pause();
       expect(sender.getStatus()).toBe("paused");
     });
 
-    it("resume is a no-op if not paused", () => {
+    it("resume is a no-op if not paused", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
-      sender.resume();
+      await sender.resume();
       expect(sender.getStatus()).toBe("idle");
     });
 
-    it("resume from paused restores to transferring", () => {
+    it("resume from paused restores to transferring", async () => {
       const file = createMockFile(1024);
       const sender = new FileSender(file, conn as any);
 
-      sender.pause();
+      await sender.pause();
       expect(sender.getStatus()).toBe("paused");
 
-      sender.resume();
+      await sender.resume();
       expect(sender.getStatus()).toBe("transferring");
     });
   });
@@ -248,7 +248,7 @@ describe("FileSender", () => {
     beforeEach(() => {
       // jsdom does not define Blob/File.prototype.arrayBuffer.
       // Polyfill it so slice().arrayBuffer() resolves with a real buffer.
-      const arrayBufferImpl = function(this: Blob): Promise<ArrayBuffer> {
+      const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
         return Promise.resolve(new ArrayBuffer(64));
       };
       Object.defineProperty(Blob.prototype, "arrayBuffer", {
@@ -341,7 +341,7 @@ describe("FileSender", () => {
       const pauseCb = vi.fn();
       sender.onPauseChange(pauseCb);
 
-      sender.startTransfer().catch(() => {});
+      sender.startTransfer().catch(() => { });
 
       conn._emit("data", {
         type: "file-accept",
@@ -411,7 +411,7 @@ describe("FileSender", () => {
       const sender = new FileSender(file, conn as any);
 
       // p1 starts and sets status to "transferring" immediately (synchronously)
-      const p1 = sender.startTransfer().catch(() => {});
+      const p1 = sender.startTransfer().catch(() => { });
 
       // p2 should resolve immediately since status is already "transferring"
       await sender.startTransfer();

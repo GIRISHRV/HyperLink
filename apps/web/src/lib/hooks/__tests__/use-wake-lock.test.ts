@@ -49,16 +49,22 @@ describe("useWakeLock", () => {
   });
 
   it("no-ops when navigator.wakeLock is absent", async () => {
-    Object.defineProperty(navigator, "wakeLock", {
-      value: undefined,
-      writable: true,
-      configurable: true,
-    });
+    const originalWakeLock = navigator.wakeLock;
+    delete (window.navigator as any).wakeLock;
+
     const { result } = renderHook(() => useWakeLock());
     await act(async () => { await result.current.request(); });
     expect(result.current.isLocked).toBe(false);
     expect(mockRequest).not.toHaveBeenCalled();
+
+    // Restore it
+    Object.defineProperty(navigator, "wakeLock", {
+      value: originalWakeLock,
+      writable: true,
+      configurable: true,
+    });
   });
+
 
   // ── sentinel release event ────────────────────────────────────────────
 

@@ -184,22 +184,26 @@ export class FileSender {
           this.pump();
 
         } else if (message.type === "file-reject") {
+          if (this.status === "cancelled" || this.status === "complete") return;
           logger.info("[SENDER] Receiver rejected the file offer");
           this.status = "cancelled";
           this.rejectCallback?.();
           cleanup();
           reject(new Error("File offer rejected by receiver"));
         } else if (message.type === "transfer-cancel") {
+          if (this.status === "cancelled" || this.status === "complete") return;
           logger.info("[SENDER] Receiver cancelled transfer");
           this.status = "cancelled";
           this.cancelCallback?.();
           cleanup();
           reject(new Error("Transfer cancelled by receiver"));
         } else if (message.type === "transfer-pause") {
+          if (this.status === "cancelled" || this.status === "complete") return;
           logger.info("[SENDER] Receiver requested pause");
           this.status = "paused";
           this.pauseCallback?.(true);
         } else if (message.type === "transfer-resume") {
+          if (this.status === "cancelled" || this.status === "complete") return;
           logger.info("[SENDER] Receiver requested resume");
           this.status = "transferring";
           this.pauseCallback?.(false);
@@ -419,25 +423,32 @@ export class FileSender {
   /**
    * Cancel transfer - notify receiver and stop
    */
-  cancel(): void {
+  async cancel(): Promise<void> {
     if (this.status === "cancelled" || this.status === "complete") return;
-    this.status = "cancelled";
+    // Stop the pump loop immediately so no more chunks are sent
+    this.status = "paused";
+    // Send the cancel message BEFORE setting status to cancelled,
+    // because safeSend() short-circuits if status is already "cancelled".
     const cancelMessage: PeerMessage = {
       type: "transfer-cancel",
       transferId: this.transferId,
       payload: null,
       timestamp: Date.now(),
     };
-    this.safeSend(cancelMessage).catch(e => {
+    try {
+      await this.safeSend(cancelMessage);
+    } catch (e) {
       logger.warn({ e }, "[SENDER] Failed to send cancel message");
-    });
+    }
+    this.status = "cancelled";
+    this.cancelCallback?.();
     this.rejectTransfer?.(new Error("Transfer cancelled by sender"));
   }
 
   /**
    * Pause transfer - stop sending chunks
    */
-  pause(): void {
+  async pause(): Promise<void> {
     if (this.status === "paused" || this.status === "cancelled") return;
     this.status = "paused";
     const pauseMessage: PeerMessage = {
@@ -446,16 +457,14 @@ export class FileSender {
       payload: null,
       timestamp: Date.now(),
     };
-    this.safeSend(pauseMessage).catch(e => {
-      logger.warn({ e }, "[SENDER] Failed to send pause message");
-    });
+    await this.safeSend(pauseMessage);
     logger.info("[SENDER] Transfer paused");
   }
 
   /**
    * Resume transfer - continue sending chunks
    */
-  resume(): void {
+  async resume(): Promise<void> {
     if (this.status !== "paused") return;
     this.status = "transferring";
     const resumeMessage: PeerMessage = {
@@ -464,9 +473,7 @@ export class FileSender {
       payload: null,
       timestamp: Date.now(),
     };
-    this.safeSend(resumeMessage).catch(e => {
-      logger.warn({ e }, "[SENDER] Failed to send resume message");
-    });
+    await this.safeSend(resumeMessage);
     logger.info("[SENDER] Transfer resumed, pumping...");
     this.pump();
   }

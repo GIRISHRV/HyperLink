@@ -40,7 +40,8 @@ test.describe("History Page (authenticated)", () => {
     test("shows either transfer rows or empty state", async ({ page }) => {
         // Wait for loading to finish
         const emptyHeading = page.getByRole("heading", { name: /no transfers found/i });
-        const tableRow = page.locator("tbody tr").first();
+        // Skeletons have 'animate-pulse', so we exclude them
+        const tableRow = page.locator("tbody tr:not(.animate-pulse)").first();
         await expect(emptyHeading.or(tableRow)).toBeVisible({ timeout: 10_000 });
     });
 

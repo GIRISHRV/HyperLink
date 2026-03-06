@@ -13,9 +13,11 @@ import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
 import FileDropZone from "@/components/transfer/file-drop-zone";
 import SelectedFileCard from "@/components/transfer/selected-file-card";
+import FilePreviewBox from "@/components/transfer/file-preview-box";
 import SendControlPanel from "@/components/transfer/send-control-panel";
 import TransferProgressPanel from "@/components/transfer/transfer-progress-panel";
 import TransferVisualizer from "@/components/transfer/transfer-visualizer";
+import RadarVisualizer from "@/components/transfer/radar-visualizer";
 import TransferFailedState from "@/components/transfer/transfer-failed-state";
 import TransferCompleteState from "@/components/transfer/transfer-complete-state";
 import TerminalLog from "@/components/transfer/terminal-log";
@@ -23,7 +25,7 @@ import ChatFAB from "@/components/transfer/chat-fab";
 import DragOverlay from "@/components/transfer/drag-overlay";
 
 import { openDB } from "idb";
-import { logger } from "@repo/utils";
+import { logger, formatFileSize } from "@repo/utils";
 
 const DB_NAME = "hyperlink-pwa-share";
 const STORE_NAME = "shared-files";
@@ -39,8 +41,8 @@ function SendPageContent() {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [swStatus, setSwStatus] = useState<"not_registered" | "installing" | "active" | "error">("not_registered");
   const [logs, setLogs] = useState<string[]>([
-    "Initializing WebRTC handshake...",
-    "Waiting for peer connection...",
+    "[SYS] Terminal initialized",
+    "[SYS] Awaiting transfer session"
   ]);
 
   const addLog = useCallback((message: string) => {
@@ -220,8 +222,6 @@ function SendPageContent() {
               <div className="flex items-center gap-2 text-muted font-mono text-sm">
                 <span className="material-symbols-outlined text-sm">lock</span>
                 <span>/secure_channel/send</span>
-                <span className={`w-2 h-2 rounded-full ${isPeerReady ? "bg-green-500 animate-pulse" : "bg-red-500"} ml-2`}></span>
-                <span className={isPeerReady ? "text-green-500" : "text-red-500"}>{isPeerReady ? "WEBRTC_READY" : "INITIALIZING"}</span>
                 {swStatus !== "active" && (
                   <span className="ml-2 text-xs px-1.5 py-0.5 border border-bauhaus-red text-bauhaus-red animate-pulse">
                     SW_WAITING: REFRESH AGAIN
@@ -232,19 +232,29 @@ function SendPageContent() {
 
             {/* === IDLE STATE === */}
             {transferState.status === "idle" && (
-              <>
-                <FileDropZone
-                  file={file}
-                  fileInputRef={fileInputRef}
-                  onDrop={handleDrop}
-                  onFileSelect={handleFileSelect}
-                />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 w-full flex-1">
+                {/* Left Column */}
+                <section className="col-span-1 lg:col-span-5 flex flex-col gap-8">
+                  <FileDropZone
+                    file={file}
+                    fileInputRef={fileInputRef}
+                    onDrop={handleDrop}
+                    onFileSelect={handleFileSelect}
+                  />
 
-                {file && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    <div className="lg:col-span-2">
+                  {file && (
+                    <div className="flex flex-col gap-8">
                       <SelectedFileCard file={file} onRemove={removeFile} />
                     </div>
+                  )}
+
+                  <FilePreviewBox file={file} />
+                  <RadarVisualizer status={transferState.status} isPeerReady={isPeerReady} className="flex-1" />
+                </section>
+
+                {/* Right Column */}
+                <section className="col-span-1 lg:col-span-7 flex flex-col gap-4 h-full">
+                  {file && (
                     <SendControlPanel
                       receiverPeerId={receiverPeerId}
                       onPeerIdChange={setReceiverPeerId}
@@ -256,15 +266,17 @@ function SendPageContent() {
                       isPeerReady={isPeerReady}
                       hasFile={!!file}
                     />
-                  </div>
-                )}
+                  )}
 
-                {error && (
-                  <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 px-4 py-3">
-                    <p className="text-sm text-bauhaus-red font-medium">{error}</p>
-                  </div>
-                )}
-              </>
+                  {error && (
+                    <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 px-4 py-3">
+                      <p className="text-sm text-bauhaus-red font-medium">{error}</p>
+                    </div>
+                  )}
+
+                  <TerminalLog logs={logs} className="flex-1 min-h-[250px]" />
+                </section>
+              </div>
             )}
 
             {/* === ZIPPING === */}
@@ -319,6 +331,7 @@ function SendPageContent() {
                   fileName={file.name}
                   percentage={(transferState.bytesTransferred / transferState.totalBytes) * 100}
                   isPaused={transferState.status === "paused"}
+                  pausedBy={transferState.pausedBy}
                   speed={transferState.speedBytesPerSecond || 0}
                   timeRemaining={transferState.estimatedSecondsRemaining || 0}
                   onPauseResume={handlePauseResume}
@@ -332,10 +345,35 @@ function SendPageContent() {
             {/* === FAILED === */}
             {transferState.status === "failed" && (
               <TransferFailedState
-                error={error || ""}
+                error={transferState.error || error || ""}
                 peerManagerRef={peerManagerRef}
                 onRetry={resetSend}
               />
+            )}
+
+            {/* === CANCELLED === */}
+            {transferState.status === "cancelled" && (
+              <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2">
+                      <span className="material-symbols-outlined text-gray-400">cancel</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-300">Transfer Cancelled</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {file ? formatFileSize(file.size) : "—"} • Cancelled
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={resetSend}
+                  className="w-full h-9 bg-primary text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors hover:bg-white"
+                >
+                  Ready for New Transfer
+                </button>
+              </div>
             )}
 
             {/* === COMPLETE === */}
@@ -343,8 +381,8 @@ function SendPageContent() {
               <TransferCompleteState fileName={file?.name || "File"} onReset={resetSend} />
             )}
 
-            {/* Terminal Log */}
-            <TerminalLog logs={logs} />
+            {/* Terminal Log is rendered in the grid for 'idle', but we still need it for other states */}
+            {transferState.status !== "idle" && <TerminalLog logs={logs} />}
           </div>
         </section>
       </main>

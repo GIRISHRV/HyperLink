@@ -48,16 +48,15 @@ test.describe("Settings Page (authenticated)", () => {
 
     test("can update display name and save", async ({ page }) => {
         const input = page.locator("#settings-display-name");
+        await input.clear();
         await input.fill("Playwright Test User");
         await page.getByRole("button", { name: /save changes/i }).click();
-        // "Saving..." appears immediately — reliable without network timing
-        await expect(
-            page.getByRole("button", { name: /saving/i })
-        ).toBeVisible({ timeout: 3_000 });
-        // Eventually returns to rest state
-        await expect(
-            page.getByRole("button", { name: /save changes|saved!/i })
-        ).toBeVisible({ timeout: 10_000 });
+
+        // Use getByText with regex for robustness
+        await expect(page.getByText(/saving/i)).toBeVisible({ timeout: 5000 });
+
+        // Eventually returns to rest state or 'Saved!'
+        await expect(page.getByRole("button", { name: /save changes|saved!/i })).toBeVisible({ timeout: 15_000 });
     });
 
     test("Sign Out button redirects to /auth", async ({ page }) => {

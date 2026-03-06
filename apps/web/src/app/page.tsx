@@ -19,19 +19,16 @@ export default function LandingPage() {
   }, [checkAuth]);
 
   return (
-    <div className="bg-background-light dark:bg-background-dark min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div className="bg-background-light dark:bg-background-dark text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col flex-1">
       {/* Navbar: Unified AppHeader */}
       <AppHeader variant="landing" />
 
       {/* Main Content Area */}
-      <main className="flex-grow flex flex-col">
+      <main className="flex flex-col flex-1">
         {/* Hero Section: Asymmetric Grid */}
         <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[600px] border-b border-subtle">
           {/* Text & Hero Content (Left/Top) */}
           <div className="lg:col-span-7 p-8 md:p-16 flex flex-col justify-center relative overflow-hidden">
-            {/* Decorative Geometric Background Elements */}
-            <div className="absolute top-10 right-10 w-32 h-32 rounded-full bg-bauhaus-blue opacity-20 blur-xl pointer-events-none"></div>
-            <div className="absolute bottom-20 left-10 w-40 h-40 shape-triangle bg-bauhaus-red opacity-10 pointer-events-none"></div>
 
             <div className="relative z-10 flex flex-col gap-6">
               <div className="flex items-center gap-2 mb-4">
@@ -41,7 +38,7 @@ export default function LandingPage() {
 
               <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter uppercase">
                 Secure.<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">Direct.</span><br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-blue-400">Direct.</span><br />
                 Fast.
               </h1>
 
@@ -73,9 +70,6 @@ export default function LandingPage() {
                 {/* Yellow Rectangle */}
                 <div className="absolute top-[40%] left-[30%] w-24 h-24 bg-primary mix-blend-multiply opacity-90 rotate-12 transition-transform duration-500 group-hover:rotate-45"></div>
               </div>
-              <div className="absolute bottom-4 right-4 text-xs font-mono text-gray-500 opacity-50">
-                FIG 01. HANDSHAKE
-              </div>
             </div>
 
             {/* Action Blocks */}
@@ -104,7 +98,7 @@ export default function LandingPage() {
         </div>
 
         {/* Feature Grid: Asymmetric Columns */}
-        <div className="w-full max-w-[1440px] mx-auto px-6 py-20 bg-background-light dark:bg-background-dark">
+        <div className="w-full max-w-[1440px] mx-auto px-6 py-16 flex-1 flex flex-col justify-center bg-background-light dark:bg-background-dark">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
             {/* Feature 1 */}
             <div className="flex flex-col gap-6 group">

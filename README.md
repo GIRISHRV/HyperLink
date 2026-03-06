@@ -1,6 +1,6 @@
 # HyperLink
 
-HyperLink is a robust peer-to-peer file transfer engine. 
+HyperLink is a robust peer-to-peer file transfer engine using WebRTC. 
 
 ## Documentation
 All documentation has been moved to the `/docs` directory to keep the root directory clean. 

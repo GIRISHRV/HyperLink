@@ -123,9 +123,9 @@ describe("AppHeader", () => {
 
     // — Transfer variant —
     describe("transfer variant", () => {
-        it("renders the HYPER logo text", async () => {
+        it("renders the HyperLink logo text", async () => {
             await renderHeader({ variant: "transfer" });
-            expect(screen.getByText("HYPER")).toBeInTheDocument();
+            expect(screen.getByText("HyperLink")).toBeInTheDocument();
         });
 
         it("shows Initializing... when isPeerReady=false", async () => {

@@ -312,6 +312,7 @@ export class FileReceiver {
    */
   handleControlMessage(message: PeerMessage): boolean {
     if (message.transferId !== this.transferId) return false;
+    if (this.status === "cancelled" || this.status === "complete") return false;
 
     if (message.type === "transfer-cancel") {
       logger.info("[RECEIVER] Sender cancelled transfer");
@@ -340,31 +341,71 @@ export class FileReceiver {
   }
 
   /**
+   * Defensive message sending wrapper
+   */
+  private async safeSend(message: unknown): Promise<void> {
+    if (this.status === "cancelled") return;
+
+    if (!this.connection) {
+      logger.warn("[RECEIVER] No connection to send message");
+      return;
+    }
+
+    if (!this.connection.open) {
+      logger.warn("[RECEIVER] Connection not open. Waiting...");
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Timeout")), 5000);
+        this.connection!.once("open", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    }
+
+    try {
+      this.connection.send(message);
+      // Small buffer drain wait helper
+      const dc = (this.connection as any).dataChannel as RTCDataChannel;
+      if (dc && dc.bufferedAmount > 0) {
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            if (dc.bufferedAmount === 0) resolve();
+            else setTimeout(check, 50);
+          };
+          check();
+          setTimeout(resolve, 500); // 500ms max wait
+        });
+      }
+    } catch (err) {
+      logger.error({ err }, "[RECEIVER] safeSend failed");
+    }
+  }
+
+  /**
    * Cancel transfer from receiver side - notify sender and clean up
    */
-  cancel(): void {
+  async cancel(): Promise<void> {
     if (this.status === "cancelled" || this.status === "complete") return;
-    this.status = "cancelled";
+    // IMPORTANT: Send the cancel message BEFORE setting status to cancelled,
+    // because safeSend() short-circuits if status is already "cancelled".
     const cancelMessage: PeerMessage = {
       type: "transfer-cancel",
       transferId: this.transferId,
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.connection?.send(cancelMessage);
-    } catch (e) {
-      logger.warn({ e }, "[RECEIVER] Failed to send cancel message");
-    }
+    await this.safeSend(cancelMessage);
+    this.status = "cancelled";
     // Clean up partial chunks from IndexedDB
     clearTransfer(this.storageId || this.transferId).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
+    this.cancelCallback?.();
     logger.info("[RECEIVER] Transfer cancelled");
   }
 
   /**
    * Pause transfer - notify sender to stop sending chunks
    */
-  pause(): void {
+  async pause(): Promise<void> {
     if (this.status === "paused" || this.status === "cancelled") return;
     this.status = "paused";
     const pauseMessage: PeerMessage = {
@@ -373,19 +414,14 @@ export class FileReceiver {
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.connection?.send(pauseMessage);
-    } catch (e) {
-      logger.warn({ e }, "[RECEIVER] Failed to send pause message");
-    }
-    this.pauseCallback?.(true);
+    await this.safeSend(pauseMessage);
     logger.info("[RECEIVER] Transfer paused by receiver");
   }
 
   /**
    * Resume transfer - notify sender to continue sending chunks
    */
-  resume(): void {
+  async resume(): Promise<void> {
     if (this.status !== "paused") return;
     this.status = "transferring";
     const resumeMessage: PeerMessage = {
@@ -394,12 +430,7 @@ export class FileReceiver {
       payload: null,
       timestamp: Date.now(),
     };
-    try {
-      this.connection?.send(resumeMessage);
-    } catch (e) {
-      logger.warn({ e }, "[RECEIVER] Failed to send resume message");
-    }
-    this.pauseCallback?.(false);
+    await this.safeSend(resumeMessage);
     logger.info("[RECEIVER] Transfer resumed by receiver");
   }
 

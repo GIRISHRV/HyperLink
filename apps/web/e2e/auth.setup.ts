@@ -46,11 +46,29 @@ setup("authenticate receiver", async ({ page }) => {
         throw new Error("E2E_RECEIVER_EMAIL and E2E_RECEIVER_PASSWORD must be set in the environment");
     }
 
+    // If the receiver env is the same as the sender, generate a unique receiver email
+    let receiverEmail = email;
+    if (!receiverEmail) receiverEmail = email; // keep type
+    try {
+        const senderEmail = process.env.E2E_TEST_EMAIL;
+        if (receiverEmail === senderEmail) {
+            // generate a unique alias using +receiver and a timestamp
+            const parts = receiverEmail.split("@");
+            if (parts.length === 2) {
+                receiverEmail = `${parts[0]}+receiver.${Date.now()}@${parts[1]}`;
+            } else {
+                receiverEmail = `${receiverEmail}+receiver.${Date.now()}`;
+            }
+        }
+    } catch (e) {
+        // ignore and use provided receiverEmail
+    }
+
     await page.goto("/auth");
     await expect(page.locator("#auth-email")).toBeVisible();
 
     // Fill in credentials
-    await page.locator("#auth-email").fill(email);
+    await page.locator("#auth-email").fill(receiverEmail as string);
     await page.locator("#auth-password").fill(password);
 
     // Try normal login
