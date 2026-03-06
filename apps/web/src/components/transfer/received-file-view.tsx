@@ -21,7 +21,7 @@ export default function ReceivedFileView({
   onReset,
 }: ReceivedFileViewProps) {
   return (
-    <div className="bg-black/60 backdrop-blur-xl p-6 border border-primary/20 shadow-[0_0_50px_-20px_rgba(var(--primary-rgb),0.2)] flex flex-col gap-6 animate-in zoom-in-95 fade-in duration-500 rounded-sm relative overflow-hidden group">
+    <div className="bg-black/60 backdrop-blur-xl p-6 border border-primary/20 shadow-[0_0_50px_-20px_rgba(var(--primary-rgb),0.2)] flex flex-col gap-6 animate-in zoom-in-95 fade-in duration-500 rounded-sm relative overflow-hidden group w-full max-w-full">
       {/* Holographic Scanline */}
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(255,255,255,0.03)_50%,transparent_100%)] h-[200%] w-full animate-[scan_4s_linear_infinite] pointer-events-none" />
 
@@ -33,7 +33,7 @@ export default function ReceivedFileView({
             </span>
           </div>
           <div>
-            <p className="font-bold text-lg text-white tracking-tight">
+            <p className="font-bold text-lg text-white tracking-tight truncate max-w-xs">
               {receivedFile.name}
             </p>
             <p className="text-xs text-primary/60 font-mono uppercase tracking-widest mt-1">

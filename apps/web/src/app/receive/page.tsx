@@ -120,6 +120,7 @@ export default function ReceivePage() {
                     fileName={receivedFile.name}
                     percentage={progress.percentage}
                     isPaused={transferState.status === "paused"}
+                    pausedBy={transferState.pausedBy}
                     speed={progress.speed}
                     timeRemaining={progress.timeRemaining}
                     onPauseResume={handlePauseResume}
@@ -128,6 +129,7 @@ export default function ReceivePage() {
                   />
                   <TransferVisualizer isPaused={transferState.status === "paused"} direction="downlink" />
                 </div>
+                <TerminalLog logs={logs} />
               </div>
             ) : (
               /* === IDLE / OFFERING / COMPLETE / CANCELLED / ERROR (Standard Grid) === */
@@ -221,9 +223,9 @@ export default function ReceivePage() {
                       </div>
                     )}
 
-                    {error && (
+                    {(transferState.error || error) && (
                       <DiagnosticPanel
-                        error={error}
+                        error={transferState.error || error || ""}
                         peerManagerRef={peerManagerRef}
                         onClear={resetReceive}
                       />

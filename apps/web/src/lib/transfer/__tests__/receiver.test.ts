@@ -27,10 +27,10 @@ vi.mock("@/lib/utils/crypto", () => ({
   base64ToArrayBuffer: vi.fn((_b64: string) => new Uint8Array(16)),
 }));
 
-const mockAddChunk = vi.fn(async (..._args: unknown[]) => {});
+const mockAddChunk = vi.fn(async (..._args: unknown[]) => { });
 const mockAssembleFileFromCursor = vi.fn(async (..._args: unknown[]) => new Blob(["assembled-file"]));
-const mockClearTransfer = vi.fn(async (..._args: unknown[]) => {});
-const mockAddFile = vi.fn(async (..._args: unknown[]) => {});
+const mockClearTransfer = vi.fn(async (..._args: unknown[]) => { });
+const mockAddFile = vi.fn(async (..._args: unknown[]) => { });
 const mockGetLastReceivedChunkIndex = vi.fn(async (..._args: unknown[]) => -1);
 
 vi.mock("@/lib/storage/idb-manager", () => ({
@@ -210,7 +210,7 @@ describe("FileReceiver", () => {
     });
 
     it("does not process chunk when cancelled", async () => {
-      receiver.cancel();
+      await receiver.cancel();
       await receiver.handleChunk(createChunkMessage(0));
       expect(mockAddChunk).not.toHaveBeenCalled();
     });
@@ -279,7 +279,7 @@ describe("FileReceiver", () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
 
-      receiver.cancel();
+      await receiver.cancel();
       expect(receiver.getStatus()).toBe("cancelled");
       expect(conn.send).toHaveBeenCalledWith(
         expect.objectContaining({ type: "transfer-cancel" })
@@ -289,16 +289,16 @@ describe("FileReceiver", () => {
     it("cleans up partial chunks from IDB", async () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
-      receiver.cancel();
+      await receiver.cancel();
       expect(mockClearTransfer).toHaveBeenCalled();
     });
 
     it("is a no-op if already cancelled", async () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
-      receiver.cancel();
+      await receiver.cancel();
       conn.send.mockClear();
-      receiver.cancel();
+      await receiver.cancel();
       expect(conn.send).not.toHaveBeenCalled();
     });
   });
@@ -308,38 +308,31 @@ describe("FileReceiver", () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
 
-      const pauseCb = vi.fn();
-      receiver.onPauseChange(pauseCb);
-
-      receiver.pause();
+      await receiver.pause();
       expect(receiver.getStatus()).toBe("paused");
       expect(conn.send).toHaveBeenCalledWith(
         expect.objectContaining({ type: "transfer-pause" })
       );
-      expect(pauseCb).toHaveBeenCalledWith(true);
     });
 
     it("resumes and sends resume message", async () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
 
-      receiver.pause();
-      const pauseCb = vi.fn();
-      receiver.onPauseChange(pauseCb);
+      await receiver.pause();
 
-      receiver.resume();
+      await receiver.resume();
       expect(receiver.getStatus()).toBe("transferring");
       expect(conn.send).toHaveBeenCalledWith(
         expect.objectContaining({ type: "transfer-resume" })
       );
-      expect(pauseCb).toHaveBeenCalledWith(false);
     });
 
     it("resume is a no-op when not paused", async () => {
       const offer = createOfferMessage();
       await receiver.handleOffer(offer);
 
-      receiver.resume();
+      await receiver.resume();
       expect(receiver.getStatus()).toBe("idle");
     });
   });

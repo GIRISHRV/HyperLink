@@ -18,6 +18,7 @@ export interface TransferState {
     error?: string;
     speedBytesPerSecond?: number;
     estimatedSecondsRemaining?: number;
+    pausedBy?: "local" | "remote";
 }
 
 export type TransferAction =
@@ -26,7 +27,7 @@ export type TransferAction =
     | { type: "AWAIT_ACCEPTANCE" }
     | { type: "START_TRANSFER"; totalBytes: number }
     | { type: "PROGRESS"; bytesTransferred: number; speed?: number; remaining?: number }
-    | { type: "PAUSE" }
+    | { type: "PAUSE"; pausedBy: "local" | "remote" }
     | { type: "RESUME" }
     | { type: "COMPLETE" }
     | { type: "FAIL"; error: string }
@@ -47,7 +48,8 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                 status: "transferring",
                 totalBytes: action.totalBytes,
                 bytesTransferred: 0,
-                error: undefined
+                error: undefined,
+                pausedBy: undefined
             };
         case "PROGRESS":
             if (state.status !== "transferring" && state.status !== "paused") return state; // Only update progress if we're actually active
@@ -59,10 +61,10 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
             };
         case "PAUSE":
             if (state.status !== "transferring") return state;
-            return { ...state, status: "paused" };
+            return { ...state, status: "paused", pausedBy: action.pausedBy };
         case "RESUME":
             if (state.status !== "paused") return state;
-            return { ...state, status: "transferring" };
+            return { ...state, status: "transferring", pausedBy: undefined };
         case "COMPLETE":
             return { ...state, status: "complete", bytesTransferred: state.totalBytes };
         case "FAIL":
@@ -74,6 +76,7 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                 status: "idle",
                 bytesTransferred: 0,
                 totalBytes: 0,
+                pausedBy: undefined,
             };
         default:
             return state;

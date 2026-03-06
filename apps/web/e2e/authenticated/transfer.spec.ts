@@ -109,3 +109,125 @@ test("complete file transfer between two authenticated peers", async () => {
         await browser.close();
     }
 });
+
+test("abort synchronization between peers", async () => {
+    test.setTimeout(90_000);
+    const browser = await chromium.launch({ slowMo: 500 });
+
+    const receiverContext = await browser.newContext({
+        storageState: RECEIVER_AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+    const senderContext = await browser.newContext({
+        storageState: AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+
+    const receiverPage = await receiverContext.newPage();
+    const senderPage = await senderContext.newPage();
+
+    try {
+        await receiverPage.goto("http://localhost:3000/receive");
+        const peerIdElement = receiverPage.getByTestId("my-peer-id");
+        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
+        const receiverPeerId = await peerIdElement.textContent();
+
+        await senderPage.goto("http://localhost:3000/send");
+        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+
+        const peerInput = senderPage.getByPlaceholder("Enter hash...");
+        await expect(peerInput).toBeVisible({ timeout: 5_000 });
+        await peerInput.fill(receiverPeerId!.trim());
+
+        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+        await connectBtn.click();
+
+        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+        await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
+        await acceptBtn.click();
+
+        // Wait for transfer to start (progress bar or pause/abort buttons appear)
+        await expect(senderPage.getByRole("button", { name: /abort/i })).toBeVisible({ timeout: 15_000 });
+
+        // Sender aborts transfer
+        await senderPage.getByRole("button", { name: /abort/i }).click();
+
+        // Sender should see failed/cancelled state
+        await expect(senderPage.getByText(/transfer cancelled by sender/i).first()).toBeVisible({ timeout: 5_000 });
+
+        // Receiver should automatically see cancelled state
+        await expect(receiverPage.getByText(/transfer cancelled by peer/i).first()).toBeVisible({ timeout: 5_000 });
+
+    } finally {
+        await receiverContext.close();
+        await senderContext.close();
+        await browser.close();
+    }
+});
+
+test("pause and resume synchronization between peers", async () => {
+    test.setTimeout(90_000);
+    const browser = await chromium.launch({ slowMo: 500 });
+
+    const receiverContext = await browser.newContext({
+        storageState: RECEIVER_AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+    const senderContext = await browser.newContext({
+        storageState: AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+
+    const receiverPage = await receiverContext.newPage();
+    const senderPage = await senderContext.newPage();
+
+    try {
+        await receiverPage.goto("http://localhost:3000/receive");
+        const peerIdElement = receiverPage.getByTestId("my-peer-id");
+        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
+        const receiverPeerId = await peerIdElement.textContent();
+
+        await senderPage.goto("http://localhost:3000/send");
+        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+
+        const peerInput = senderPage.getByPlaceholder("Enter hash...");
+        await expect(peerInput).toBeVisible({ timeout: 5_000 });
+        await peerInput.fill(receiverPeerId!.trim());
+
+        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+        await connectBtn.click();
+
+        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+        await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
+        await acceptBtn.click();
+
+        // Wait for transfer to start
+        const senderPauseBtn = senderPage.locator('button:has-text("Pause")');
+        const receiverPauseBtn = receiverPage.locator('button:has-text("Halt")');
+
+        await expect(senderPauseBtn).toBeVisible({ timeout: 15_000 });
+
+        // Receiver pauses the transfer
+        await receiverPauseBtn.click();
+
+        // Receiver's button should change to Resume
+        await expect(receiverPage.locator('button:has-text("RESUME DOWNLINK")')).toBeVisible({ timeout: 5_000 });
+
+        // Sender shouldn't be able to resume (button disabled or says "Paused by peer")
+        const senderPausedBtn = senderPage.locator('button:has-text("Paused by Peer")');
+        await expect(senderPausedBtn).toBeVisible({ timeout: 5_000 });
+        await expect(senderPausedBtn).toBeDisabled();
+
+        // Receiver resumes the transfer
+        await receiverPage.locator('button:has-text("RESUME DOWNLINK")').click();
+
+        // Both should be back to initial state
+        await expect(senderPage.locator('button:has-text("Pause")')).toBeVisible({ timeout: 5_000 });
+        await expect(receiverPage.locator('button:has-text("Halt")')).toBeVisible({ timeout: 5_000 });
+
+    } finally {
+        await receiverContext.close();
+        await senderContext.close();
+        await browser.close();
+    }
+});

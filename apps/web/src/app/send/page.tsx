@@ -25,7 +25,7 @@ import ChatFAB from "@/components/transfer/chat-fab";
 import DragOverlay from "@/components/transfer/drag-overlay";
 
 import { openDB } from "idb";
-import { logger } from "@repo/utils";
+import { logger, formatFileSize } from "@repo/utils";
 
 const DB_NAME = "hyperlink-pwa-share";
 const STORE_NAME = "shared-files";
@@ -331,6 +331,7 @@ function SendPageContent() {
                   fileName={file.name}
                   percentage={(transferState.bytesTransferred / transferState.totalBytes) * 100}
                   isPaused={transferState.status === "paused"}
+                  pausedBy={transferState.pausedBy}
                   speed={transferState.speedBytesPerSecond || 0}
                   timeRemaining={transferState.estimatedSecondsRemaining || 0}
                   onPauseResume={handlePauseResume}
@@ -344,10 +345,35 @@ function SendPageContent() {
             {/* === FAILED === */}
             {transferState.status === "failed" && (
               <TransferFailedState
-                error={error || ""}
+                error={transferState.error || error || ""}
                 peerManagerRef={peerManagerRef}
                 onRetry={resetSend}
               />
+            )}
+
+            {/* === CANCELLED === */}
+            {transferState.status === "cancelled" && (
+              <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white/5 p-2">
+                      <span className="material-symbols-outlined text-gray-400">cancel</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-300">Transfer Cancelled</p>
+                      <p className="text-xs text-white/50 font-mono">
+                        {file ? formatFileSize(file.size) : "—"} • Cancelled
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={resetSend}
+                  className="w-full h-9 bg-primary text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors hover:bg-white"
+                >
+                  Ready for New Transfer
+                </button>
+              </div>
             )}
 
             {/* === COMPLETE === */}

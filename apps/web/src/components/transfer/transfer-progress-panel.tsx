@@ -8,6 +8,7 @@ interface TransferProgressPanelProps {
   fileName: string;
   percentage: number;
   isPaused: boolean;
+  pausedBy?: "local" | "remote";
   speed: number;
   timeRemaining: number;
   onPauseResume: () => void;
@@ -21,6 +22,7 @@ export default function TransferProgressPanel({
   fileName,
   percentage,
   isPaused,
+  pausedBy,
   speed,
   timeRemaining,
   onPauseResume,
@@ -30,7 +32,7 @@ export default function TransferProgressPanel({
   const isUplink = direction === "uplink";
 
   return (
-    <div className="lg:col-span-5 flex flex-col gap-6">
+    <div className="lg:col-span-5 flex flex-col gap-6 w-full overflow-hidden">
       {/* Secure Link Card */}
       <div className="bg-surface p-4 border-l-4 border-primary flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
@@ -77,7 +79,7 @@ export default function TransferProgressPanel({
             <h3 className="text-white font-black uppercase text-xl tracking-tighter">
               {isUplink ? "Uploading Payload" : "Receiving Payload"}
             </h3>
-            <p className="text-muted text-xs font-mono mt-1">{fileName}</p>
+            <p className="text-muted text-xs font-mono mt-1 truncate max-w-xs">{fileName}</p>
           </div>
           <div className="text-right">
             <span className="text-primary font-mono text-2xl font-bold block">
@@ -101,18 +103,29 @@ export default function TransferProgressPanel({
         <div className="grid grid-cols-2 gap-3 mt-auto z-10">
           <button
             onClick={onPauseResume}
-            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${isPaused
+            disabled={isPaused && pausedBy === "remote"}
+            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${isPaused && pausedBy === "remote"
+              ? "bg-surface text-muted border-subtle-bauhaus cursor-not-allowed"
+              : isPaused
                 ? "bg-primary text-black border-primary hover:bg-white"
                 : "bg-transparent text-white border-white/20 hover:border-white hover:bg-white/5"
               }`}
           >
-            <span className="material-symbols-outlined !text-[18px]">
-              {isPaused ? "play_arrow" : "pause"}
-            </span>
+            {isPaused && pausedBy === "remote" ? (
+              <span className="material-symbols-outlined !text-[18px]">
+                pause_circle
+              </span>
+            ) : (
+              <span className="material-symbols-outlined !text-[18px]">
+                {isPaused ? "play_arrow" : "pause"}
+              </span>
+            )}
             {isPaused
-              ? isUplink
-                ? "Resume Uplink"
-                : "RESUME DOWNLINK"
+              ? pausedBy === "remote"
+                ? "Paused by Peer"
+                : isUplink
+                  ? "Resume Uplink"
+                  : "RESUME DOWNLINK"
               : isUplink
                 ? "Pause"
                 : "Halt"}

@@ -24,7 +24,17 @@ export default function FilePreviewBox({ file }: FilePreviewBoxProps) {
     if (file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/")) {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
+      return () => {
+        // Find existing media elements and clear src to prevent fetch AbortError in console
+        const mediaElements = document.querySelectorAll('video, audio');
+        mediaElements.forEach((el) => {
+          if ((el as HTMLMediaElement).src === url) {
+            (el as HTMLMediaElement).removeAttribute('src');
+            (el as HTMLMediaElement).load();
+          }
+        });
+        URL.revokeObjectURL(url);
+      };
     } else if (file.type.startsWith("text/") || file.name.endsWith(".md") || file.name.endsWith(".json")) {
       // Read a tiny snippet of the text file for preview
       const reader = new FileReader();

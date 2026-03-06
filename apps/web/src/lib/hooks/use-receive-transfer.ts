@@ -352,9 +352,17 @@ export function useReceiveTransfer({
                   return;
                 }
                 if (fileReceiverRef.current) {
-                  fileReceiverRef.current.handleControlMessage(
-                    message
-                  );
+                  fileReceiverRef.current.handleControlMessage(message);
+
+                  // Update UI state based on control message
+                  if (message.type === "transfer-cancel") {
+                    dispatchTransfer({ type: "CANCEL" });
+                    setReceivedFile(null);
+                  } else if (message.type === "transfer-pause") {
+                    dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
+                  } else if (message.type === "transfer-resume") {
+                    dispatchTransfer({ type: "RESUME" });
+                  }
                 }
               }
             });
@@ -469,7 +477,7 @@ export function useReceiveTransfer({
 
     receiver.onPauseChange((paused) => {
       if (paused) {
-        dispatchTransfer({ type: "PAUSE" });
+        dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
         logger.info("[PAUSE] Transfer paused by sender");
       } else {
         dispatchTransfer({ type: "RESUME" });
@@ -478,14 +486,21 @@ export function useReceiveTransfer({
     });
 
     receiver.onError((recvError) => {
+      const msg = typeof recvError === "string" ? recvError : recvError.message;
       if (recvError === "DECRYPTION_FAILED") {
         setError("Incorrect password. The transfer was cancelled.");
         onLog?.("[ERR] Decryption failed. Incorrect password.");
+        dispatchTransfer({
+          type: "FAIL",
+          error: "Incorrect password. The transfer was cancelled.",
+        });
       } else {
-        const msg =
-          typeof recvError === "string" ? recvError : recvError.message;
         setError(`Transfer error: ${msg}`);
         onLog?.(`[ERR] ${msg}`);
+        dispatchTransfer({
+          type: "FAIL",
+          error: `Transfer error: ${msg}`,
+        });
       }
     });
 
@@ -655,7 +670,7 @@ export function useReceiveTransfer({
   async function confirmCancel() {
     setShowCancelModal(false);
     if (fileReceiverRef.current) {
-      fileReceiverRef.current.cancel();
+      await fileReceiverRef.current.cancel();
     }
 
     dispatchTransfer({ type: "CANCEL" });
@@ -664,14 +679,15 @@ export function useReceiveTransfer({
     }
   }
 
-  function handlePauseResume() {
+  async function handlePauseResume() {
     if (!fileReceiverRef.current) return;
     if (transferState.status === "paused") {
-      fileReceiverRef.current.resume();
+      if (transferState.pausedBy === "remote") return;
+      await fileReceiverRef.current.resume();
       dispatchTransfer({ type: "RESUME" });
     } else {
-      fileReceiverRef.current.pause();
-      dispatchTransfer({ type: "PAUSE" });
+      await fileReceiverRef.current.pause();
+      dispatchTransfer({ type: "PAUSE", pausedBy: "local" });
     }
   }
 

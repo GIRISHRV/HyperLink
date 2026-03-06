@@ -34,6 +34,7 @@ const m = vi.hoisted(() => {
   const senderEvents: {
     onPauseChange?: (paused: boolean) => void;
     onReject?: () => void;
+    onCancel?: () => void;
   } = {};
   const mockSenderSetPassword = vi.fn().mockResolvedValue(undefined);
   const mockSenderSendOffer = vi.fn().mockResolvedValue(undefined);
@@ -43,6 +44,9 @@ const m = vi.hoisted(() => {
   });
   const mockSenderOnReject = vi.fn().mockImplementation((cb: () => void) => {
     senderEvents.onReject = cb;
+  });
+  const mockSenderOnCancel = vi.fn().mockImplementation((cb: () => void) => {
+    senderEvents.onCancel = cb;
   });
   const mockSenderCancel = vi.fn();
   const mockSenderPause = vi.fn();
@@ -87,6 +91,7 @@ const m = vi.hoisted(() => {
     mockSenderStartTransfer,
     mockSenderOnPauseChange,
     mockSenderOnReject,
+    mockSenderOnCancel,
     mockSenderCancel,
     mockSenderPause,
     mockSenderResume,
@@ -125,6 +130,7 @@ vi.mock("@/lib/transfer/sender", () => {
     startTransfer = m.mockSenderStartTransfer;
     onPauseChange = m.mockSenderOnPauseChange;
     onReject = m.mockSenderOnReject;
+    onCancel = m.mockSenderOnCancel;
     cancel = m.mockSenderCancel;
     pause = m.mockSenderPause;
     resume = m.mockSenderResume;
@@ -463,6 +469,8 @@ describe("useSendTransfer", () => {
       });
 
       const { result } = renderHook(() => useSendTransfer(defaultOptions()));
+
+      await waitFor(() => expect(result.current.isPeerReady).toBe(true));
 
       // Trigger the completion handler registered in useEffect
       await act(async () => {
