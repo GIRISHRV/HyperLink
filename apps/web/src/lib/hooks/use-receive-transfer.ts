@@ -20,6 +20,8 @@ import {
 } from "@/lib/utils/notification";
 import { logger } from "@repo/utils";
 import { getMimeType } from "@/lib/utils/mime";
+import { supabase } from "@/lib/supabase/client";
+import { updateUserProfile } from "@/lib/services/profile-service";
 import type {
   PeerMessage,
   TransferProgress,
@@ -57,6 +59,10 @@ export function useReceiveTransfer({
   const [myPeerId, setMyPeerId] = useState("");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<TransferProgress | null>(null);
+  const [cleanupProgress, setCleanupProgress] = useState<{
+    cleared: number;
+    total: number;
+  } | null>(null);
   const [receivedFile, setReceivedFile] = useState<{
     name: string;
     size: number;
@@ -88,7 +94,7 @@ export function useReceiveTransfer({
     onDataRef.current = onData;
   }, [onData]);
 
-  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
+  const { request: requestWakeLock, release: releaseWakeLock, isLocked: isWakeLockActive } = useWakeLock();
   const { vibrate } = useHaptics();
 
   const isReceiveTransferActive =
@@ -160,6 +166,7 @@ export function useReceiveTransfer({
     setReceivedFile(null);
     setTransferId(null);
     setPendingOffer(null);
+    setCleanupProgress(null);
     fileReceiverRef.current = null;
   }
 
@@ -199,12 +206,29 @@ export function useReceiveTransfer({
         logger.info({ userId: user.id }, "[RECEIVE] User authenticated");
 
         const iceServers = await getIceServers();
-        const config = await getPeerConfigAsync(iceServers);
-        logger.info({ config }, "[RECEIVE] Creating PeerManager");
+        // Task #4: Support Compatibility Mode (Forced Relay)
+        const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
+        const config = await getPeerConfigAsync(iceServers, forceRelay);
+
+        logger.info({ config, forceRelay }, "[RECEIVE] Creating PeerManager");
         peerManagerRef.current = new PeerManager(config);
 
+        // Task #4: Listen for firewall blocked events
+        peerManagerRef.current.on("firewall-blocked", () => {
+          toast.error("Firewall Blocked", {
+            description: "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
+            duration: 10000,
+          });
+        });
+
         logger.info("[RECEIVE] Initializing PeerManager...");
-        const peerId = await peerManagerRef.current.initialize();
+        // Task #3: Fetch Supabase JWT for signaling authentication
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        // Task #9: Generate a stable, user-linked Peer ID
+        const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
+        const id = await peerManagerRef.current.initialize(stablePeerId, token);
 
         if (!isMountedCheck()) {
           logger.info(
@@ -213,8 +237,13 @@ export function useReceiveTransfer({
           return;
         }
 
-        logger.info({ peerId }, "[RECEIVE] PeerManager initialized");
-        setMyPeerId(peerId);
+        logger.info({ id }, "[RECEIVE] PeerManager initialized");
+        setMyPeerId(id);
+
+        // Task #5: Update Supabase with the active Peer ID for discovery (non-blocking)
+        updateUserProfile(user.id, { active_peer_id: id }).catch((err) => {
+          logger.error({ err }, "[RECEIVE] Failed to update user profile with Peer ID");
+        });
 
         logger.info("[RECEIVE] Listening for incoming connections...");
 
@@ -331,7 +360,7 @@ export function useReceiveTransfer({
                 });
 
                 dispatchTransfer({ type: "OFFER" });
-              } else if (message.type === "chunk") {
+              } else if (message.type === "chunk" || message.type === "chunk-probe") {
                 if (fileReceiverRef.current) {
                   await fileReceiverRef.current.handleChunk(
                     message as PeerMessage<ChunkPayload>
@@ -418,6 +447,10 @@ export function useReceiveTransfer({
 
     receiver.onProgress((progressData) => {
       setProgress(progressData);
+    });
+
+    receiver.onCleanup((cleared, total) => {
+      setCleanupProgress({ cleared, total });
     });
 
     receiver.onComplete(async (blob) => {
@@ -704,7 +737,9 @@ export function useReceiveTransfer({
     receivedFile,
     transferId,
     pendingOffer,
+    cleanupProgress,
     isReceiveTransferActive,
+    isWakeLockActive,
 
     // Modal states
     showPasswordModal,

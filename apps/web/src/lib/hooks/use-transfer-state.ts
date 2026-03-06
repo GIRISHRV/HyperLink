@@ -52,7 +52,18 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                 pausedBy: undefined
             };
         case "PROGRESS":
-            if (state.status !== "transferring" && state.status !== "paused") return state; // Only update progress if we're actually active
+            // If chunks are flowing but we're still in the offer/acceptance phase,
+            // transition to transferring so the progress panel becomes visible.
+            if (state.status === "awaiting_acceptance" || state.status === "offering" || state.status === "connecting") {
+                return {
+                    ...state,
+                    status: "transferring",
+                    bytesTransferred: action.bytesTransferred,
+                    speedBytesPerSecond: action.speed,
+                    estimatedSecondsRemaining: action.remaining,
+                };
+            }
+            if (state.status !== "transferring" && state.status !== "paused") return state;
             return {
                 ...state,
                 bytesTransferred: action.bytesTransferred,

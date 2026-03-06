@@ -76,6 +76,7 @@ export type PeerMessageType =
   | "file-reject"
   | "chunk"
   | "chunk-ack"
+  | "chunk-probe"
   | "transfer-complete"
   | "transfer-error"
   | "transfer-cancel"

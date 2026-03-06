@@ -8,6 +8,7 @@ export interface UserProfile {
   display_name: string | null;
   avatar_icon: string;
   avatar_color: string;
+  active_peer_id: string | null; // Added for Task #9
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +17,7 @@ export interface UpdateProfileData {
   display_name?: string;
   avatar_icon?: string;
   avatar_color?: string;
+  active_peer_id?: string; // Added for Task #9
 }
 
 /**

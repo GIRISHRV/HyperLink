@@ -13,6 +13,7 @@ interface TransferProgressPanelProps {
   timeRemaining: number;
   onPauseResume: () => void;
   onCancel: () => void;
+  isWakeLockActive?: boolean;
   /** "uplink" for send, "downlink" for receive */
   direction: "uplink" | "downlink";
 }
@@ -28,6 +29,7 @@ export default function TransferProgressPanel({
   onPauseResume,
   onCancel,
   direction,
+  isWakeLockActive,
 }: TransferProgressPanelProps) {
   const isUplink = direction === "uplink";
 
@@ -69,6 +71,22 @@ export default function TransferProgressPanel({
               : "downloading"}
         </span>
       </div>
+
+      {/* Task #7: Wake Lock Indicator */}
+      {isWakeLockActive && (
+        <div className="bg-amber-500/10 border-l-4 border-amber-500 p-3 flex items-center justify-between z-10 animate-in fade-in slide-in-from-left-2">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-amber-500 animate-pulse">coffee</span>
+            <div>
+              <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest">System Stay-Awake Active</p>
+              <p className="text-white/60 text-[10px] font-mono">Screen will remain on until transfer completes</p>
+            </div>
+          </div>
+          <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black uppercase tracking-tighter rounded-sm">
+            Active
+          </div>
+        </div>
+      )}
 
       {/* Main Progress Card */}
       <div className="bg-surface-inset/90 backdrop-blur-sm p-6 border border-subtle-bauhaus flex-1 flex flex-col gap-6 relative overflow-hidden group">

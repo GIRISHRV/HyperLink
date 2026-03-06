@@ -79,4 +79,9 @@ describe("TransferProgressPanel", () => {
         fireEvent.click(screen.getByText("Abort"));
         expect(onCancel).toHaveBeenCalledOnce();
     });
+
+    it("shows 'System Stay-Awake Active' when wake lock is active", () => {
+        render(<TransferProgressPanel {...baseProps} isWakeLockActive={true} />);
+        expect(screen.getByText("System Stay-Awake Active")).toBeTruthy();
+    });
 });

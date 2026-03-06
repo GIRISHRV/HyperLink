@@ -25,6 +25,12 @@ export class FileSender {
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private rejectCallback?: () => void;
+  private acceptedCallback?: () => void;
+  private lastAckTimestamp: number = 0;
+  private probeTimer: NodeJS.Timeout | null = null;
+  private probeCount: number = 0;
+  private readonly PROBE_INTERVAL = 3000;
+  private readonly MAX_PROBES = 5;
 
   // Encryption state
   private salt?: Uint8Array;
@@ -113,6 +119,7 @@ export class FileSender {
       };
 
       const cleanup = () => {
+        this.stopHeartbeat();
         this.connection.off("close", onClose);
         this.connection.off("error", onError);
         if (this.status === "transferring" || this.status === "paused") {
@@ -147,6 +154,9 @@ export class FileSender {
         if (message.type === "file-accept" && !transferStarted) {
           logger.info("[SENDER] Received file-accept, pumping chunks...");
           transferStarted = true;
+          this.acceptedCallback?.();
+          this.lastAckTimestamp = Date.now();
+          this.startHeartbeat();
           this.pump();
           return;
         }
@@ -165,6 +175,8 @@ export class FileSender {
         if (message.type === "chunk-ack") {
           // Receiver confirmed chunk, slide window
           this.activeChunks = Math.max(0, this.activeChunks - 1);
+          this.lastAckTimestamp = Date.now();
+          this.probeCount = 0;
 
           if (this.status === "cancelled") return;
           if (this.status === "paused") return;
@@ -507,6 +519,13 @@ export class FileSender {
   }
 
   /**
+   * Register acceptance callback (receiver accepted the offer)
+   */
+  onAccepted(callback: () => void): void {
+    this.acceptedCallback = callback;
+  }
+
+  /**
    * Get current chunk index (for resumption info)
    */
   getCurrentChunk(): number {
@@ -525,5 +544,70 @@ export class FileSender {
    */
   getTransferId(): string {
     return this.transferId;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.probeTimer = setInterval(() => {
+      if (this.status !== "transferring" || this.activeChunks === 0) return;
+
+      const now = Date.now();
+      if (now - this.lastAckTimestamp > this.PROBE_INTERVAL) {
+        this.sendProbe();
+      }
+    }, 1000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.probeTimer) {
+      clearInterval(this.probeTimer);
+      this.probeTimer = null;
+    }
+  }
+
+  private async sendProbe(): Promise<void> {
+    if (this.probeCount >= this.MAX_PROBES) {
+      logger.error({ transferId: this.transferId, probes: this.probeCount }, "[SENDER] Transfer stalled. Max probes reached.");
+      this.sendError("Transfer stalled (connection lost)").catch(() => { });
+      this.rejectTransfer?.(new Error("Transfer stalled"));
+      this.cancel();
+      return;
+    }
+
+    this.probeCount++;
+    // Re-send the last un-acked chunk as a probe
+    // The "last un-acked" is currentChunk - activeChunks
+    const probeIndex = Math.max(0, this.currentChunk - this.activeChunks);
+
+    logger.warn({
+      transferId: this.transferId,
+      probeIndex,
+      probeCount: this.probeCount,
+      activeChunks: this.activeChunks
+    }, "[SENDER] Sending chunk-probe (ACK delayed)");
+
+    const start = probeIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, this.file.size);
+
+    try {
+      let arrayBuffer = await this.file.slice(start, end).arrayBuffer();
+      if (this.cryptoKey) {
+        arrayBuffer = await encryptChunk(arrayBuffer, this.cryptoKey);
+      }
+
+      const probeMessage: PeerMessage<ChunkPayload> = {
+        type: "chunk-probe",
+        transferId: this.transferId,
+        payload: {
+          chunkIndex: probeIndex,
+          data: arrayBuffer,
+        },
+        timestamp: Date.now(),
+      };
+
+      await this.safeSend(probeMessage);
+    } catch (err) {
+      logger.error({ err, probeIndex }, "[SENDER] Probe failed");
+    }
   }
 }

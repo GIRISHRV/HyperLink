@@ -1,5 +1,6 @@
 /**
  * Phase 2 — PeerManager (peer-manager.ts) — Comprehensive Tests
+ * @vitest-environment jsdom
  *
  * Tests for: initialize, connectToPeer, event emission, destroy, reconnection.
  */
@@ -109,7 +110,7 @@ vi.mock('peerjs', () => {
     }
 
     return {
-        default: vi.fn(function(id?: string | object, options?: object) { return new MockPeer(id, options); }),
+        default: vi.fn(function (id?: string | object, options?: object) { return new MockPeer(id, options); }),
         DataConnection: MockDataConnection,
     };
 });
@@ -143,22 +144,37 @@ describe('PeerManager', () => {
         expect(peerManager.getPeerId()).toBeNull();
     });
 
+    it('can generate a random secure ID', () => {
+        const id = PeerManager.getRandomId();
+        expect(id).toMatch(/^hl-/);
+        expect(id.length).toBeGreaterThan(10);
+    });
+
     // ─── Initialize ────────────────────────────────────────────────────
 
     it('initializes with provided peerId', async () => {
-        const p = peerManager.initialize('custom-id');
+        const p = peerManager.initialize('hl-custom-id');
         vi.advanceTimersByTime(50);
         const id = await p;
-        expect(id).toBe('custom-id');
+        expect(id).toBe('hl-custom-id');
         expect(peerManager.getState()).toBe('connected');
     });
 
-    it('initializes with auto-generated peerId', async () => {
+    it('initializes with auto-generated peerId if none provided', async () => {
+        // Mock crypto.randomUUID to return a predictable string
+        const mockUUID = '12345678-1234-1234-1234-1234567890ab';
+        const originalUUID = global.crypto.randomUUID;
+        global.crypto.randomUUID = vi.fn().mockReturnValue(mockUUID);
+
         const p = peerManager.initialize();
         vi.advanceTimersByTime(50);
         const id = await p;
-        expect(id).toBe('mock-peer-id');
+
+        // PeerManager.getRandomId() returns hl-prefix + first segment of UUID
+        expect(id).toBe('hl-12345678');
         expect(peerManager.getState()).toBe('connected');
+
+        global.crypto.randomUUID = originalUUID;
     });
 
     it('returns existing promise on re-initialization', () => {
@@ -245,6 +261,59 @@ describe('PeerManager', () => {
         peerManager.destroy();
         peerManager.destroy();
         expect(peerManager.getState()).toBe('closed');
+    });
+
+    // ─── NAT Traversal (Task #4) ──────────────────────────────────────────
+
+    it('Task #4: emits firewall-blocked if only host candidates gathered', async () => {
+        const p = peerManager.initialize('local');
+        vi.advanceTimersByTime(50);
+        await p;
+
+        const firewallBlockedCb = vi.fn();
+        peerManager.on('firewall-blocked', firewallBlockedCb);
+
+        // Manually trigger a connection to get access to the mock RTCPeerConnection
+        const conn = peerManager.connectToPeer('remote');
+        const pc = (conn as any).peerConnection;
+
+        // Find the icecandidate listener
+        const candidateListener = pc.addEventListener.mock.calls.find((call: any) => call[0] === 'icecandidate')[1];
+        const stateListener = pc.addEventListener.mock.calls.find((call: any) => call[0] === 'iceconnectionstatechange')[1];
+
+        // 1. Gather ONLY a host candidate
+        candidateListener({ candidate: { type: 'host', protocol: 'udp', address: '127.0.0.1' } });
+
+        // 2. Fail the connection
+        // Mocking the state property on the pc object itself
+        Object.defineProperty(pc, 'iceConnectionState', { get: () => 'failed' });
+        stateListener();
+
+        expect(firewallBlockedCb).toHaveBeenCalled();
+    });
+
+    it('Task #4: does NOT emit firewall-blocked if relay candidate exists', async () => {
+        const p = peerManager.initialize('local');
+        vi.advanceTimersByTime(50);
+        await p;
+
+        const firewallBlockedCb = vi.fn();
+        peerManager.on('firewall-blocked', firewallBlockedCb);
+
+        const conn = peerManager.connectToPeer('remote');
+        const pc = (conn as any).peerConnection;
+
+        const candidateListener = pc.addEventListener.mock.calls.find((call: any) => call[0] === 'icecandidate')[1];
+        const stateListener = pc.addEventListener.mock.calls.find((call: any) => call[0] === 'iceconnectionstatechange')[1];
+
+        // 1. Gather a relay candidate
+        candidateListener({ candidate: { type: 'relay', protocol: 'udp', address: '1.2.3.4' } });
+
+        // 2. Fail the connection
+        Object.defineProperty(pc, 'iceConnectionState', { get: () => 'failed' });
+        stateListener();
+
+        expect(firewallBlockedCb).not.toHaveBeenCalled();
     });
 
     // ─── Reconnection ──────────────────────────────────────────────────

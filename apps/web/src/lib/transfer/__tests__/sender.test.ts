@@ -6,7 +6,7 @@
  *
  * All PeerJS and crypto dependencies are mocked.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { FileSender } from "../sender";
 
 // ─── Mock dependencies ─────────────────────────────────────────────────
@@ -437,6 +437,68 @@ describe("FileSender", () => {
       await sender.startTransfer();
 
       expect(sender.getStatus()).toBe("complete");
+    });
+  });
+
+  describe("heartbeat and probes (Task 2)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Polyfill arrayBuffer for jsdom
+      const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
+        return Promise.resolve(new ArrayBuffer(65536));
+      };
+      Object.defineProperty(Blob.prototype, "arrayBuffer", {
+        value: arrayBufferImpl,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("sends a chunk-probe if no ACK received for 3 seconds", async () => {
+      const file = createMockFile(65536 * 5); // 5 chunks
+      const sender = new FileSender(file, conn as any);
+
+      sender.startTransfer().catch(() => { });
+
+      // Accept
+      conn._emit("data", {
+        type: "file-accept",
+        transferId: "mock-transfer-id"
+      });
+
+      // Wait a bit for initial pump
+      await vi.advanceTimersByTimeAsync(50);
+      conn.send.mockClear();
+
+      // Wait more than PROBE_INTERVAL (3000ms) + initial drift
+      await vi.advanceTimersByTimeAsync(5000);
+
+      const probeMsg = conn.send.mock.calls.find(c => c[0].type === "chunk-probe");
+      expect(probeMsg).toBeDefined();
+      expect(probeMsg![0].payload.chunkIndex).toBe(0); // first un-acked
+    });
+
+    it("stalls after max probes reached", async () => {
+      const file = createMockFile(64);
+      const sender = new FileSender(file, conn as any);
+
+      sender.startTransfer().catch(() => { });
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+      await vi.advanceTimersByTimeAsync(50);
+
+      // Trigger 5 probes (MAX_PROBES)
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(3500);
+      }
+
+      // Next heartbeat check (after 1s) should see probeCount >= MAX_PROBES
+      await vi.advanceTimersByTimeAsync(1500);
+
+      expect(sender.getStatus()).toBe("cancelled");
     });
   });
 });

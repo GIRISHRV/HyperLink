@@ -1,6 +1,6 @@
 {
   "name": "hyperlink",
-  "version": "1.00.000",
+  "version": "1.00.002",
   "private": true,
   "description": "HyperLink: High-Speed P2P File Engine using WebRTC and IndexedDB",
   "workspaces": [
@@ -17,7 +17,8 @@
     "clean": "turbo clean && rm -rf node_modules",
     "test": "npm test --workspace=apps/web && npm run test:e2e --workspace=apps/web",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
-    "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web"
+    "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web",
+    "validate": "npm run test && npm run lint && npx tsc --noEmit -p apps/web/tsconfig.json && npm run build"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

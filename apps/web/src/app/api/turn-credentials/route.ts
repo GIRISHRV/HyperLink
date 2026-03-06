@@ -23,12 +23,21 @@ export async function GET() {
         { urls: "stun:stun1.l.google.com:19302" },
     ];
 
-    if (process.env.TURN_URL) {
-        // Paid / private TURN — credentials live only on the server
-        iceServers.push({
-            urls: process.env.TURN_URL,
-            username: process.env.TURN_USERNAME ?? "",
-            credential: process.env.TURN_CREDENTIAL ?? "",
+    // Task #4: Support multiple TURN providers for redundancy
+    const turnProviders = [
+        { url: process.env.TURN_URL, user: process.env.TURN_USERNAME, pass: process.env.TURN_CREDENTIAL },
+        { url: process.env.TURN_URL_2, user: process.env.TURN_USERNAME_2, pass: process.env.TURN_CREDENTIAL_2 },
+        { url: process.env.TURN_URL_3, user: process.env.TURN_USERNAME_3, pass: process.env.TURN_CREDENTIAL_3 },
+    ].filter(p => p.url);
+
+    if (turnProviders.length > 0) {
+        // Use private/paid TURN providers if configured
+        turnProviders.forEach(p => {
+            iceServers.push({
+                urls: p.url!,
+                username: p.user ?? "",
+                credential: p.pass ?? "",
+            });
         });
     } else {
         // Public OpenRelay fallback — free, rate-limited, fine for development

@@ -78,6 +78,7 @@ function SendPageContent() {
     resetSend,
     handlePauseResume,
     handleCancel,
+    isWakeLockActive,
     showBackModal,
     confirmBackNavigation,
     cancelBackNavigation,
@@ -337,6 +338,7 @@ function SendPageContent() {
                   onPauseResume={handlePauseResume}
                   onCancel={handleCancel}
                   direction="uplink"
+                  isWakeLockActive={isWakeLockActive}
                 />
                 <TransferVisualizer isPaused={transferState.status === "paused"} direction="uplink" />
               </div>

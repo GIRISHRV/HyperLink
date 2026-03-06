@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const [selectedIcon, setSelectedIcon] = useState("person");
   const [selectedColor, setSelectedColor] = useState(AVATAR_COLORS[0]);
   const [displayName, setDisplayName] = useState("");
+  const [compatibilityMode, setCompatibilityMode] = useState(false); // Task #4: Forced Relay
 
   // UI state
   const [saved, setSaved] = useState(false);
@@ -63,6 +64,10 @@ export default function SettingsPage() {
       const color = AVATAR_COLORS.find((c) => c.value === profile.avatar_color);
       if (color) setSelectedColor(color);
     }
+
+    // Task #4: Load compatibility mode from local storage
+    const stored = localStorage.getItem("hl_compatibility_mode");
+    setCompatibilityMode(stored === "true");
   }, [user]);
 
   useEffect(() => {
@@ -88,6 +93,9 @@ export default function SettingsPage() {
       }
 
       await updateUserProfile(user.id, updates);
+
+      // Task #4: Save compatibility mode to localStorage
+      localStorage.setItem("hl_compatibility_mode", compatibilityMode.toString());
 
       // Artificial delay for UI feedback and E2E test reliability
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -280,6 +288,30 @@ export default function SettingsPage() {
                         <Ripple />
                       </button>
                     ))}
+                  </div>
+                </section>
+
+                {/* Network & Connectivity (Task #4) */}
+                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-yellow-500 border-y border-r border-white/5 p-8 rounded-r-sm shadow-xl">
+                  <h2 className="text-3xl font-black uppercase mb-6 tracking-tight flex items-center gap-3 text-white">
+                    <span className="material-symbols-outlined text-yellow-500 text-3xl">router</span>
+                    Connectivity
+                  </h2>
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10">
+                      <div>
+                        <h3 className="text-lg font-bold text-white uppercase tracking-tight">Compatibility Mode</h3>
+                        <p className="text-sm text-gray-400 mt-1">Forces all traffic through relay (TURN). Use this if transfers are failing on strict firewalls.</p>
+                      </div>
+                      <button
+                        onClick={() => setCompatibilityMode(!compatibilityMode)}
+                        className={`relative inline-flex h-8 w-14 items-center transition-all focus:outline-none ${compatibilityMode ? 'bg-primary' : 'bg-white/10'} rounded-none`}
+                      >
+                        <span
+                          className={`inline-block size-6 transform bg-white transition-transform ${compatibilityMode ? 'translate-x-7' : 'translate-x-1'}`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </section>
 

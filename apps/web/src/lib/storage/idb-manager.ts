@@ -74,19 +74,50 @@ export async function addChunk(chunk: FileChunk): Promise<void> {
 }
 
 /**
- * Clear all chunks for a transfer (called after download complete)
+ * Clear all chunks for a transfer in batches to prevent browser lockup for large files (Task #6)
  */
-export async function clearTransfer(transferId: string): Promise<void> {
+export async function clearTransfer(
+  transferId: string,
+  onProgress?: (cleared: number, total: number) => void
+): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(CHUNK_STORE, "readwrite");
-  const index = tx.store.index("transferId");
-  const keys = await index.getAllKeys(transferId);
+  const BATCH_SIZE = 5000;
 
-  for (const key of keys) {
-    await tx.store.delete(key);
+  // 1. Get total count for progress reporting
+  const total = await db.countFromIndex(CHUNK_STORE, "transferId", transferId);
+  if (total === 0) return;
+
+  let cleared = 0;
+
+  while (true) {
+    const tx = db.transaction(CHUNK_STORE, "readwrite");
+    const index = tx.store.index("transferId");
+    let cursor = await index.openCursor(transferId);
+
+    let batchCount = 0;
+    while (cursor && batchCount < BATCH_SIZE) {
+      await cursor.delete();
+      batchCount++;
+      cleared++;
+      cursor = await cursor.continue();
+    }
+
+    await tx.done;
+
+    if (onProgress) {
+      onProgress(cleared, total);
+    }
+
+    // If we've processed everything, exit
+    if (cleared >= total || batchCount < BATCH_SIZE) {
+      break;
+    }
+
+    // Yield to main thread to permit UI interactions/rendering (Task #6 Requirement)
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  await tx.done;
+  logger.info({ transferId, totalChunks: total }, "[IDB] Successfully cleared transfer chunks");
 }
 
 /**

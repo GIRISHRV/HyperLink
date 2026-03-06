@@ -3,6 +3,9 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 import rateLimit from "express-rate-limit";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const PORT = parseInt(process.env.PORT || "9000");
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",").map(s => s.trim()) || [
@@ -67,15 +70,50 @@ app.get("/", (_req, res) => {
   res.send("HyperLink Signaling Server is running 🚀");
 });
 
+import jwt from "jsonwebtoken";
+
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || "";
+
 // Initialize PeerServer middleware
 const peerServer = ExpressPeerServer(server, {
-  path: "/myapp", // This becomes /peerjs/myapp when mounted on /peerjs, or relative to mount point
+  path: "/myapp",
   allow_discovery: true,
 });
 
+// Auth Middleware for Task 3
+app.use((req, res, next) => {
+  // Allow discovery and other requests only if authenticated
+  // PeerJS initial requests: /myapp/id, /myapp/peerid/offer, etc.
+
+  // Public routes
+  if (req.path === "/health" || req.path === "/") {
+    return next();
+  }
+
+  // Skip auth if no secret is provided (for local dev if not configured)
+  if (!SUPABASE_JWT_SECRET) {
+    console.warn("[AUTH] SUPABASE_JWT_SECRET not found, skipping verification (INSECURE)");
+    return next();
+  }
+
+  const token = (req.headers["authorization"]?.toString().split(" ")[1]) || (req.query.token as string);
+
+  if (!token) {
+    console.log(`[AUTH] Rejected request from ${req.ip}: No token provided`);
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
+    (req as any).user = decoded;
+    next();
+  } catch (err) {
+    console.log(`[AUTH] Rejected request from ${req.ip}: Invalid token`);
+    return res.status(403).json({ error: "Invalid or expired token" });
+  }
+});
+
 // Mount PeerServer
-// Note: Client connects to host/myapp
-// We mount at root so path matches
 app.use("/", peerServer);
 
 // Track connected peer count with a simple counter

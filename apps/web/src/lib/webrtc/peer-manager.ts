@@ -10,6 +10,7 @@ export class PeerManager {
 
   private isDestroyed: boolean = false;
   private initializationPromise: Promise<string> | null = null;
+  private lastIceCandidates: RTCIceCandidate[] = []; // Task #4: Track candidates for diagnostics
 
   // Reconnection state
   private static readonly MAX_RECONNECT_ATTEMPTS = 5;
@@ -19,18 +20,44 @@ export class PeerManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isReconnecting: boolean = false;
 
+  /**
+   * Generate a cryptographically secure random ID
+   * Fallback for Task #9
+   */
+  public static getRandomId(prefix: string = "hl"): string {
+    try {
+      const cryptoObj = (typeof window !== "undefined" ? window.crypto : null) ||
+        (typeof global !== "undefined" ? (global as any).crypto : null);
+
+      if (cryptoObj && cryptoObj.randomUUID) {
+        return `${prefix}-${cryptoObj.randomUUID().split("-")[0]}`;
+      }
+
+      if (cryptoObj && cryptoObj.getRandomValues) {
+        const array = new Uint32Array(4);
+        cryptoObj.getRandomValues(array);
+        return `${prefix}-${array[0].toString(16)}-${array[1].toString(16)}`;
+      }
+
+      // Last resort fallback
+      return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36).slice(-5)}`;
+    } catch (e) {
+      return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+  }
+
   constructor(private config: PeerConfig) { }
 
   /**
    * Initialize PeerJS connection to signaling server
    */
-  initialize(peerId?: string): Promise<string> {
+  initialize(peerId?: string, token?: string): Promise<string> {
     if (this.isDestroyed) return Promise.reject(new Error("PeerManager is destroyed"));
     if (this.initializationPromise) return this.initializationPromise;
 
     this.initializationPromise = new Promise((resolve, reject) => {
       try {
-        const options = {
+        const options: any = {
           host: this.config.host,
           port: this.config.port,
           path: this.config.path,
@@ -39,19 +66,20 @@ export class PeerManager {
           config: this.config.config, // Use the provided RTCPeerConnection configuration
         };
 
+        if (token) {
+          options.token = token;
+        }
+
         logger.info({
           ...options,
           config: {
             ...options.config,
-            iceServers: options.config?.iceServers?.map((s) => ({ ...s, credential: '***' }))
+            iceServers: options.config?.iceServers?.map((s: any) => ({ ...s, credential: '***' }))
           }
         }, "[PeerManager] Initializing with config");
 
-        if (peerId) {
-          this.peer = new Peer(peerId, options);
-        } else {
-          this.peer = new Peer(options);
-        }
+        const finalId = peerId || PeerManager.getRandomId();
+        this.peer = new Peer(finalId, options);
 
         this.peer.on("open", (id) => {
           if (this.isDestroyed) {
@@ -190,6 +218,7 @@ export class PeerManager {
     if (pc) {
       pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
         if (event.candidate) {
+          this.lastIceCandidates.push(event.candidate); // Task #4: Store for diagnostics
           const type = event.candidate.type; // 'host', 'srflx' (STUN), or 'relay' (TURN)
           const protocol = event.candidate.protocol;
           // .address is the standard property; .ip is the legacy alias declared in global.d.ts
@@ -212,8 +241,17 @@ export class PeerManager {
         logger.info({ state }, "[ICE] Connection state changed");
 
         if (state === "failed") {
+          // Task #4: Determine if firewall is blocking connection
+          // If we only have 'host' candidates, it means STUN/TURN failed or was blocked.
+          const hasRemoteCandidates = this.lastIceCandidates.some(c => c.type !== 'host');
+          if (!hasRemoteCandidates && this.lastIceCandidates.length > 0) {
+            logger.error("[ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely.");
+            this.emit("firewall-blocked");
+          }
+
           logger.error({
             iceGatheringState: pc.iceGatheringState,
+            candidateCount: this.lastIceCandidates.length,
             signalingState: pc.signalingState,
             localDescription: pc.localDescription?.type,
             remoteDescription: pc.remoteDescription?.type,

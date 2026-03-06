@@ -26,6 +26,7 @@ export class FileReceiver {
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private errorCallback?: (error: Error | string) => void;
+  private cleanupCallback?: (cleared: number, total: number) => void;
   private resumeFromChunk: number = 0; // For crash recovery
 
   // Encryption state
@@ -127,9 +128,21 @@ export class FileReceiver {
    * Handle incoming chunk - store it and send ACK
    */
   async handleChunk(message: PeerMessage<ChunkPayload>): Promise<void> {
-    if (this.status === "cancelled") return;
+    if (this.status === "cancelled" || this.status === "complete") return;
 
     const { chunkIndex, data } = message.payload;
+    const isProbe = message.type === "chunk-probe";
+
+    // IDEMPOTENCY CHECK: If we already processed this chunk, just ACK and skip.
+    // This is crucial for Task 2 (ACK Resilience) so we don't do redundant IDB writes.
+    // Since we are mostly sequential (sliding window), index < resumeFromChunk is a solid indicator.
+    // For intermediate duplicates, we rely on the fact that we increment receivedChunks only for NEW ones.
+    if (chunkIndex < this.resumeFromChunk) {
+      if (isProbe) logger.debug({ chunkIndex }, "[RECEIVER] Received probe for already-processed chunk, re-ACKing");
+      this.sendAck(chunkIndex);
+      return;
+    }
+
     let chunkData = data;
 
     // Decrypt if encrypted
@@ -186,6 +199,10 @@ export class FileReceiver {
 
     this.receivedChunks++;
     this.bytesReceived += chunkData.byteLength; // Track decrypted size
+    // For live idempotency (Task 2), keep resumeFromChunk updated as the progress pointer
+    if (chunkIndex >= this.resumeFromChunk) {
+      this.resumeFromChunk = chunkIndex + 1;
+    }
 
     // Log progress every 10%
     const percentage = (this.receivedChunks / this.totalChunks) * 100;
@@ -271,8 +288,10 @@ export class FileReceiver {
         logger.warn("[RECEIVER] No completeCallback set!");
       }
 
-      // Clear chunks from IndexedDB
-      await clearTransfer(this.transferId);
+      // Clear chunks from IndexedDB with batched progress reporting (Task #6)
+      await clearTransfer(this.transferId, (cleared, total) => {
+        this.cleanupCallback?.(cleared, total);
+      });
       logger.info("[RECEIVER] Cleared chunks from IndexedDB");
     } catch (error) {
       logger.error({ error }, "Error assembling file");
@@ -308,6 +327,13 @@ export class FileReceiver {
   }
 
   /**
+   * Register cleanup progress callback (Task #6)
+   */
+  onCleanup(callback: (cleared: number, total: number) => void): void {
+    this.cleanupCallback = callback;
+  }
+
+  /**
    * Handle control messages from sender (cancel, pause, resume)
    */
   handleControlMessage(message: PeerMessage): boolean {
@@ -318,8 +344,10 @@ export class FileReceiver {
       logger.info("[RECEIVER] Sender cancelled transfer");
       this.status = "cancelled";
       this.cancelCallback?.();
-      // Clean up partial chunks from IndexedDB
-      clearTransfer(this.transferId).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed"));
+      // Clean up partial chunks from IndexedDB with batched progress reporting (Task #6)
+      clearTransfer(this.transferId, (cleared, total) => {
+        this.cleanupCallback?.(cleared, total);
+      }).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed"));
       return true;
     }
 
@@ -396,8 +424,10 @@ export class FileReceiver {
     };
     await this.safeSend(cancelMessage);
     this.status = "cancelled";
-    // Clean up partial chunks from IndexedDB
-    clearTransfer(this.storageId || this.transferId).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
+    // Clean up partial chunks from IndexedDB with batched progress reporting (Task #6)
+    clearTransfer(this.storageId || this.transferId, (cleared, total) => {
+      this.cleanupCallback?.(cleared, total);
+    }).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
     this.cancelCallback?.();
     logger.info("[RECEIVER] Transfer cancelled");
   }

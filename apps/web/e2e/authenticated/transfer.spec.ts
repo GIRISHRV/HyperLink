@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const FIXTURE_FILE = path.resolve(__dirname, "../fixtures/test-file-10mb.bin");
+const LARGE_FIXTURE_FILE = path.resolve(__dirname, "../fixtures/test-file-50mb.bin");
 const AUTH_FILE = path.resolve(__dirname, "../.auth/user.json");
 const RECEIVER_AUTH_FILE = path.resolve(__dirname, "../.auth/receiver.json");
 
@@ -111,8 +112,9 @@ test("complete file transfer between two authenticated peers", async () => {
 });
 
 test("abort synchronization between peers", async () => {
-    test.setTimeout(90_000);
-    const browser = await chromium.launch({ slowMo: 500 });
+    test.setTimeout(120_000);
+    // Use 50MB fixture so the transfer is still in progress when we assert the abort button.
+    const browser = await chromium.launch({ slowMo: 1000 });
 
     const receiverContext = await browser.newContext({
         storageState: RECEIVER_AUTH_FILE,
@@ -133,7 +135,7 @@ test("abort synchronization between peers", async () => {
         const receiverPeerId = await peerIdElement.textContent();
 
         await senderPage.goto("http://localhost:3000/send");
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+        await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
 
         const peerInput = senderPage.getByPlaceholder("Enter hash...");
         await expect(peerInput).toBeVisible({ timeout: 5_000 });
@@ -166,8 +168,9 @@ test("abort synchronization between peers", async () => {
 });
 
 test("pause and resume synchronization between peers", async () => {
-    test.setTimeout(90_000);
-    const browser = await chromium.launch({ slowMo: 500 });
+    test.setTimeout(120_000);
+    // Use 50MB fixture so the transfer is still in progress when we assert the pause button.
+    const browser = await chromium.launch({ slowMo: 1000 });
 
     const receiverContext = await browser.newContext({
         storageState: RECEIVER_AUTH_FILE,
@@ -188,7 +191,7 @@ test("pause and resume synchronization between peers", async () => {
         const receiverPeerId = await peerIdElement.textContent();
 
         await senderPage.goto("http://localhost:3000/send");
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+        await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
 
         const peerInput = senderPage.getByPlaceholder("Enter hash...");
         await expect(peerInput).toBeVisible({ timeout: 5_000 });

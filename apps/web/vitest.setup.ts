@@ -3,6 +3,22 @@ import '@testing-library/jest-dom'
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost:54321";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+
+// ── localStorage polyfill ────────────────────────────────────────────────────
+// jsdom provides localStorage, but in some Vitest configurations the global
+// object doesn't wire it up correctly, causing "localStorage.getItem is not a
+// function". This polyfill ensures the API is always available in tests.
+if (typeof globalThis.localStorage === "undefined" || typeof globalThis.localStorage.getItem !== "function") {
+  const store: Record<string, string> = {};
+  globalThis.localStorage = {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = String(value); },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+    get length() { return Object.keys(store).length; },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+  } as Storage;
+}
 /**
  * ─── Suppress Expected Unhandled Rejections ──────────────────────────────
  *

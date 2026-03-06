@@ -48,7 +48,9 @@ export default function ReceivePage() {
     progress,
     receivedFile,
     pendingOffer,
+    cleanupProgress,
     isReceiveTransferActive,
+    isWakeLockActive,
     showPasswordModal,
     setShowPasswordModal,
     showCancelModal,
@@ -126,6 +128,7 @@ export default function ReceivePage() {
                     onPauseResume={handlePauseResume}
                     onCancel={handleCancelClick}
                     direction="downlink"
+                    isWakeLockActive={isWakeLockActive}
                   />
                   <TransferVisualizer isPaused={transferState.status === "paused"} direction="downlink" />
                 </div>
@@ -196,6 +199,8 @@ export default function ReceivePage() {
                         showShareFallback={showShareFallback}
                         onTextShareFallback={handleTextShareFallback}
                         onReset={resetReceive}
+                        cleanupProgress={cleanupProgress}
+                        isWakeLockActive={isWakeLockActive}
                       />
                     )}
 

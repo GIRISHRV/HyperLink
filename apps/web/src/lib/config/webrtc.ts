@@ -21,7 +21,7 @@ export async function getIceServers(): Promise<RTCIceServer[]> {
     }
 }
 
-export async function getPeerConfigAsync(iceServers: RTCIceServer[]): Promise<PeerConfig> {
+export async function getPeerConfigAsync(iceServers: RTCIceServer[], forceRelay: boolean = false): Promise<PeerConfig> {
     return {
         host: process.env.NEXT_PUBLIC_PEER_SERVER_HOST!,
         port: parseInt(process.env.NEXT_PUBLIC_PEER_SERVER_PORT!),
@@ -30,7 +30,7 @@ export async function getPeerConfigAsync(iceServers: RTCIceServer[]): Promise<Pe
         debug: 0,
         config: {
             iceServers,
-            iceTransportPolicy: "all",
+            iceTransportPolicy: forceRelay ? "relay" : "all", // Task #4: Support forced relay
             iceCandidatePoolSize: 10,
         },
     };

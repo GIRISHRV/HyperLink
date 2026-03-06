@@ -468,4 +468,41 @@ describe("FileReceiver", () => {
       // Should not throw
     });
   });
+
+  describe("idempotency and probes (Task 2)", () => {
+    beforeEach(async () => {
+      const offer = createOfferMessage({ totalChunks: 5 });
+      await receiver.handleOffer(offer);
+    });
+
+    it("skips storage write for duplicate chunks but sends ACK", async () => {
+      await receiver.handleChunk(createChunkMessage(0));
+      expect(mockAddChunk).toHaveBeenCalledTimes(1);
+      conn.send.mockClear();
+
+      // Send same chunk again
+      await receiver.handleChunk(createChunkMessage(0));
+
+      // Should NOT call addChunk again
+      expect(mockAddChunk).toHaveBeenCalledTimes(1);
+      // Should STILL send ACK
+      expect(conn.send).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "chunk-ack", payload: { chunkIndex: 0 } })
+      );
+    });
+
+    it("handles chunk-probe identically to chunk", async () => {
+      const probeMsg = {
+        ...createChunkMessage(1),
+        type: "chunk-probe" as const,
+      };
+
+      await receiver.handleChunk(probeMsg);
+
+      expect(mockAddChunk).toHaveBeenCalledTimes(1);
+      expect(conn.send).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "chunk-ack", payload: { chunkIndex: 1 } })
+      );
+    });
+  });
 });

@@ -12,6 +12,17 @@ interface ReceivedFileViewProps {
   onReset: () => void;
 }
 
+interface ReceivedFileViewProps {
+  receivedFile: { name: string; size: number; blob?: Blob };
+  onDownload: () => void;
+  onShare: () => void;
+  showShareFallback: boolean;
+  onTextShareFallback: () => void;
+  onReset: () => void;
+  cleanupProgress?: { cleared: number; total: number } | null;
+  isWakeLockActive?: boolean;
+}
+
 export default function ReceivedFileView({
   receivedFile,
   onDownload,
@@ -19,6 +30,8 @@ export default function ReceivedFileView({
   showShareFallback,
   onTextShareFallback,
   onReset,
+  cleanupProgress,
+  isWakeLockActive,
 }: ReceivedFileViewProps) {
   return (
     <div className="bg-black/60 backdrop-blur-xl p-6 border border-primary/20 shadow-[0_0_50px_-20px_rgba(var(--primary-rgb),0.2)] flex flex-col gap-6 animate-in zoom-in-95 fade-in duration-500 rounded-sm relative overflow-hidden group w-full max-w-full">
@@ -36,12 +49,41 @@ export default function ReceivedFileView({
             <p className="font-bold text-lg text-white tracking-tight truncate max-w-xs">
               {receivedFile.name}
             </p>
-            <p className="text-xs text-primary/60 font-mono uppercase tracking-widest mt-1">
-              {formatFileSize(receivedFile.size)} • Verified Complete
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-xs text-primary/60 font-mono uppercase tracking-widest">
+                {formatFileSize(receivedFile.size)} • Verified Complete
+              </p>
+              {isWakeLockActive && (
+                <div className="flex items-center gap-1 text-[10px] text-amber-500 font-bold uppercase tracking-tighter bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 animate-pulse">
+                  <span className="material-symbols-outlined !text-[12px]">coffee</span>
+                  Stay-Awake Active
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Task #6: Cleanup Progress */}
+      {cleanupProgress && cleanupProgress.cleared < cleanupProgress.total && (
+        <div className="bg-surface-inset p-3 border border-white/5 flex flex-col gap-2 z-10 animate-in fade-in slide-in-from-top-2">
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
+            <span className="text-primary flex items-center gap-1">
+              <span className="material-symbols-outlined !text-[14px] animate-spin">refresh</span>
+              Cleaning up temporary storage...
+            </span>
+            <span className="text-muted">
+              {Math.round((cleanupProgress.cleared / cleanupProgress.total) * 100)}%
+            </span>
+          </div>
+          <div className="h-1 bg-white/5 w-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${(cleanupProgress.cleared / cleanupProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* File Preview Container */}
       {receivedFile.blob && (
