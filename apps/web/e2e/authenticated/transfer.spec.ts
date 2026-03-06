@@ -154,6 +154,9 @@ test("abort synchronization between peers", async () => {
         // Sender aborts transfer
         await senderPage.getByRole("button", { name: /abort/i }).click();
 
+        // Confirm cancellation in the modal
+        await senderPage.getByRole("button", { name: /cancel transfer/i }).click();
+
         // Sender should see failed/cancelled state
         await expect(senderPage.getByText(/transfer cancelled by sender/i).first()).toBeVisible({ timeout: 5_000 });
 

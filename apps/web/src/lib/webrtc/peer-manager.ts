@@ -78,6 +78,12 @@ export class PeerManager {
           }
         }, "[PeerManager] Initializing with config");
 
+        this.config.onLog?.("[SYS] Initializing PeerManager...");
+        this.config.onLog?.("[NET] Connecting to signaling server...");
+        if (token) {
+          this.config.onLog?.("[SEC] Authenticating with signaling server using JWT...");
+        }
+
         const finalId = peerId || PeerManager.getRandomId();
         this.peer = new Peer(finalId, options);
 
@@ -93,7 +99,13 @@ export class PeerManager {
             this.isReconnecting = false;
             this.reconnectAttempts = 0;
             logger.info({ peerId: id }, "[PeerManager] Reconnected to signaling server");
+            this.config.onLog?.("[NET] Reconnected to signaling server.");
             this.emit("reconnected", id);
+          } else {
+            if (token) {
+              this.config.onLog?.("[SEC] Authenticated with signaling server (JWT verified).");
+            }
+            this.config.onLog?.(`[SYS] PeerManager initialized with ID: ${id}`);
           }
 
           this.emit("state-change", "connected");
@@ -139,6 +151,7 @@ export class PeerManager {
     if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
     if (this.reconnectAttempts >= PeerManager.MAX_RECONNECT_ATTEMPTS) {
       logger.error({ attempts: this.reconnectAttempts }, "[PeerManager] Max reconnection attempts reached");
+      this.config.onLog?.("[ERR] [NET] Max reconnection attempts reached. Offline.");
       this.emit("reconnect-failed");
       return;
     }
@@ -153,6 +166,11 @@ export class PeerManager {
     );
 
     logger.info({ attempt: this.reconnectAttempts, delayMs: Math.round(delay) }, "[PeerManager] Scheduling reconnection");
+    if (this.reconnectAttempts === 1) {
+      this.config.onLog?.(`[WARN] [NET] Signaling server disconnected. Scheduling reconnection in ${Math.round(delay)}ms...`);
+    } else {
+      this.config.onLog?.(`[NET] Reconnecting to signaling server (Attempt ${this.reconnectAttempts}/${PeerManager.MAX_RECONNECT_ATTEMPTS})...`);
+    }
     this.emit("reconnecting", { attempt: this.reconnectAttempts, maxAttempts: PeerManager.MAX_RECONNECT_ATTEMPTS });
 
     this.reconnectTimer = setTimeout(() => {
@@ -170,6 +188,7 @@ export class PeerManager {
       throw new Error("Peer not initialized");
     }
 
+    this.config.onLog?.(`[NET] Initiating connection to remote peer: ${remotePeerId}`);
     const conn = this.peer.connect(remotePeerId, {
       reliable: true,
       serialization: "binary",
@@ -183,6 +202,7 @@ export class PeerManager {
    * Handle incoming peer connections
    */
   private handleIncomingConnection(conn: DataConnection) {
+    this.config.onLog?.(`[NET] Incoming connection from peer: ${conn.peer}`);
     this.handleConnection(conn);
     this.emit("incoming-connection", conn);
   }
@@ -194,6 +214,7 @@ export class PeerManager {
     this.connections.set(conn.peer, conn);
 
     conn.on("open", () => {
+      this.config.onLog?.("[RTC] reliable-channel open (SCTP maxRetransmits: 0)");
       this.emit("connection-open", conn);
     });
 
@@ -225,20 +246,27 @@ export class PeerManager {
           const address = event.candidate.address ?? event.candidate.ip;
           const safeAddress = process.env.NODE_ENV === 'production' ? '[REDACTED]' : address;
           logger.info({ type, protocol, address: safeAddress }, "[ICE] Candidate gathered");
+          this.config.onLog?.(`[ICE] Candidate gathered: ${type} (${protocol}) from ${safeAddress}`);
+          if (type === "relay") {
+            this.config.onLog?.("[ICE] Relay server (TURN) allocated.");
+          }
         } else {
           logger.info("[ICE] All local candidates gathered");
+          this.config.onLog?.("[ICE] All local candidates gathered.");
         }
       });
 
       // Monitor signaling state
       pc.addEventListener("signalingstatechange", () => {
         logger.info({ state: pc.signalingState }, "[WEBRTC] Signaling state changed");
+        this.config.onLog?.(`[WEBRTC] Signaling state changed: ${pc.signalingState}`);
       });
 
       // Monitor ICE connection state changes
       pc.addEventListener("iceconnectionstatechange", () => {
         const state = pc.iceConnectionState;
         logger.info({ state }, "[ICE] Connection state changed");
+        this.config.onLog?.(`[ICE] State changed to '${state}'`);
 
         if (state === "failed") {
           // Task #4: Determine if firewall is blocking connection
@@ -246,6 +274,7 @@ export class PeerManager {
           const hasRemoteCandidates = this.lastIceCandidates.some(c => c.type !== 'host');
           if (!hasRemoteCandidates && this.lastIceCandidates.length > 0) {
             logger.error("[ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely.");
+            this.config.onLog?.("[ERR] [ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely.");
             this.emit("firewall-blocked");
           }
 
@@ -268,6 +297,7 @@ export class PeerManager {
                     local: pair.localCandidateId,
                     remote: pair.remoteCandidateId,
                   }, "[ICE] Connected using candidate pair");
+                  this.config.onLog?.(`[ICE] Connected using candidate pair: ${pair.localCandidateId} -> ${pair.remoteCandidateId}`);
                 }
               }
             });

@@ -249,7 +249,7 @@ describe("FileSender", () => {
       // jsdom does not define Blob/File.prototype.arrayBuffer.
       // Polyfill it so slice().arrayBuffer() resolves with a real buffer.
       const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
-        return Promise.resolve(new ArrayBuffer(64));
+        return Promise.resolve(new ArrayBuffer(this.size));
       };
       Object.defineProperty(Blob.prototype, "arrayBuffer", {
         value: arrayBufferImpl,
@@ -279,7 +279,7 @@ describe("FileSender", () => {
       conn._emit("data", {
         type: "chunk-ack",
         transferId: "mock-transfer-id",
-        payload: null,
+        payload: { chunkIndex: 0 },
         timestamp: Date.now(),
       });
 
@@ -428,9 +428,6 @@ describe("FileSender", () => {
     });
 
     it("completes immediately for 0-chunk file", async () => {
-      const { calculateChunkCount } = await import("@repo/utils");
-      (calculateChunkCount as ReturnType<typeof vi.fn>).mockReturnValueOnce(0);
-
       const file = createMockFile(0, "empty.txt");
       const sender = new FileSender(file, conn as any);
 
@@ -445,7 +442,7 @@ describe("FileSender", () => {
       vi.useFakeTimers();
       // Polyfill arrayBuffer for jsdom
       const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
-        return Promise.resolve(new ArrayBuffer(65536));
+        return Promise.resolve(new ArrayBuffer(this.size));
       };
       Object.defineProperty(Blob.prototype, "arrayBuffer", {
         value: arrayBufferImpl,
@@ -499,6 +496,93 @@ describe("FileSender", () => {
       await vi.advanceTimersByTimeAsync(1500);
 
       expect(sender.getStatus()).toBe("cancelled");
+    });
+  });
+
+  describe("adaptive scaling", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
+        return Promise.resolve(new ArrayBuffer(this.size));
+      };
+      Object.defineProperty(Blob.prototype, "arrayBuffer", {
+        value: arrayBufferImpl,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("increases chunk size after consecutive fast ACKs", async () => {
+      const file = createMockFile(1024 * 1024 * 10);
+      const sender = new FileSender(file, conn as any);
+
+      let now = 1000;
+      vi.setSystemTime(now);
+      sender.startTransfer().catch(() => { });
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+
+      // Advance to allow initial pump to record start times
+      await Promise.resolve();
+      now += 1;
+      vi.setSystemTime(now);
+
+      // Send 32 ACKs with very small increments to keep RTT fast (< 80ms)
+      for (let i = 0; i < 32; i++) {
+        now += 1;
+        vi.setSystemTime(now);
+        conn._emit("data", {
+          type: "chunk-ack",
+          transferId: "mock-transfer-id",
+          payload: { chunkIndex: i },
+        });
+        await Promise.resolve();
+        now += 1;
+        vi.setSystemTime(now);
+      }
+
+      const hasLargeChunk = conn.send.mock.calls.some(c => c[0].payload?.data?.byteLength >= 131072);
+      expect(hasLargeChunk).toBe(true);
+    });
+
+    it("decreases chunk size after slow ACK", async () => {
+      const file = createMockFile(1024 * 1024 * 10);
+      const sender = new FileSender(file, conn as any);
+
+      let now = 1000;
+      vi.setSystemTime(now);
+      sender.startTransfer().catch(() => { });
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+
+      await Promise.resolve();
+      now += 1;
+      vi.setSystemTime(now);
+
+      // 1. Scale up first
+      for (let i = 0; i < 32; i++) {
+        now += 1;
+        vi.setSystemTime(now);
+        conn._emit("data", { type: "chunk-ack", transferId: "mock-transfer-id", payload: { chunkIndex: i } });
+        await Promise.resolve();
+        now += 1;
+        vi.setSystemTime(now);
+      }
+
+      const hasLargeChunk = conn.send.mock.calls.some(c => c[0].payload?.data?.byteLength >= 131072);
+      expect(hasLargeChunk).toBe(true);
+
+      // 2. Simulate a slow ACK
+      const slowIndex = 32;
+      now += 500;
+      vi.setSystemTime(now);
+      conn._emit("data", { type: "chunk-ack", transferId: "mock-transfer-id", payload: { chunkIndex: slowIndex } });
+
+      await Promise.resolve();
+      const lastCall = conn.send.mock.calls[conn.send.mock.calls.length - 1][0];
+      expect(lastCall.payload.data.byteLength).toBe(65536);
     });
   });
 });

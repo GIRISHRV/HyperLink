@@ -15,6 +15,13 @@ vi.mock("@/lib/services/transfer-service", () => ({
   updateTransferStatus: mockUpdateStatus,
 }));
 
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
@@ -26,8 +33,9 @@ describe("useTransferGuard", () => {
     vi.clearAllMocks();
     mockUpdateStatus.mockResolvedValue({ error: null });
     // Prevent jsdom history state side effects
-    historySpy = vi.spyOn(window.history, "pushState").mockImplementation(() => {});
-    vi.spyOn(window.history, "go").mockImplementation(() => {});
+    historySpy = vi.spyOn(window.history, "pushState").mockImplementation(() => { });
+    vi.spyOn(window.history, "go").mockImplementation(() => { });
+    mockPush.mockClear();
   });
 
   afterEach(() => {
@@ -141,7 +149,7 @@ describe("useTransferGuard", () => {
     });
 
     expect(result.current.showBackModal).toBe(false);
-    expect(window.history.go).toHaveBeenCalledWith(-2);
+    expect(mockPush).toHaveBeenCalledWith("/dashboard");
   });
 
   // ── Transitions ────────────────────────────────────────────────────────────

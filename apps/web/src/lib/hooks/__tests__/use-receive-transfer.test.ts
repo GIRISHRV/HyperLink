@@ -122,6 +122,7 @@ vi.mock("@/lib/services/profile-service", () => ({
 
 vi.mock("@/lib/transfer/receiver", () => {
   class FileReceiver {
+    setOnLog = vi.fn();
     setConnection = m.mockRecvSetConnection;
     setStorageId = m.mockRecvSetStorageId;
     handleOffer = m.mockRecvHandleOffer;

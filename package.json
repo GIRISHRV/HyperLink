@@ -1,6 +1,6 @@
 {
   "name": "hyperlink",
-  "version": "1.00.002",
+  "version": "1.00.003",
   "private": true,
   "description": "HyperLink: High-Speed P2P File Engine using WebRTC and IndexedDB",
   "workspaces": [

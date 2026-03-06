@@ -8,6 +8,7 @@ import { useFileSelection } from "@/lib/hooks/use-file-selection";
 import { useChat } from "@/lib/hooks/use-chat";
 import AppHeader from "@/components/app-header";
 import ConfirmLeaveModal from "@/components/confirm-leave-modal";
+import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import PasswordModal from "@/components/password-modal";
 import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
@@ -26,6 +27,7 @@ import DragOverlay from "@/components/transfer/drag-overlay";
 
 import { openDB } from "idb";
 import { logger, formatFileSize } from "@repo/utils";
+import { getUserProfile, type UserProfile } from "@/lib/services/profile-service";
 
 const DB_NAME = "hyperlink-pwa-share";
 const STORE_NAME = "shared-files";
@@ -40,6 +42,7 @@ function SendPageContent() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [swStatus, setSwStatus] = useState<"not_registered" | "installing" | "active" | "error">("not_registered");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [logs, setLogs] = useState<string[]>([
     "[SYS] Terminal initialized",
     "[SYS] Awaiting transfer session"
@@ -67,21 +70,34 @@ function SendPageContent() {
   // --- Chat hook ---
   const chat = useChat(user?.id);
 
+  // --- Fetch Profile ---
+  useEffect(() => {
+    if (user?.id) {
+      getUserProfile(user.id).then(setProfile).catch(err => {
+        logger.error({ err }, "Failed to fetch user profile for chat");
+      });
+    }
+  }, [user?.id]);
+
   // --- Transfer hook ---
   const {
     transferState,
     isPeerReady,
+    myPeerId,
     error: transferError,
     connectionRef,
     peerManagerRef,
     handleSend,
     resetSend,
     handlePauseResume,
-    handleCancel,
+    handleCancelClick,
     isWakeLockActive,
     showBackModal,
     confirmBackNavigation,
     cancelBackNavigation,
+    showCancelModal,
+    setShowCancelModal,
+    confirmCancel,
   } = useSendTransfer({
     user,
     file,
@@ -182,6 +198,12 @@ function SendPageContent() {
         onConfirm={confirmBackNavigation}
         onCancel={cancelBackNavigation}
       />
+      <ConfirmCancelModal
+        isOpen={showCancelModal}
+        onConfirm={confirmCancel}
+        onCancel={() => setShowCancelModal(false)}
+        transferType="sending"
+      />
 
       <PasswordModal
         isOpen={showPasswordModal}
@@ -208,6 +230,7 @@ function SendPageContent() {
           if (isActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
             return false;
           }
+          if (isActive) confirmCancel();
           return true;
         }}
       />
@@ -275,7 +298,7 @@ function SendPageContent() {
                     </div>
                   )}
 
-                  <TerminalLog logs={logs} className="flex-1 min-h-[250px]" />
+                  <TerminalLog logs={logs} className="flex-1 mt-auto min-h-[250px]" />
                 </section>
               </div>
             )}
@@ -336,7 +359,7 @@ function SendPageContent() {
                   speed={transferState.speedBytesPerSecond || 0}
                   timeRemaining={transferState.estimatedSecondsRemaining || 0}
                   onPauseResume={handlePauseResume}
-                  onCancel={handleCancel}
+                  onCancel={handleCancelClick}
                   direction="uplink"
                   isWakeLockActive={isWakeLockActive}
                 />
@@ -394,7 +417,13 @@ function SendPageContent() {
         isOpen={chat.isChatOpen}
         onClose={() => chat.setIsChatOpen(false)}
         messages={chat.messages}
-        onSendMessage={(text) => chat.sendMessage(text, connectionRef.current, "")}
+        onSendMessage={(text) => chat.sendMessage(
+          text,
+          connectionRef.current,
+          "",
+          profile?.display_name || "Sender",
+          myPeerId
+        )}
         currentUserId={user?.id || "sender"}
         peerId={receiverPeerId}
       />

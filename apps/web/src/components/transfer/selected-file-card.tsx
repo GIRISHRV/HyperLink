@@ -25,9 +25,9 @@ export default function SelectedFileCard({
             description
           </span>
         </div>
-        <div className="flex flex-col justify-between flex-1 py-1">
+        <div className="flex flex-col justify-between flex-1 py-1 min-w-0">
           <div>
-            <h4 className="text-white text-xl md:text-2xl font-bold leading-tight mb-2">
+            <h4 className="text-white text-xl md:text-2xl font-bold leading-tight mb-2 break-all line-clamp-3">
               {file.name}
             </h4>
             <div className="flex flex-col gap-1 font-mono text-sm text-muted">

@@ -131,6 +131,7 @@ vi.mock("@/lib/webrtc/peer-manager", () => {
 
 vi.mock("@/lib/transfer/sender", () => {
   class FileSender {
+    setOnLog = vi.fn();
     setPassword = m.mockSenderSetPassword;
     sendOffer = m.mockSenderSendOffer;
     startTransfer = m.mockSenderStartTransfer;
@@ -488,14 +489,14 @@ describe("useSendTransfer", () => {
     });
   });
 
-  describe("handleCancel", () => {
+  describe("confirmCancel", () => {
     it("does nothing when no fileSender is active", () => {
       const { result } = renderHook(() =>
         useSendTransfer(defaultOptions())
       );
 
       act(() => {
-        result.current.handleCancel();
+        result.current.confirmCancel();
       });
 
       expect(m.mockSenderCancel).not.toHaveBeenCalled();

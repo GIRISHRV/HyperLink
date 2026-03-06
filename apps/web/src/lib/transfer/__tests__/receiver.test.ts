@@ -216,7 +216,7 @@ describe("FileReceiver", () => {
     });
 
     it("assembles file when all chunks received", async () => {
-      const offer = createOfferMessage({ totalChunks: 2 });
+      const offer = createOfferMessage({ totalChunks: 2, fileSize: 65536 * 2 });
       await receiver.handleOffer(offer);
 
       const completeCb = vi.fn();

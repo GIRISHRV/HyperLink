@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { updateTransferStatus } from "@/lib/services/transfer-service";
 
 /**
@@ -15,10 +16,12 @@ export function useTransferGuard(
   transferId: string | null,
   isActive: boolean // true when status is connecting/transferring/paused
 ) {
+  const router = useRouter();
   const transferIdRef = useRef(transferId);
   const isActiveRef = useRef(isActive);
   const cleanedUpRef = useRef(false); // Prevent duplicate cleanup calls
   const guardPushedRef = useRef(false); // EDGE-002: Prevent history stack leak
+  const isNavigatingAwayRef = useRef(false);
   const [showBackModal, setShowBackModal] = useState(false);
 
   // Keep refs in sync so the cleanup closure always has latest values
@@ -44,7 +47,7 @@ export function useTransferGuard(
   // Also attempts to mark transfer as failed
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!isActiveRef.current) return;
+      if (!isActiveRef.current || isNavigatingAwayRef.current) return;
       e.preventDefault();
       e.returnValue = "";
       // Attempt cleanup here (browsers give some time for this)
@@ -102,9 +105,9 @@ export function useTransferGuard(
   /** Called when user confirms leaving via back-button modal */
   const confirmBackNavigation = useCallback(() => {
     setShowBackModal(false);
-    // Go back for real — pop the extra history entry and the actual entry
-    window.history.go(-2);
-  }, []);
+    isNavigatingAwayRef.current = true;
+    router.push("/dashboard");
+  }, [router]);
 
   /** Called when user cancels leaving via back-button modal */
   const cancelBackNavigation = useCallback(() => {

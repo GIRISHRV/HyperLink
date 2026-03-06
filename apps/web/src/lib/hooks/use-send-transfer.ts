@@ -54,6 +54,7 @@ export function useSendTransfer({
   const [transferId, setTransferId] = useState<string | null>(null);
   const [isPeerReady, setIsPeerReady] = useState(false);
   const [myPeerId, setMyPeerId] = useState("");
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const peerManagerRef = useRef<PeerManager | null>(null);
   const initializingRef = useRef(false);
@@ -146,6 +147,7 @@ export function useSendTransfer({
       // Task #4: Support Compatibility Mode (Forced Relay)
       const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
       const config = await getPeerConfigAsync(iceServers, forceRelay);
+      config.onLog = addLog;
 
       peerManagerRef.current = new PeerManager(config);
 
@@ -206,11 +208,24 @@ export function useSendTransfer({
     onResetRef.current?.();
   }, [dispatchTransfer]);
 
-  const handleCancel = useCallback(() => {
+  const handleCancelClick = useCallback(() => {
+    setShowCancelModal(true);
+  }, []);
+
+  const confirmCancel = useCallback(async () => {
+    setShowCancelModal(false);
     if (fileSenderRef.current) {
       fileSenderRef.current.cancel();
     }
-  }, []);
+    dispatchTransfer({ type: "CANCEL" });
+    if (transferId) {
+      try {
+        await updateTransferStatus(transferId, "cancelled");
+      } catch (err) {
+        logger.error({ err }, "[SEND] Failed to update transfer status to cancelled");
+      }
+    }
+  }, [dispatchTransfer, transferId]);
 
   const handlePauseResume = useCallback(() => {
     if (!fileSenderRef.current) return;
@@ -250,6 +265,7 @@ export function useSendTransfer({
           setTransferId(dbId);
 
           const sender = new FileSender(file, conn, dbId);
+          sender.setOnLog(addLog);
           fileSenderRef.current = sender;
 
           if (password) {
@@ -294,6 +310,8 @@ export function useSendTransfer({
             dispatchTransfer({
               type: "PROGRESS",
               bytesTransferred: p.bytesTransferred,
+              speed: p.speed,
+              remaining: p.timeRemaining,
             });
             onDataRef.current?.(p);
           });
@@ -315,6 +333,9 @@ export function useSendTransfer({
 
       conn.on("data", (data: unknown) => {
         try {
+          // Task: Fix Chat Reception
+          onDataRef.current?.(data);
+
           const message = validatePeerMessage(data);
           if (message && message.type === "chunk-ack") {
             // Handled internally by FileSender
@@ -372,7 +393,10 @@ export function useSendTransfer({
     peerManagerRef,
     handleSend,
     handlePauseResume,
-    handleCancel,
+    handleCancelClick,
+    confirmCancel,
+    showCancelModal,
+    setShowCancelModal,
     resetSend,
   };
 }

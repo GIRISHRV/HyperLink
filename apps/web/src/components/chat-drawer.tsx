@@ -75,6 +75,14 @@ export default function ChatDrawer({
                                         ? "bg-primary text-black border-primary"
                                         : "bg-white/5 text-white border-white/10"
                                         }`}>
+                                        {!msg.isSystem && (
+                                            <div className={`text-[10px] font-mono mb-1 flex justify-between gap-4 ${isMe ? "text-black/60" : "text-primary/70"}`}>
+                                                <span className="font-bold">{msg.senderName || (isMe ? "You" : "Peer")}</span>
+                                                {msg.senderPeerId && (
+                                                    <span>#{msg.senderPeerId.slice(-4)}</span>
+                                                )}
+                                            </div>
+                                        )}
                                         {msg.isSystem ? (
                                             <span className="text-xs font-mono opacity-70 uppercase">{msg.text}</span>
                                         ) : (

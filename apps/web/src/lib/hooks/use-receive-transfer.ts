@@ -94,6 +94,15 @@ export function useReceiveTransfer({
     onDataRef.current = onData;
   }, [onData]);
 
+  const onLogRef = useRef(onLog);
+  useEffect(() => {
+    onLogRef.current = onLog;
+  }, [onLog]);
+
+  const addLog = useCallback((message: string) => {
+    onLogRef.current?.(message);
+  }, []);
+
   const { request: requestWakeLock, release: releaseWakeLock, isLocked: isWakeLockActive } = useWakeLock();
   const { vibrate } = useHaptics();
 
@@ -147,17 +156,7 @@ export function useReceiveTransfer({
     releaseWakeLock,
   ]);
 
-  // Navigation warning for active transfers
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isReceiveTransferActive) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isReceiveTransferActive]);
+
 
   function resetReceive() {
     dispatchTransfer({ type: "RESET" });
@@ -209,6 +208,7 @@ export function useReceiveTransfer({
         // Task #4: Support Compatibility Mode (Forced Relay)
         const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
         const config = await getPeerConfigAsync(iceServers, forceRelay);
+        config.onLog = addLog;
 
         logger.info({ config, forceRelay }, "[RECEIVE] Creating PeerManager");
         peerManagerRef.current = new PeerManager(config);
@@ -419,6 +419,10 @@ export function useReceiveTransfer({
     return () => {
       isMounted = false;
       initializingRef.current = false;
+      if (peerManagerRef.current) {
+        peerManagerRef.current.destroy();
+        peerManagerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkAuthAndInitPeer]);
@@ -434,6 +438,7 @@ export function useReceiveTransfer({
 
     logger.info("[RECEIVE PAGE] Creating FileReceiver...");
     const receiver = new FileReceiver();
+    receiver.setOnLog(addLog);
     fileReceiverRef.current = receiver;
     receiver.setConnection(connection);
     if (senderDbId) {

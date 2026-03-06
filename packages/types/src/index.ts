@@ -48,6 +48,7 @@ export interface PeerConfig {
     iceTransportPolicy?: string;
     iceCandidatePoolSize?: number;
   };
+  onLog?: (msg: string) => void;
 }
 
 /**
@@ -92,6 +93,8 @@ export type PeerMessageType =
 export interface ChatMessage {
   id: string;
   senderId: string;
+  senderName?: string;
+  senderPeerId?: string;
   text: string;
   timestamp: number;
   isSystem?: boolean;

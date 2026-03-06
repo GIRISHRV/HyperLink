@@ -78,7 +78,8 @@ export async function addChunk(chunk: FileChunk): Promise<void> {
  */
 export async function clearTransfer(
   transferId: string,
-  onProgress?: (cleared: number, total: number) => void
+  onProgress?: (cleared: number, total: number) => void,
+  onLog?: (msg: string) => void
 ): Promise<void> {
   const db = await getDB();
   const BATCH_SIZE = 5000;
@@ -107,6 +108,9 @@ export async function clearTransfer(
     if (onProgress) {
       onProgress(cleared, total);
     }
+    if (onLog && cleared < total) {
+      onLog(`[DB] Clearing temporary chunks from database (${cleared}/${total})...`);
+    }
 
     // If we've processed everything, exit
     if (cleared >= total || batchCount < BATCH_SIZE) {
@@ -118,6 +122,7 @@ export async function clearTransfer(
   }
 
   logger.info({ transferId, totalChunks: total }, "[IDB] Successfully cleared transfer chunks");
+  onLog?.("[DB] Successfully cleared transfer chunks.");
 }
 
 /**

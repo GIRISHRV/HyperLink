@@ -21,15 +21,27 @@ import ReceivedFileView from "@/components/transfer/received-file-view";
 import IncomingOfferCard from "@/components/transfer/incoming-offer-card";
 import DiagnosticPanel from "@/components/transfer/diagnostic-panel";
 import ChatFAB from "@/components/transfer/chat-fab";
+import { getUserProfile, type UserProfile } from "@/lib/services/profile-service";
+import { logger } from "@repo/utils";
 
 export default function ReceivePage() {
   const { user } = useRequireAuth();
 
   // --- Page-only UI state ---
   const [showMyQRModal, setShowMyQRModal] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   // --- Chat hook ---
   const chat = useChat(user?.id);
+
+  // --- Fetch Profile ---
+  useEffect(() => {
+    if (user?.id) {
+      getUserProfile(user.id).then(setProfile).catch(err => {
+        logger.error({ err }, "Failed to fetch user profile for chat");
+      });
+    }
+  }, [user?.id]);
 
   const [logs, setLogs] = useState<string[]>([
     "[SYS] Terminal initialized",
@@ -95,6 +107,7 @@ export default function ReceivePage() {
           if (isReceiveTransferActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
             return false;
           }
+          if (isReceiveTransferActive) confirmCancel();
           return true;
         }}
       />
@@ -237,7 +250,7 @@ export default function ReceivePage() {
                     )}
                   </div>
 
-                  <TerminalLog logs={logs} className="flex-1 min-h-[250px]" />
+                  <TerminalLog logs={logs} className="flex-1 mt-auto min-h-[250px]" />
                 </section>
               </div>
             )}
@@ -282,7 +295,13 @@ export default function ReceivePage() {
         isOpen={chat.isChatOpen}
         onClose={() => chat.setIsChatOpen(false)}
         messages={chat.messages}
-        onSendMessage={(text) => chat.sendMessage(text, activeConnectionRef.current, "")}
+        onSendMessage={(text) => chat.sendMessage(
+          text,
+          activeConnectionRef.current,
+          "",
+          profile?.display_name || "Receiver",
+          myPeerId
+        )}
         currentUserId={user?.id || "receiver"}
         peerId={activeConnectionRef.current?.peer || "sender"}
       />
