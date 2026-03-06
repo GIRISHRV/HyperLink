@@ -92,7 +92,7 @@ describe("useTransferState", () => {
     expect(result.current.isTransferring).toBe(true);
 
     // pause
-    act(() => result.current.dispatch({ type: "PAUSE" }));
+    act(() => result.current.dispatch({ type: "PAUSE", pausedBy: "local" }));
     expect(result.current.state.status).toBe("paused");
     expect(result.current.isPaused).toBe(true);
     expect(result.current.isActive).toBe(true); // paused is still considered "active"
@@ -153,13 +153,13 @@ describe("useTransferState", () => {
   describe("invalid transitions are no-ops", () => {
     it("PAUSE when not transferring is a no-op", () => {
       const { result } = renderHook(() => useTransferState());
-      act(() => result.current.dispatch({ type: "PAUSE" }));
+      act(() => result.current.dispatch({ type: "PAUSE", pausedBy: "local" }));
       expect(result.current.state.status).toBe("idle"); // unchanged
     });
 
     it("PAUSE when idle does nothing", () => {
       const { result } = renderHook(() => useTransferState());
-      act(() => result.current.dispatch({ type: "PAUSE" }));
+      act(() => result.current.dispatch({ type: "PAUSE", pausedBy: "local" }));
       expect(result.current.state.status).toBe("idle");
     });
 
@@ -220,7 +220,7 @@ describe("useTransferState", () => {
     it("handles progress updates while paused", () => {
       const { result } = renderHook(() => useTransferState());
       act(() => result.current.dispatch({ type: "START_TRANSFER", totalBytes: 1000 }));
-      act(() => result.current.dispatch({ type: "PAUSE" }));
+      act(() => result.current.dispatch({ type: "PAUSE", pausedBy: "local" }));
 
       // Progress updates should still be accepted when paused
       act(() =>
