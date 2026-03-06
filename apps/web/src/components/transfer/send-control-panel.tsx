@@ -69,7 +69,7 @@ export default function SendControlPanel({
               <span className="material-symbols-outlined text-green-500">
                 lock
               </span>
-              <span className="text-sm font-bold text-green-400 uppercase tracking-wider">
+              <span data-testid="encryption-status-badge" className="text-sm font-bold text-green-400 uppercase tracking-wider">
                 Encrypted
               </span>
             </div>

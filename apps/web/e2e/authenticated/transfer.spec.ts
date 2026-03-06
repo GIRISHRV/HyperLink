@@ -231,3 +231,76 @@ test("pause and resume synchronization between peers", async () => {
         await browser.close();
     }
 });
+
+test("complete encrypted file transfer with password", async () => {
+    test.setTimeout(120_000); // Encryption adds processing time
+    const browser = await chromium.launch({ slowMo: 500 });
+
+    const receiverContext = await browser.newContext({
+        storageState: RECEIVER_AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+    const senderContext = await browser.newContext({
+        storageState: AUTH_FILE,
+        baseURL: "http://localhost:3000",
+    });
+
+    const receiverPage = await receiverContext.newPage();
+    const senderPage = await senderContext.newPage();
+
+    try {
+        // 1. Receiver opens /receive
+        await receiverPage.goto("http://localhost:3000/receive");
+        const peerIdElement = receiverPage.getByTestId("my-peer-id");
+        await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
+        const receiverPeerId = (await peerIdElement.textContent())?.trim();
+
+        // 2. Sender opens /send and selects file
+        await senderPage.goto("http://localhost:3000/send");
+        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+
+        // 3. Sender enters receiver ID
+        const peerInput = senderPage.getByPlaceholder("Enter hash...");
+        await peerInput.fill(receiverPeerId!);
+
+        // 4. Sender sets password
+        await senderPage.getByRole("button", { name: /set encryption password/i }).click();
+        const senderPasswordInput = senderPage.locator("#password-modal-input");
+        await expect(senderPasswordInput).toBeVisible();
+        await senderPasswordInput.fill("test-password-123");
+        await senderPage.getByRole("button", { name: /set password/i }).click();
+
+        // Verify "Encrypted" status badge appears
+        await expect(senderPage.getByTestId("encryption-status-badge")).toBeVisible();
+
+        // 5. Sender initiates transfer
+        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+        await connectBtn.click();
+
+        // 6. Receiver accepts offer
+        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+        await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
+        await acceptBtn.click();
+
+        // 7. Receiver enters password to decrypt
+        const receiverPasswordInput = receiverPage.locator("#password-modal-input");
+        await expect(receiverPasswordInput).toBeVisible({ timeout: 10_000 });
+        await receiverPasswordInput.fill("test-password-123");
+        await receiverPage.getByRole("button", { name: /decrypt/i }).click();
+
+        // 8. Verify both sides complete
+        await expect(
+            senderPage.getByText(/transfer complete|complete|100%/i).first()
+        ).toBeVisible({ timeout: 60_000 });
+
+        await expect(
+            receiverPage.getByText(/transfer complete|complete|download/i).first()
+        ).toBeVisible({ timeout: 60_000 });
+
+        console.log("[TEST] ✅ Encrypted transfer E2E completed successfully");
+    } finally {
+        await receiverContext.close();
+        await senderContext.close();
+        await browser.close();
+    }
+});
