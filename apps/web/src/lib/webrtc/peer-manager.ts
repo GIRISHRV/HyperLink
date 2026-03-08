@@ -70,7 +70,7 @@ export class PeerManager {
           options.token = token;
         }
 
-        logger.info({
+        logger.debug({
           ...options,
           config: {
             ...options.config,
@@ -98,7 +98,7 @@ export class PeerManager {
           if (this.isReconnecting) {
             this.isReconnecting = false;
             this.reconnectAttempts = 0;
-            logger.info({ peerId: id }, "[PeerManager] Reconnected to signaling server");
+            logger.debug({ peerId: id }, "[PeerManager] Reconnected to signaling server");
             this.config.onLog?.("[NET] Reconnected to signaling server.");
             this.emit("reconnected", id);
           } else {
@@ -120,6 +120,7 @@ export class PeerManager {
         });
 
         this.peer.on("connection", (conn) => {
+          console.log(`[PeerManager] Incoming connection from ${conn.peer}`);
           this.handleIncomingConnection(conn);
         });
 
@@ -165,7 +166,7 @@ export class PeerManager {
       PeerManager.MAX_DELAY_MS
     );
 
-    logger.info({ attempt: this.reconnectAttempts, delayMs: Math.round(delay) }, "[PeerManager] Scheduling reconnection");
+    logger.debug({ attempt: this.reconnectAttempts, delayMs: Math.round(delay) }, "[PeerManager] Scheduling reconnection");
     if (this.reconnectAttempts === 1) {
       this.config.onLog?.(`[WARN] [NET] Signaling server disconnected. Scheduling reconnection in ${Math.round(delay)}ms...`);
     } else {
@@ -175,7 +176,7 @@ export class PeerManager {
 
     this.reconnectTimer = setTimeout(() => {
       if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
-      logger.info({ attempt: this.reconnectAttempts }, "[PeerManager] Attempting reconnection...");
+      logger.debug({ attempt: this.reconnectAttempts }, "[PeerManager] Attempting reconnection...");
       this.peer.reconnect();
     }, delay);
   }
@@ -188,6 +189,7 @@ export class PeerManager {
       throw new Error("Peer not initialized");
     }
 
+    console.log(`[PeerManager] connectToPeer to ${remotePeerId}`);
     this.config.onLog?.(`[NET] Initiating connection to remote peer: ${remotePeerId}`);
     const conn = this.peer.connect(remotePeerId, {
       reliable: true,
@@ -202,6 +204,7 @@ export class PeerManager {
    * Handle incoming peer connections
    */
   private handleIncomingConnection(conn: DataConnection) {
+    console.log(`[PeerManager] handleIncomingConnection for ${conn.peer}`);
     this.config.onLog?.(`[NET] Incoming connection from peer: ${conn.peer}`);
     this.handleConnection(conn);
     this.emit("incoming-connection", conn);
@@ -245,27 +248,27 @@ export class PeerManager {
           // .address is the standard property; .ip is the legacy alias declared in global.d.ts
           const address = event.candidate.address ?? event.candidate.ip;
           const safeAddress = process.env.NODE_ENV === 'production' ? '[REDACTED]' : address;
-          logger.info({ type, protocol, address: safeAddress }, "[ICE] Candidate gathered");
+          logger.debug({ type, protocol, address: safeAddress }, "[ICE] Candidate gathered");
           this.config.onLog?.(`[ICE] Candidate gathered: ${type} (${protocol}) from ${safeAddress}`);
           if (type === "relay") {
             this.config.onLog?.("[ICE] Relay server (TURN) allocated.");
           }
         } else {
-          logger.info("[ICE] All local candidates gathered");
+          logger.debug("[ICE] All local candidates gathered");
           this.config.onLog?.("[ICE] All local candidates gathered.");
         }
       });
 
       // Monitor signaling state
       pc.addEventListener("signalingstatechange", () => {
-        logger.info({ state: pc.signalingState }, "[WEBRTC] Signaling state changed");
+        logger.debug({ state: pc.signalingState }, "[WEBRTC] Signaling state changed");
         this.config.onLog?.(`[WEBRTC] Signaling state changed: ${pc.signalingState}`);
       });
 
       // Monitor ICE connection state changes
       pc.addEventListener("iceconnectionstatechange", () => {
         const state = pc.iceConnectionState;
-        logger.info({ state }, "[ICE] Connection state changed");
+        logger.debug({ state }, "[ICE] Connection state changed");
         this.config.onLog?.(`[ICE] State changed to '${state}'`);
 
         if (state === "failed") {
@@ -293,7 +296,7 @@ export class PeerManager {
               if (report.type === "candidate-pair") {
                 const pair = report as RTCIceCandidatePairStats;
                 if (pair.state === "succeeded") {
-                  logger.info({
+                  logger.debug({
                     local: pair.localCandidateId,
                     remote: pair.remoteCandidateId,
                   }, "[ICE] Connected using candidate pair");
@@ -307,7 +310,7 @@ export class PeerManager {
 
       // Monitor gathering state
       pc.addEventListener("icegatheringstatechange", () => {
-        logger.info({ state: pc.iceGatheringState }, "[ICE] Gathering state changed");
+        logger.debug({ state: pc.iceGatheringState }, "[ICE] Gathering state changed");
       });
     }
   }

@@ -138,7 +138,7 @@ export function useSendTransfer({
     initializingRef.current = true;
     try {
       if (!user) {
-        logger.info("[SEND] No user yet, waiting...");
+        logger.debug("[SEND] No user yet, waiting...");
         initializingRef.current = false;
         return;
       }
@@ -165,7 +165,15 @@ export function useSendTransfer({
 
       // Task #9: Generate a stable, user-linked Peer ID
       const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
-      const id = await peerManagerRef.current.initialize(stablePeerId, token);
+      
+      // Add timeout wrapper for initialization
+      const INIT_TIMEOUT = 45000; // 45 seconds (increased for slower browsers/networks)
+      const initPromise = peerManagerRef.current.initialize(stablePeerId, token);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("PeerManager initialization timed out")), INIT_TIMEOUT);
+      });
+      
+      const id = await Promise.race([initPromise, timeoutPromise]);
       setMyPeerId(id);
       setIsPeerReady(true);
       addLog("✓ Peer manager initialized successfully");
@@ -252,6 +260,7 @@ export function useSendTransfer({
       connectionRef.current = conn;
 
       conn.on("open", async () => {
+        console.log(`[useSendTransfer] Connection opened to ${receiverPeerId}`);
         try {
           addLog("✓ Connection established");
           playConnectionSound();
@@ -273,10 +282,12 @@ export function useSendTransfer({
           }
 
           addLog("Sending file offer...");
+          console.log(`[useSendTransfer] Sending file offer for ${file.name} (${file.size} bytes)`);
           await sender.sendOffer();
           dispatchTransfer({ type: "AWAIT_ACCEPTANCE" });
 
           sender.onAccepted(() => {
+            console.log(`[useSendTransfer] Peer accepted the file!`);
             dispatchTransfer({
               type: "START_TRANSFER",
               totalBytes: file.size,
@@ -312,6 +323,8 @@ export function useSendTransfer({
               bytesTransferred: p.bytesTransferred,
               speed: p.speed,
               remaining: p.timeRemaining,
+              chunkSize: p.chunkSize,
+              windowSize: p.windowSize,
             });
             onDataRef.current?.(p);
           });

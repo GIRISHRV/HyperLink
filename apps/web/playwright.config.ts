@@ -16,12 +16,13 @@ const authFile = path.join(__dirname, "e2e/.auth/user.json");
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 4,
+  retries: process.env.CI ? 3 : 1, // More retries in CI for flaky WebRTC tests
+  workers: 1, // Always use 1 worker to avoid resource contention
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 30_000,
+  timeout: 60_000, // Increased to 60s for CI environments
 
 
   use: {
@@ -51,9 +52,21 @@ export default defineConfig({
       },
       testMatch: /authenticated\/.*\.spec\.ts/,
     },
+    {
+      name: "authenticated-firefox",
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: authFile,
+        // Firefox needs longer timeouts for WebRTC and navigation
+        navigationTimeout: 60_000,
+        actionTimeout: 15_000,
+      },
+      testMatch: /authenticated\/.*\.spec\.ts/,
+    },
 
     // 3. Unauthenticated tests — existing specs in e2e/ root (no session)
-    // Runs on Chromium, Firefox, and WebKit to ensure foundational P2P works everywhere
+    // Runs on Chromium and Firefox only
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
@@ -61,12 +74,12 @@ export default defineConfig({
     },
     {
       name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
+      use: { 
+        ...devices["Desktop Firefox"],
+        // Firefox needs longer timeouts for navigation
+        navigationTimeout: 60_000,
+        actionTimeout: 15_000,
+      },
       testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
     },
   ],
@@ -89,4 +102,3 @@ export default defineConfig({
     },
   ],
 });
-

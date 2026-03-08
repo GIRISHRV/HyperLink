@@ -142,7 +142,7 @@ export default function AuthPage() {
       logger.error({ err }, "Auth error:");
       // Debug: log the raw error object to console for normalization tuning
       // eslint-disable-next-line no-console
-      console.log('Supabase error (raw):', err);
+      logger.debug({ err }, 'Supabase error (raw):');
       // SEC-004: Exponential backoff after repeated failures
       // Remove failedAttempts logic, just set lockout
       if (lockoutUntil === 0) {
@@ -299,7 +299,7 @@ export default function AuthPage() {
                 className={`w-full bg-bauhaus-blue hover:bg-blue-600 text-white font-bold h-14 flex items-center justify-center gap-3 group transition-all duration-300 uppercase tracking-wider text-sm relative overflow-hidden${lockoutUntil > Date.now() ? ' opacity-60 cursor-not-allowed' : ''}`}
                 type="submit"
                 disabled={loading || lockoutUntil > Date.now()}
-            >
+              >
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
                 <span className="relative z-10">
                   {loading

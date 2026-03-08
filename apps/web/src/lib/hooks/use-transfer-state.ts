@@ -19,6 +19,8 @@ export interface TransferState {
     speedBytesPerSecond?: number;
     estimatedSecondsRemaining?: number;
     pausedBy?: "local" | "remote";
+    chunkSize?: number;
+    windowSize?: number;
 }
 
 export type TransferAction =
@@ -26,7 +28,7 @@ export type TransferAction =
     | { type: "OFFER" }
     | { type: "AWAIT_ACCEPTANCE" }
     | { type: "START_TRANSFER"; totalBytes: number }
-    | { type: "PROGRESS"; bytesTransferred: number; speed?: number; remaining?: number }
+    | { type: "PROGRESS"; bytesTransferred: number; speed?: number; remaining?: number; chunkSize?: number; windowSize?: number }
     | { type: "PAUSE"; pausedBy: "local" | "remote" }
     | { type: "RESUME" }
     | { type: "COMPLETE" }
@@ -61,6 +63,8 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                     bytesTransferred: action.bytesTransferred,
                     speedBytesPerSecond: action.speed,
                     estimatedSecondsRemaining: action.remaining,
+                    chunkSize: action.chunkSize,
+                    windowSize: action.windowSize,
                 };
             }
             if (state.status !== "transferring" && state.status !== "paused") return state;
@@ -68,7 +72,9 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                 ...state,
                 bytesTransferred: action.bytesTransferred,
                 speedBytesPerSecond: action.speed,
-                estimatedSecondsRemaining: action.remaining
+                estimatedSecondsRemaining: action.remaining,
+                chunkSize: action.chunkSize,
+                windowSize: action.windowSize,
             };
         case "PAUSE":
             if (state.status !== "transferring") return state;

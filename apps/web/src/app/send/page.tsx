@@ -191,6 +191,13 @@ function SendPageContent() {
     if (peerId) setReceiverPeerId(peerId);
   }, [searchParams]);
 
+  // Expose myPeerId to window for Playwright E2E tests
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).myPeerId = myPeerId;
+    }
+  }, [myPeerId]);
+
   return (
     <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
       <ConfirmLeaveModal
@@ -362,6 +369,8 @@ function SendPageContent() {
                   onCancel={handleCancelClick}
                   direction="uplink"
                   isWakeLockActive={isWakeLockActive}
+                  chunkSize={transferState.chunkSize}
+                  windowSize={transferState.windowSize}
                 />
                 <TransferVisualizer isPaused={transferState.status === "paused"} direction="uplink" />
               </div>

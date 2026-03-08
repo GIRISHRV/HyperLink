@@ -11,14 +11,14 @@ export function useWakeLock() {
                 const lock = await navigator.wakeLock.request('screen');
                 wakeLockRef.current = lock;
                 setIsLocked(true);
-                logger.info('Wake Lock acquired');
+                logger.debug('Wake Lock acquired');
 
                 lock.addEventListener('release', () => {
                     setIsLocked(false);
-                    logger.info('Wake Lock released');
+                    logger.debug('Wake Lock released');
                 });
             } catch (err) {
-                logger.error({ err }, 'Failed to acquire Wake Lock');
+                logger.warn({ err }, 'Failed to acquire Wake Lock');
             }
         }
     }, []);

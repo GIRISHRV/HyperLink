@@ -166,8 +166,8 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@repo/utils", () => ({
   logger: {
     info: vi.fn(),
-    error: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
     debug: vi.fn(),
   },
 }));

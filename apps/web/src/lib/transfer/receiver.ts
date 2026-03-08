@@ -28,6 +28,8 @@ export class FileReceiver {
   private errorCallback?: (error: Error | string) => void;
   private cleanupCallback?: (cleared: number, total: number) => void;
   private resumeFromChunk: number = 0; // For crash recovery
+  private writableStream?: FileSystemWritableFileStream;
+  private fileHandle?: FileSystemFileHandle;
 
   // Encryption state
   private isEncrypted: boolean = false;
@@ -54,6 +56,16 @@ export class FileReceiver {
    */
   setConnection(connection: DataConnection): void {
     this.connection = connection;
+  }
+
+  /**
+   * Set writable stream and file handle for Direct-to-Disk (Item #1)
+   */
+  setWritableStream(stream: FileSystemWritableFileStream, handle?: FileSystemFileHandle): void {
+    this.writableStream = stream;
+    this.fileHandle = handle;
+    logger.debug("[RECEIVER] Direct-to-Disk streaming enabled");
+    this.onLog?.("[SYS] Direct-to-Disk streaming enabled. Writing directly to file.");
   }
 
   /**
@@ -85,7 +97,7 @@ export class FileReceiver {
 
     if (this.isEncrypted && message.payload.salt) {
       this.salt = base64ToArrayBuffer(message.payload.salt);
-      logger.info("[RECEIVER] 🔒 File is encrypted, salt received");
+      logger.debug("[RECEIVER] 🔒 File is encrypted, salt received");
       this.onLog?.("[SEC] 🔒 File is encrypted, salt received.");
     }
 
@@ -102,7 +114,7 @@ export class FileReceiver {
         this.receivedChunks = lastIndex + 1;
         this.bytesReceived = Math.min(this.receivedChunks * INITIAL_CHUNK_SIZE, this.fileSize);
         this.resumeFromChunk = lastIndex + 1;
-        logger.info({
+        logger.debug({
           transferId: this.transferId,
           resumeFrom: this.resumeFromChunk,
           existingChunks: this.receivedChunks
@@ -113,7 +125,7 @@ export class FileReceiver {
       logger.warn({ err }, "[RECEIVER] Failed to check for existing chunks, starting fresh");
     }
 
-    logger.info({
+    logger.debug({
       transferId: this.transferId,
       storageId: this.storageId,
       filename: this.filename,
@@ -130,7 +142,7 @@ export class FileReceiver {
     if (!this.isEncrypted || !this.salt) return;
     try {
       this.cryptoKey = await deriveKey(password, this.salt);
-      logger.info("[RECEIVER] 🔑 Key derived successfully");
+      logger.debug("[RECEIVER] 🔑 Key derived successfully");
       this.onLog?.("[SEC] 🔑 Key derived successfully.");
     } catch (e) {
       logger.error({ e }, "[RECEIVER] Failed to derive key");
@@ -144,7 +156,7 @@ export class FileReceiver {
   async handleChunk(message: PeerMessage<ChunkPayload>): Promise<void> {
     if (this.status === "cancelled" || this.status === "complete") return;
 
-    const { chunkIndex, data } = message.payload;
+    const { chunkIndex, data, offset } = message.payload;
     const isProbe = message.type === "chunk-probe";
 
     // IDEMPOTENCY CHECK: If we already processed this chunk, just ACK and skip.
@@ -189,25 +201,33 @@ export class FileReceiver {
       }
     }
 
-    // Store chunk to IndexedDB
-    const chunk: FileChunk = {
-      transferId: this.transferId,
-      chunkIndex,
-      data: new Blob([chunkData]),
-      timestamp: Date.now(),
-    };
-
     try {
-      await addChunk(chunk);
+      if (this.writableStream) {
+        // Direct-to-Disk: Write directly to the file at the specific offset
+        await this.writableStream.write({
+          type: "write",
+          position: offset,
+          data: chunkData
+        });
+      } else {
+        // Fallback or Dual-Write: Store chunk to IndexedDB
+        const chunk: FileChunk = {
+          transferId: this.transferId,
+          chunkIndex,
+          data: new Blob([chunkData]),
+          timestamp: Date.now(),
+        };
+        await addChunk(chunk);
+      }
     } catch (error) {
-      logger.error({ chunkIndex, error }, "[RECEIVER] Failed to store chunk");
-      this.onLog?.(`[WARN] [DB] Storage write failed for chunk ${chunkIndex}.`);
-      // EDGE-001: Notify sender of failure to prevent ACK deadlock
+      logger.error({ chunkIndex, error }, "[RECEIVER] Write failed");
+      this.onLog?.(`[WARN] [FS] Write failed for chunk ${chunkIndex}.`);
+      // Notify sender of failure
       if (this.connection) {
         const errorMsg: PeerMessage = {
           type: "transfer-error",
           transferId: this.transferId,
-          payload: { message: "Storage write failed" },
+          payload: { message: "Disk write failed" },
           timestamp: Date.now(),
         };
         this.connection.send(errorMsg);
@@ -224,9 +244,9 @@ export class FileReceiver {
     }
 
     // Log progress every 10%
-    const percentage = (this.receivedChunks / this.totalChunks) * 100;
+    const percentage = (this.bytesReceived / this.fileSize) * 100;
     if (this.receivedChunks % Math.ceil(this.totalChunks / 10) === 0) {
-      logger.info({ percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks }, "[RECEIVER] Progress");
+      logger.debug({ percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks }, "[RECEIVER] Progress");
     }
 
     // Update progress callback
@@ -242,6 +262,8 @@ export class FileReceiver {
         percentage,
         speed,
         timeRemaining,
+        chunkSize: (message.payload as any).chunkSize,
+        windowSize: (message.payload as any).windowSize,
       });
     }
 
@@ -250,7 +272,7 @@ export class FileReceiver {
 
     // Check if transfer is complete via byte count (Safety)
     if (this.bytesReceived >= this.fileSize) {
-      logger.info("[RECEIVER] All bytes received via count, assembling file...");
+      logger.debug("[RECEIVER] All bytes received via count, assembling file...");
       this.onLog?.("[FS] All bytes received via count. Initiating file assembly...");
       await this.assembleFile();
     }
@@ -285,28 +307,41 @@ export class FileReceiver {
    */
   private async assembleFile(): Promise<void> {
     try {
-      logger.info("[RECEIVER] assembleFile: Assembling chunks using IDB cursor stream...");
-      this.onLog?.("[FS] Assembling chunks from IDB cursor stream...");
+      logger.debug("[RECEIVER] assembleFile: Finalizing transfer...");
 
-      const finalBlob = await assembleFileFromCursor(this.transferId, this.fileType);
-      this.status = "complete";
-      logger.info({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob constructed in memory");
-      this.onLog?.(`[FS] Final Blob constructed in memory: ${finalBlob.size} bytes.`);
+      let finalBlob: Blob | undefined;
 
-      // Store the completed file blob to IndexedDB
-      try {
-        const saveId = this.storageId || this.transferId;
-        await addFile(saveId, this.fileType, finalBlob);
-        logger.info({ saveId }, "[RECEIVER] Saved completed file to IndexedDB");
-        this.onLog?.("[DB] Saved completed file to persistent storage.");
-      } catch (e) {
-        logger.error({ error: e }, "[RECEIVER] Failed to save completed file");
+      if (this.writableStream) {
+        this.onLog?.("[FS] Closing file stream...");
+        await this.writableStream.close();
+        this.writableStream = undefined;
+        this.onLog?.("[FS] Direct-to-Disk stream finalized.");
+      } else {
+        this.onLog?.("[FS] Assembling chunks from IDB cursor stream...");
+        finalBlob = await assembleFileFromCursor(this.transferId, this.fileType);
+        logger.debug({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob constructed in memory");
+        this.onLog?.(`[FS] Final Blob constructed in memory: ${finalBlob.size} bytes.`);
       }
 
-      // Callback with completed file
+      this.status = "complete";
+
+      // Store the completed file blob to IndexedDB (Only for non-streaming)
+      if (finalBlob) {
+        try {
+          const saveId = this.storageId || this.transferId;
+          await addFile(saveId, this.fileType, finalBlob);
+          logger.debug({ saveId }, "[RECEIVER] Saved completed file to IndexedDB");
+          this.onLog?.("[DB] Saved completed file to persistent storage.");
+        } catch (e) {
+          logger.error({ error: e }, "[RECEIVER] Failed to save completed file");
+        }
+      }
+
+      // Callback with completed file/blob
       if (this.completeCallback) {
-        logger.info("[RECEIVER] Calling completeCallback");
-        this.completeCallback(finalBlob, this.filename);
+        logger.debug("[RECEIVER] Calling completeCallback");
+        // For streaming, we pass undefined blob but the filename
+        this.completeCallback(finalBlob as Blob, this.filename);
       } else {
         logger.warn("[RECEIVER] No completeCallback set!");
       }
@@ -316,7 +351,7 @@ export class FileReceiver {
       await clearTransfer(this.transferId, (cleared, total) => {
         this.cleanupCallback?.(cleared, total);
       }, this.onLog);
-      logger.info("[RECEIVER] Cleared chunks from IndexedDB");
+      logger.debug("[RECEIVER] Cleared chunks from IndexedDB");
     } catch (error) {
       logger.error({ error }, "Error assembling file");
     }
@@ -365,7 +400,7 @@ export class FileReceiver {
     if (this.status === "cancelled" || this.status === "complete") return false;
 
     if (message.type === "transfer-cancel") {
-      logger.info("[RECEIVER] Sender cancelled transfer");
+      logger.debug("[RECEIVER] Sender cancelled transfer");
       this.onLog?.("[SYS] Sender cancelled transfer. Initiating cleanup...");
       this.status = "cancelled";
       this.cancelCallback?.();
@@ -377,7 +412,7 @@ export class FileReceiver {
     }
 
     if (message.type === "transfer-pause") {
-      logger.info("[RECEIVER] Sender paused transfer");
+      logger.debug("[RECEIVER] Sender paused transfer");
       this.onLog?.("[SYS] Sender paused transfer.");
       this.status = "paused";
       this.pauseCallback?.(true);
@@ -385,7 +420,7 @@ export class FileReceiver {
     }
 
     if (message.type === "transfer-resume") {
-      logger.info("[RECEIVER] Sender resumed transfer");
+      logger.debug("[RECEIVER] Sender resumed transfer");
       this.onLog?.("[SYS] Sender resumed transfer.");
       this.status = "transferring";
       this.pauseCallback?.(false);
@@ -393,7 +428,7 @@ export class FileReceiver {
     }
 
     if (message.type === "transfer-complete") {
-      logger.info("[RECEIVER] Sender signaled transfer complete, assembling...");
+      logger.debug("[RECEIVER] Sender signaled transfer complete, assembling...");
       this.onLog?.("[SYS] Sender signaled transfer complete.");
       this.assembleFile();
       return true;
@@ -458,12 +493,36 @@ export class FileReceiver {
     };
     await this.safeSend(cancelMessage);
     this.status = "cancelled";
+
+    if (this.writableStream) {
+      try {
+        // abort() stops the stream.
+        await this.writableStream.abort();
+        this.writableStream = undefined;
+
+        // Explicitly remove the file handle to ensure no partial/broken file is left on disk.
+        // Some browsers don't automatically delete the file on abort().
+        if (this.fileHandle && (this.fileHandle as any).remove) {
+          try {
+            await (this.fileHandle as any).remove();
+            logger.debug("[RECEIVER] Partial file removed from disk");
+            this.onLog?.("[FS] Partial file removed from disk.");
+          } catch (removeErr) {
+            logger.warn({ removeErr }, "[RECEIVER] Failed to remove partial file via fileHandle.remove()");
+          }
+        }
+        this.fileHandle = undefined;
+      } catch (err) {
+        logger.error({ err }, "[RECEIVER] Failed to abort stream on cancel");
+      }
+    }
+
     // Clean up partial chunks from IndexedDB with batched progress reporting (Task #6)
     clearTransfer(this.storageId || this.transferId, (cleared, total) => {
       this.cleanupCallback?.(cleared, total);
     }, this.onLog).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
     this.cancelCallback?.();
-    logger.info("[RECEIVER] Transfer cancelled");
+    logger.debug("[RECEIVER] Transfer cancelled");
   }
 
   /**
@@ -479,7 +538,7 @@ export class FileReceiver {
       timestamp: Date.now(),
     };
     await this.safeSend(pauseMessage);
-    logger.info("[RECEIVER] Transfer paused by receiver");
+    logger.debug("[RECEIVER] Transfer paused by receiver");
   }
 
   /**
@@ -495,7 +554,7 @@ export class FileReceiver {
       timestamp: Date.now(),
     };
     await this.safeSend(resumeMessage);
-    logger.info("[RECEIVER] Transfer resumed by receiver");
+    logger.debug("[RECEIVER] Transfer resumed by receiver");
   }
 
   getStatus(): TransferStatus {
@@ -558,7 +617,7 @@ export class FileReceiver {
       timestamp: Date.now(),
     };
     this.connection.send(msg);
-    logger.info({ startChunk: this.resumeFromChunk }, "[RECEIVER] Sent resume-from to sender");
+    logger.debug({ startChunk: this.resumeFromChunk }, "[RECEIVER] Sent resume-from to sender");
     this.onLog?.(`[NET] Sent resume-from to sender: Skipping ${this.resumeFromChunk} chunks.`);
   }
 }

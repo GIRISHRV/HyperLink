@@ -44,10 +44,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to main content
         </a>
         <div id="main-content" className="relative z-10 flex-1 flex flex-col">{children}</div>
+        {process.env.NODE_ENV !== "production" && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  if (typeof window !== 'undefined') {
+                    // Silence dev logs per user preference for a clean console
+                    // We only wrap them to avoid breaking early-access internals
+                    const noop = () => {};
+                    window.console.log = noop;
+                    window.console.info = noop;
+                  }
+                })();
+              `,
+            }}
+          />
+        )}
         <BackgroundGrid />
         <ClipboardListener />
-        <Analytics />
-        <SpeedInsights />
+        {process.env.NODE_ENV === "production" && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
         <Toaster />
         <GlobalFooter />
         <SwUpdateWatcher />

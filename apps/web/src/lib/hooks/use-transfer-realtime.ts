@@ -259,10 +259,10 @@ export function useUserTransfersRealtime(initialLimit = 20) {
    * Optimistically remove multiple transfers and delete from DB
    */
   const removeMultipleTransfers = useCallback(async (transferIds: string[]) => {
-    logger.info({ transferIds }, "[REALTIME] Removing multiple transfers");
+    logger.debug({ transferIds }, "[REALTIME] Removing multiple transfers");
     setTransfers((prev) => prev.filter((t) => !transferIds.includes(t.id)));
     const result = await deleteMultipleFromDB(transferIds);
-    logger.info({ result }, "[REALTIME] Delete result");
+    logger.debug({ result }, "[REALTIME] Delete result");
     return result;
   }, []);
 

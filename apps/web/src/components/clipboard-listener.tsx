@@ -27,7 +27,7 @@ export function ClipboardListener() {
         // If we are already on the send page, let the page handle it
         if (pathname === "/send") return;
 
-        logger.info({ name: file.name }, "[CLIPBOARD-LISTENER] File pasted globally, showing toast");
+        logger.debug({ name: file.name }, "[CLIPBOARD-LISTENER] File pasted globally, showing toast");
         setPastedFile(file);
         setShowToast(true);
     });

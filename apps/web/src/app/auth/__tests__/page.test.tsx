@@ -27,7 +27,7 @@ vi.mock("@/lib/services/auth-service", () => ({
 }));
 
 vi.mock("@repo/utils", () => ({
-    logger: { error: vi.fn(), info: vi.fn() },
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock("@/lib/utils/auth-redirect", () => ({

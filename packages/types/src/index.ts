@@ -61,6 +61,8 @@ export interface TransferProgress {
   percentage: number;
   speed: number; // bytes per second
   timeRemaining: number; // seconds
+  chunkSize?: number; // current dynamic chunk size (Task #8)
+  windowSize?: number; // current dynamic window size (Task #8)
 }
 
 /**
@@ -138,5 +140,8 @@ export interface FileOfferPayload {
 export interface ChunkPayload {
   chunkIndex: number;
   data: ArrayBuffer;
+  offset: number; // Added for Direct-to-Disk (Item #1)
+  chunkSize?: number;
+  windowSize?: number;
 }
 

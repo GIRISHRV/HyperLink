@@ -24,7 +24,7 @@ export function useClipboardFile(onFilePasted: (file: File) => void) {
                 if (items[i].kind === "file") {
                     const file = items[i].getAsFile();
                     if (file) {
-                        logger.info({ name: file.name, type: file.type, size: file.size }, "[CLIPBOARD] File detected");
+                        logger.debug({ name: file.name, type: file.type, size: file.size }, "[CLIPBOARD] File detected");
                         onFilePasted(file);
                         event.preventDefault(); // successful paste
                         return;

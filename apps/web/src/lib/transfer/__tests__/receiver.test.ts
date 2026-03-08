@@ -80,6 +80,7 @@ function createChunkMessage(
     payload: {
       chunkIndex,
       data: new ArrayBuffer(65536),
+      offset: chunkIndex * 65536,
     },
   };
 }

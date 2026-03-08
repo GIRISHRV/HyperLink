@@ -2,7 +2,7 @@
 
 After digging into the guts of the code, here are the real-world "holes" and technical risks I found in the current implementation. These are things a savvy teacher or committee member might spot if they ask about edge cases.
 
-## 1. Implement "Direct-to-Disk" Pipeline (Streaming)
+## ~~1. Implement "Direct-to-Disk" Pipeline (Streaming)~~ (Done)
 **Current Problem**:
 - **The "Warehouse" Model**: Chunks are stored in IndexedDB (a "hidden warehouse").
 - **The Assembly Freeze**: At 100%, the browser must sort and combine thousands of tiny pieces into one big file. This causes a massive CPU/UI freeze on large (10GB+) transfers.
@@ -95,7 +95,7 @@ After digging into the guts of the code, here are the real-world "holes" and tec
 ~~- **Automatic Release**: Ensure the wake lock is released immediately upon `complete`, `failed`, or `cancelled` states to respect the user's battery life.~~
 ~~- **UI Indicator**: Show a small "System Stay-Awake Active" icon near the progress bar so the user knows why their screen isn't turning off.~~
 
-## 8. High-Bandwidth Dynamic Chunking
+## ~~8. High-Bandwidth Dynamic Chunking~~ (Done)
 **Current Problem**:
 - **ACK Overhead**: Using a fixed 64KB chunk size means a 10GB file requires ~160,000 individual acknowledgment messages.
 - **Speed Bottleneck**: On high-speed Fiber connections (1Gbps+), the CPU overhead of processing 2,000+ ACKs per second becomes the bottleneck, preventing the app from hitting its true potential speed.

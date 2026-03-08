@@ -56,3 +56,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+.kiro
+E2E_CI_CONFIGURATION.md
+*.png

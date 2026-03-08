@@ -121,7 +121,7 @@ export async function clearTransfer(
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  logger.info({ transferId, totalChunks: total }, "[IDB] Successfully cleared transfer chunks");
+  logger.debug({ transferId, totalChunks: total }, "[IDB] Successfully cleared transfer chunks");
   onLog?.("[DB] Successfully cleared transfer chunks.");
 }
 

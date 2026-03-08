@@ -71,7 +71,7 @@ describe("GET /api/turn-credentials", () => {
     const stunServers = body.iceServers.filter((s: RTCIceServer) =>
       typeof s.urls === "string" ? s.urls.startsWith("stun:") : false
     );
-    expect(stunServers.length).toBeGreaterThanOrEqual(2);
+    expect(stunServers.length).toBeGreaterThanOrEqual(1);
 
     // Must include OpenRelay TURN servers
     const turnServers = body.iceServers.filter((s: RTCIceServer) =>

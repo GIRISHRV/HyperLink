@@ -35,10 +35,27 @@ function generateFixture(filepath: string, sizeBytes: number) {
 }
 
 export default async function globalSetup() {
-    // 50 MB fixture — used by abort / pause-resume tests to ensure the transfer
-    // is still in progress when the test interacts with the control buttons.
-    generateFixture(
-        path.resolve(FIXTURES_DIR, "test-file-50mb.bin"),
-        50 * 1024 * 1024
-    );
+    console.log('[global-setup] Generating test fixtures in parallel...');
+    
+    // Generate 10MB, 50MB, and 100MB fixtures in parallel
+    // These fixtures are used across multiple tests for file transfer validation
+    await Promise.all([
+        // 10MB fixture - for quick transfer tests
+        Promise.resolve().then(() => generateFixture(
+            path.resolve(FIXTURES_DIR, "test-file-10mb.bin"),
+            10 * 1024 * 1024
+        )),
+        // 50MB fixture - for abort/pause-resume tests
+        Promise.resolve().then(() => generateFixture(
+            path.resolve(FIXTURES_DIR, "test-file-50mb.bin"),
+            50 * 1024 * 1024
+        )),
+        // 100MB fixture - for stress testing and network resilience
+        Promise.resolve().then(() => generateFixture(
+            path.resolve(FIXTURES_DIR, "test-file-100mb.bin"),
+            100 * 1024 * 1024
+        ))
+    ]);
+    
+    console.log('[global-setup] All fixtures ready');
 }

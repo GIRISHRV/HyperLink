@@ -40,6 +40,11 @@ export async function updateTransferStatus(
   transferId: string,
   status: Transfer["status"]
 ): Promise<boolean> {
+  if (!transferId) {
+    logger.warn({ status }, "[TRANSFER-SERVICE] updateTransferStatus called without ID");
+    return false;
+  }
+
   const updates: Partial<Transfer> = { status };
 
   if (status === "complete") {
@@ -49,7 +54,7 @@ export async function updateTransferStatus(
   const { error } = await supabase.from("transfers").update(updates).eq("id", transferId);
 
   if (error) {
-    logger.error({ error }, "Error updating transfer");
+    logger.error({ error, transferId }, "Error updating transfer");
     return false;
   }
 
@@ -101,10 +106,15 @@ export async function getUserTransfers(userId: string): Promise<Transfer[]> {
  * Delete transfer
  */
 export async function deleteTransfer(transferId: string): Promise<boolean> {
+  if (!transferId) {
+    logger.warn("[TRANSFER-SERVICE] deleteTransfer called without ID");
+    return false;
+  }
+
   const { error } = await supabase.from("transfers").delete().eq("id", transferId);
 
   if (error) {
-    logger.error({ error }, "Error deleting transfer");
+    logger.error({ error, transferId }, "Error deleting transfer");
     return false;
   }
 
@@ -117,7 +127,7 @@ export async function deleteTransfer(transferId: string): Promise<boolean> {
 export async function deleteMultipleTransfers(transferIds: string[]): Promise<boolean> {
   if (transferIds.length === 0) return true;
 
-  logger.info({ count: transferIds.length }, "[TRANSFER-SERVICE] Deleting transfers");
+  logger.debug({ count: transferIds.length }, "[TRANSFER-SERVICE] Deleting transfers");
 
   // Use .select() to get rows that were deleted (requires RLS access)
   const { data, error } = await supabase
@@ -131,7 +141,7 @@ export async function deleteMultipleTransfers(transferIds: string[]): Promise<bo
     return false;
   }
 
-  logger.info({ deleted: data?.length ?? 0 }, "[TRANSFER-SERVICE] Deleted");
+  logger.debug({ deleted: data?.length ?? 0 }, "[TRANSFER-SERVICE] Deleted");
   return true;
 }
 

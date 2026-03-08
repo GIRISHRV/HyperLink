@@ -18,16 +18,14 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const iceServers: RTCIceServer[] = [
-        // Always include at least two STUN servers
+        // Always include at least one STUN server (reduced from 2)
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
     ];
 
     // Task #4: Support multiple TURN providers for redundancy
     const turnProviders = [
         { url: process.env.TURN_URL, user: process.env.TURN_USERNAME, pass: process.env.TURN_CREDENTIAL },
         { url: process.env.TURN_URL_2, user: process.env.TURN_USERNAME_2, pass: process.env.TURN_CREDENTIAL_2 },
-        { url: process.env.TURN_URL_3, user: process.env.TURN_USERNAME_3, pass: process.env.TURN_CREDENTIAL_3 },
     ].filter(p => p.url);
 
     if (turnProviders.length > 0) {
@@ -40,7 +38,8 @@ export async function GET() {
             });
         });
     } else {
-        // Public OpenRelay fallback — free, rate-limited, fine for development
+        // Public OpenRelay fallback — reduced to 3 total (1 STUN + 3 TURN)
+        // or 4 total to stay under 5. Let's keep 4.
         iceServers.push(
             {
                 urls: "turn:openrelay.metered.ca:80",

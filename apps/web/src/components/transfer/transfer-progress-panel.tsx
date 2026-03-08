@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 
 import { formatFileSize, formatTime } from "@repo/utils";
 import { ProgressBar } from "@/components/progress-bar";
@@ -16,6 +17,8 @@ interface TransferProgressPanelProps {
   isWakeLockActive?: boolean;
   /** "uplink" for send, "downlink" for receive */
   direction: "uplink" | "downlink";
+  chunkSize?: number;
+  windowSize?: number;
 }
 
 export default function TransferProgressPanel({
@@ -30,8 +33,21 @@ export default function TransferProgressPanel({
   onCancel,
   direction,
   isWakeLockActive,
+  chunkSize,
+  windowSize,
 }: TransferProgressPanelProps) {
   const isUplink = direction === "uplink";
+  const [showDetails, setShowDetails] = React.useState(false);
+
+  const getTurboLevel = (size?: number) => {
+    if (!size) return null;
+    if (size >= 1024 * 1024) return { label: "TURBO [ULTRA]", color: "text-primary" };
+    if (size >= 512 * 1024) return { label: "TURBO [HIGH]", color: "text-amber-400" };
+    if (size >= 256 * 1024) return { label: "TURBO [MED]", color: "text-blue-400" };
+    return { label: "TURBO [LOW]", color: "text-white/40" };
+  };
+
+  const turbo = getTurboLevel(chunkSize);
 
   return (
     <div className="lg:col-span-5 flex flex-col gap-6 w-full overflow-hidden">
@@ -100,7 +116,7 @@ export default function TransferProgressPanel({
             <p className="text-muted text-xs font-mono mt-1 truncate max-w-xs">{fileName}</p>
           </div>
           <div className="text-right">
-            <span className="text-primary font-mono text-2xl font-bold block">
+            <span data-testid="progress" className="text-primary font-mono text-2xl font-bold block">
               {percentage.toFixed(0)}%
             </span>
             <span className="text-white/30 text-xs uppercase tracking-wider">
@@ -108,6 +124,16 @@ export default function TransferProgressPanel({
             </span>
           </div>
         </div>
+
+        {/* Dynamic Chunking Indicator (Task #8) */}
+        {turbo && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 w-fit rounded-full -mt-2 animate-in fade-in slide-in-from-top-1">
+            <span className={`material-symbols-outlined text-sm ${turbo.color} animate-pulse`}>rocket_launch</span>
+            <span className={`text-[10px] font-black uppercase tracking-tighter ${turbo.color}`}>{turbo.label}</span>
+            <div className="w-[1px] h-3 bg-white/10 mx-1" />
+            <span className="text-[10px] text-white/40 font-mono">{formatFileSize(chunkSize || 0)}/chunk</span>
+          </div>
+        )}
 
         <ProgressBar
           percentage={percentage}
@@ -157,6 +183,40 @@ export default function TransferProgressPanel({
             </span>
             Abort
           </button>
+        </div>
+
+        {/* Technical Details Toggle (Task #8) */}
+        <div className="z-10 mt-2">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white/50 flex items-center gap-1 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              {showDetails ? "keyboard_arrow_up" : "keyboard_arrow_down"}
+            </span>
+            Technical Diagnostics
+          </button>
+
+          {showDetails && (
+            <div className="mt-3 grid grid-cols-2 gap-4 p-4 bg-black/40 border border-white/5 rounded-sm animate-in fade-in slide-in-from-top-2">
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Pipe Capacity</p>
+                <p className="text-xs font-mono text-primary">{formatFileSize(chunkSize || 0)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Congestion Window</p>
+                <p className="text-xs font-mono text-blue-400">{windowSize || 0} chunks</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Protocol</p>
+                <p className="text-xs font-mono text-white/60">WebRTC/SCTP</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Encapsulation</p>
+                <p className="text-xs font-mono text-white/60">AES-GCM-256</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

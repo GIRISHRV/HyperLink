@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const senderFile = path.join(__dirname, ".auth/user.json");
 const receiverFile = path.join(__dirname, ".auth/receiver.json");
 
-setup("authenticate sender", async ({ page }) => {
+setup("authenticate sender", async ({ page, context }) => {
     const email = process.env.E2E_TEST_EMAIL;
     const password = process.env.E2E_TEST_PASSWORD;
 
@@ -18,10 +18,26 @@ setup("authenticate sender", async ({ page }) => {
         );
     }
 
-    await page.goto("/auth");
+    // Clear any existing auth state first
+    await context.clearCookies();
+    await context.clearPermissions();
+    
+    // Clear localStorage and sessionStorage
+    await page.goto("/");
+    await page.evaluate(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+    });
+
+    await page.goto("/auth", { waitUntil: "domcontentloaded" });
+
+    // Wait for the loading skeleton to disappear (auth check happens first)
+    await page.waitForSelector('.animate-pulse', { state: 'detached', timeout: 15_000 }).catch(() => {
+        // If no skeleton found, that's fine - page might have loaded quickly
+    });
 
     // Wait for the auth form to be ready
-    await expect(page.locator("#auth-email")).toBeVisible();
+    await expect(page.locator("#auth-email")).toBeVisible({ timeout: 15_000 });
 
     // Fill in credentials
     await page.locator("#auth-email").fill(email);
@@ -38,13 +54,24 @@ setup("authenticate sender", async ({ page }) => {
     await page.context().storageState({ path: senderFile });
 });
 
-setup("authenticate receiver", async ({ page }) => {
+setup("authenticate receiver", async ({ page, context }) => {
     const email = process.env.E2E_RECEIVER_EMAIL;
     const password = process.env.E2E_RECEIVER_PASSWORD;
 
     if (!email || !password) {
         throw new Error("E2E_RECEIVER_EMAIL and E2E_RECEIVER_PASSWORD must be set in the environment");
     }
+
+    // Clear any existing auth state first
+    await context.clearCookies();
+    await context.clearPermissions();
+    
+    // Clear localStorage and sessionStorage
+    await page.goto("/");
+    await page.evaluate(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+    });
 
     // If the receiver env is the same as the sender, generate a unique receiver email
     let receiverEmail = email;
@@ -64,8 +91,14 @@ setup("authenticate receiver", async ({ page }) => {
         // ignore and use provided receiverEmail
     }
 
-    await page.goto("/auth");
-    await expect(page.locator("#auth-email")).toBeVisible();
+    await page.goto("/auth", { waitUntil: "domcontentloaded" });
+    
+    // Wait for the loading skeleton to disappear (auth check happens first)
+    await page.waitForSelector('.animate-pulse', { state: 'detached', timeout: 15_000 }).catch(() => {
+        // If no skeleton found, that's fine - page might have loaded quickly
+    });
+    
+    await expect(page.locator("#auth-email")).toBeVisible({ timeout: 15_000 });
 
     // Fill in credentials
     await page.locator("#auth-email").fill(receiverEmail as string);

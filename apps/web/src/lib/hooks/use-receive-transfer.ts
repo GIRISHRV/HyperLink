@@ -156,8 +156,6 @@ export function useReceiveTransfer({
     releaseWakeLock,
   ]);
 
-
-
   function resetReceive() {
     dispatchTransfer({ type: "RESET" });
     setError("");
@@ -172,7 +170,7 @@ export function useReceiveTransfer({
   // Peer initialization
   const checkAuthAndInitPeer = useCallback(
     async (isMountedCheck: () => boolean) => {
-      logger.info(
+      logger.debug(
         {
           hasPeerManager: !!peerManagerRef.current,
           isInitializing: initializingRef.current,
@@ -182,7 +180,7 @@ export function useReceiveTransfer({
 
       if (peerManagerRef.current) {
         const peerId = peerManagerRef.current.getPeerId();
-        logger.info({ peerId }, "[RECEIVE] Peer already exists");
+        logger.debug({ peerId }, "[RECEIVE] Peer already exists");
         if (peerId) {
           setMyPeerId(peerId);
         }
@@ -190,30 +188,30 @@ export function useReceiveTransfer({
       }
 
       if (initializingRef.current) {
-        logger.info("[RECEIVE] Already initializing, skipping");
+        logger.debug("[RECEIVE] Already initializing, skipping");
         return;
       }
 
-      logger.info("[RECEIVE] Starting initialization...");
+      logger.debug("[RECEIVE] Starting initialization...");
       initializingRef.current = true;
       try {
         if (!user) {
-          logger.info("[RECEIVE] No user yet, waiting...");
+          logger.debug("[RECEIVE] No user yet, waiting...");
           initializingRef.current = false;
           return;
         }
-        logger.info({ userId: user.id }, "[RECEIVE] User authenticated");
+        logger.debug({ userId: user.id }, "[RECEIVE] User authenticated");
 
         const iceServers = await getIceServers();
-        // Task #4: Support Compatibility Mode (Forced Relay)
+        // Support Compatibility Mode (Forced Relay)
         const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
         const config = await getPeerConfigAsync(iceServers, forceRelay);
         config.onLog = addLog;
 
-        logger.info({ config, forceRelay }, "[RECEIVE] Creating PeerManager");
+        logger.debug({ config, forceRelay }, "[RECEIVE] Creating PeerManager");
         peerManagerRef.current = new PeerManager(config);
 
-        // Task #4: Listen for firewall blocked events
+        // Listen for firewall blocked events
         peerManagerRef.current.on("firewall-blocked", () => {
           toast.error("Firewall Blocked", {
             description: "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
@@ -221,31 +219,39 @@ export function useReceiveTransfer({
           });
         });
 
-        logger.info("[RECEIVE] Initializing PeerManager...");
-        // Task #3: Fetch Supabase JWT for signaling authentication
+        logger.debug("[RECEIVE] Initializing PeerManager...");
+        // Fetch Supabase JWT for signaling authentication
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
 
-        // Task #9: Generate a stable, user-linked Peer ID
+        // Generate a stable, user-linked Peer ID
         const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
-        const id = await peerManagerRef.current.initialize(stablePeerId, token);
+        
+        // Add timeout wrapper for initialization
+        const INIT_TIMEOUT = 45000; // 45 seconds (increased for slower browsers/networks)
+        const initPromise = peerManagerRef.current.initialize(stablePeerId, token);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("PeerManager initialization timed out")), INIT_TIMEOUT);
+        });
+        
+        const id = await Promise.race([initPromise, timeoutPromise]);
 
         if (!isMountedCheck()) {
-          logger.info(
+          logger.debug(
             "[RECEIVE] Component unmounted during peer initialization"
           );
           return;
         }
 
-        logger.info({ id }, "[RECEIVE] PeerManager initialized");
+        logger.debug({ id }, "[RECEIVE] PeerManager initialized");
         setMyPeerId(id);
 
-        // Task #5: Update Supabase with the active Peer ID for discovery (non-blocking)
+        // Update Supabase with the active Peer ID for discovery (non-blocking)
         updateUserProfile(user.id, { active_peer_id: id }).catch((err) => {
           logger.error({ err }, "[RECEIVE] Failed to update user profile with Peer ID");
         });
 
-        logger.info("[RECEIVE] Listening for incoming connections...");
+        logger.debug("[RECEIVE] Listening for incoming connections...");
 
         // Reconnection event listeners
         peerManagerRef.current.on("reconnecting", (data: unknown) => {
@@ -294,8 +300,9 @@ export function useReceiveTransfer({
             dispatchTransfer({ type: "CONNECT" });
             setError("");
             setProgress(null);
+            console.log(`[useReceiveTransfer] Active connection set for peer ${connection.peer}`);
             onLog?.("[SYS] Peer connected");
-            logger.info(
+            logger.debug(
               "[CONNECTION] Incoming peer connection detected"
             );
 
@@ -305,7 +312,7 @@ export function useReceiveTransfer({
 
             connection.on("close", () => {
               if (activeConnectionRef.current !== connection) return;
-              logger.info("[CONNECTION] Peer connection closed");
+              logger.debug("[CONNECTION] Peer connection closed");
 
               if (statusRef.current === "complete") {
                 activeConnectionRef.current = null;
@@ -335,8 +342,9 @@ export function useReceiveTransfer({
               const message = data as PeerMessage;
 
               if (message.type === "file-offer") {
+                console.log(`[useReceiveTransfer] Received file-offer: ${JSON.stringify(message.payload)}`);
                 onLog?.("[SYS] File offer received");
-                logger.info(
+                logger.debug(
                   { message },
                   "[RECEIVE] 🎯 FILE-OFFER received"
                 );
@@ -427,7 +435,7 @@ export function useReceiveTransfer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkAuthAndInitPeer]);
 
-  async function startTransferSequence(pw?: string) {
+  async function startTransferSequence(pw?: string, writableStream?: any, fileHandle?: any) {
     if (!pendingOffer) return;
 
     const {
@@ -436,15 +444,18 @@ export function useReceiveTransfer({
       dbTransferId: senderDbId,
     } = pendingOffer;
 
-    logger.info("[RECEIVE PAGE] Creating FileReceiver...");
+    logger.debug("[RECEIVE PAGE] Creating FileReceiver...");
     const receiver = new FileReceiver();
     receiver.setOnLog(addLog);
     fileReceiverRef.current = receiver;
     receiver.setConnection(connection);
+    if (writableStream) {
+      receiver.setWritableStream(writableStream, fileHandle);
+    }
     if (senderDbId) {
       receiver.setStorageId(senderDbId);
     }
-    logger.info(
+    logger.debug(
       "[RECEIVE PAGE] FileReceiver created and assigned to ref"
     );
 
@@ -452,6 +463,14 @@ export function useReceiveTransfer({
 
     receiver.onProgress((progressData) => {
       setProgress(progressData);
+      dispatchTransfer({
+        type: "PROGRESS",
+        bytesTransferred: progressData.bytesTransferred,
+        speed: progressData.speed,
+        remaining: progressData.timeRemaining,
+        chunkSize: progressData.chunkSize,
+        windowSize: progressData.windowSize,
+      });
     });
 
     receiver.onCleanup((cleared, total) => {
@@ -506,7 +525,7 @@ export function useReceiveTransfer({
 
     receiver.onCancel(async () => {
       dispatchTransfer({ type: "CANCEL" });
-      logger.info("[CANCEL] Transfer cancelled by sender");
+      logger.debug("[CANCEL] Transfer cancelled by sender");
       onLog?.("[SYS] Transfer cancelled by peer");
       vibrate("error");
       playErrorSound();
@@ -516,10 +535,10 @@ export function useReceiveTransfer({
     receiver.onPauseChange((paused) => {
       if (paused) {
         dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
-        logger.info("[PAUSE] Transfer paused by sender");
+        logger.debug("[PAUSE] Transfer paused by sender");
       } else {
         dispatchTransfer({ type: "RESUME" });
-        logger.info("[RESUME] Transfer resumed by sender");
+        logger.debug("[RESUME] Transfer resumed by sender");
       }
     });
 
@@ -542,11 +561,11 @@ export function useReceiveTransfer({
       }
     });
 
-    logger.info("[RECEIVE PAGE] Calling handleOffer on receiver...");
+    logger.debug("[RECEIVE PAGE] Calling handleOffer on receiver...");
     receiver.handleOffer(message);
 
     if (pw) {
-      logger.info("[RECEIVE PAGE] Processing password...");
+      logger.debug("[RECEIVE PAGE] Processing password...");
       try {
         await receiver.processPassword(pw);
       } catch (e) {
@@ -561,7 +580,7 @@ export function useReceiveTransfer({
       }
     }
 
-    logger.info(
+    logger.debug(
       "[RECEIVE PAGE] Receiver setup complete, ready for chunks"
     );
 
@@ -585,7 +604,7 @@ export function useReceiveTransfer({
 
     // Give the receiver a moment to fully initialize before sending acceptance
     await new Promise((resolve) => setTimeout(resolve, 100));
-    logger.info(
+    logger.debug(
       "[RECEIVE PAGE] Sending file-accept message to sender..."
     );
 
@@ -596,32 +615,94 @@ export function useReceiveTransfer({
       timestamp: Date.now(),
     };
     connection.send(acceptMessage);
-    logger.info("[RECEIVE PAGE] file-accept message sent");
+    logger.debug("[RECEIVE PAGE] file-accept message sent");
   }
 
   async function handleAcceptOffer() {
-    logger.info("[RECEIVE PAGE] handleAcceptOffer called");
-    if (!pendingOffer) return;
+    console.log(`[useReceiveTransfer] handleAcceptOffer triggered`);
+    if (!pendingOffer) {
+      console.warn(`[useReceiveTransfer] handleAcceptOffer called but no pendingOffer!`);
+      return;
+    }
 
     if (
       pendingOffer.message.payload.isEncrypted &&
       !pendingOffer.password
     ) {
-      logger.info(
+      logger.debug(
         "[RECEIVE PAGE] File is encrypted, prompting for password..."
       );
       setShowPasswordModal(true);
       return;
     }
 
-    startTransferSequence(pendingOffer.password);
+    // Direct-to-Disk (Streaming)
+    const STREAMING_THRESHOLD = 100 * 1024 * 1024; // 100MB
+    let writableStream: any = undefined;
+
+    logger.debug({
+      fileSize: pendingOffer.fileSize,
+      threshold: STREAMING_THRESHOLD,
+      hasPicker: "showSaveFilePicker" in window,
+      isSecure: isSecureContext()
+    }, "[RECEIVE] Direct-to-Disk trigger check");
+
+    if (pendingOffer.fileSize > STREAMING_THRESHOLD) {
+      if (!("showSaveFilePicker" in window)) {
+        addLog("⚠️ Browser lacks Direct-to-Disk support. Falling back to IndexedDB (Warning: Large files may be slow).");
+      } else {
+        addLog(`[SYS] Direct-to-Disk criteria: ${pendingOffer.fileSize > STREAMING_THRESHOLD ? 'MET' : 'NOT MET'} (Size: ${Math.round(pendingOffer.fileSize / 1024 / 1024)}MB)`);
+      }
+    }
+
+    if (
+      pendingOffer.fileSize > STREAMING_THRESHOLD &&
+      "showSaveFilePicker" in window
+    ) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: pendingOffer.filename,
+        });
+        const stream = await handle.createWritable();
+        addLog("✓ File stream initialized (Direct-to-Disk)");
+        startTransferSequence(pendingOffer.password, stream, handle);
+        return;
+      } catch (err) {
+        logger.warn({ err }, "[RECEIVE] File picker failed or cancelled");
+        if ((err as Error).name === "AbortError") {
+          return;
+        }
+        addLog("[WARN] File picker unavailable. Falling back to IndexedDB.");
+      }
+    }
+
+    startTransferSequence(pendingOffer.password, writableStream);
   }
 
-  function handlePasswordSubmit(pw: string) {
+  async function handlePasswordSubmit(pw: string) {
     if (!pendingOffer) return;
     setPendingOffer({ ...pendingOffer, password: pw });
     setShowPasswordModal(false);
-    startTransferSequence(pw);
+
+    const STREAMING_THRESHOLD = 100 * 1024 * 1024; // 100MB
+    let writableStream: any = undefined;
+
+    if (pendingOffer.fileSize > STREAMING_THRESHOLD && "showSaveFilePicker" in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: pendingOffer.filename,
+        });
+        const stream = await handle.createWritable();
+        addLog("✓ File stream initialized (Direct-to-Disk)");
+        startTransferSequence(pw, stream, handle);
+        return;
+      } catch (err) {
+        logger.warn({ err }, "[RECEIVE] File picker failed or cancelled");
+        if ((err as Error).name === "AbortError") return;
+      }
+    }
+
+    startTransferSequence(pw, writableStream);
   }
 
   function handleRejectOffer() {
@@ -670,7 +751,7 @@ export function useReceiveTransfer({
 
     try {
       await navigator.share(preparedShareData);
-      logger.info("✓ Share successful");
+      logger.debug("✓ Share successful");
     } catch (err) {
       const shareError = err as Error;
       if (shareError.name === "AbortError") return;
@@ -693,7 +774,7 @@ export function useReceiveTransfer({
         text: `HyperLink: Receive file at ${window.location.origin}`,
         url: window.location.origin,
       });
-      logger.info("✓ Shared text fallback");
+      logger.debug("✓ Shared text fallback");
       setShowShareFallback(false);
     } catch (err) {
       logger.error(`✗ Fallback failed: ${(err as Error).name}`);
@@ -730,7 +811,10 @@ export function useReceiveTransfer({
   }
 
   function copyPeerId() {
-    navigator.clipboard.writeText(myPeerId);
+    if (myPeerId) {
+      navigator.clipboard.writeText(myPeerId);
+      toast.success("Peer ID copied");
+    }
   }
 
   return {
