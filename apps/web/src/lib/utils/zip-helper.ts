@@ -1,9 +1,21 @@
-import { zipSync, Zippable } from "fflate";
+import { WorkerPool } from "./worker-pool";
 
 const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for reading files
 
 // Cancellation token
 let cancelZipping = false;
+
+// ZIP worker pool (lazy initialized)
+let zipWorkerPool: WorkerPool | null = null;
+
+function getZipWorkerPool(): WorkerPool {
+  if (!zipWorkerPool) {
+    zipWorkerPool = new WorkerPool(() => {
+      return new Worker(new URL("@/workers/zip.worker.ts", import.meta.url));
+    });
+  }
+  return zipWorkerPool;
+}
 
 export function cancelZip() {
   cancelZipping = true;
@@ -11,11 +23,12 @@ export function cancelZip() {
 
 /**
  * Zips multiple files into a single ZIP file with chunked reading to reduce memory pressure.
- * Uses 'Store' (level 0) compression for speed and low CPU usage.
+ * Uses Web Worker for compression to prevent UI blocking.
  *
  * Memory-efficient approach:
  * - Reads files in 1MB chunks sequentially
  * - Processes one file at a time
+ * - Offloads compression to Web Worker
  * - Reduces peak memory usage compared to loading all files at once
  */
 export async function zipFiles(
@@ -24,11 +37,11 @@ export async function zipFiles(
 ): Promise<File> {
   cancelZipping = false; // Reset cancellation flag
 
-  const zipData: Zippable = {};
+  const fileDataArray: Array<{ path: string; data: Uint8Array; mtime?: number }> = [];
   let totalBytesRead = 0;
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
-  // Read each file in chunks and store in zipData
+  // Read each file in chunks
   for (const file of files) {
     if (cancelZipping) {
       throw new Error("Zipping cancelled by user");
@@ -59,9 +72,9 @@ export async function zipFiles(
       offset += CHUNK_SIZE;
       totalBytesRead += uint8Array.length;
 
-      // Report progress during reading
+      // Report progress during reading (0-70%)
       if (onProgress) {
-        const progress = Math.min(95, Math.floor((totalBytesRead / totalSize) * 95));
+        const progress = Math.min(70, Math.floor((totalBytesRead / totalSize) * 70));
         onProgress(progress);
       }
     }
@@ -75,25 +88,34 @@ export async function zipFiles(
       position += chunk.length;
     }
 
-    zipData[path] = [
-      fileData,
-      {
-        level: 0,
-        mtime: file.lastModified ? new Date(file.lastModified) : new Date(),
-      },
-    ];
+    fileDataArray.push({
+      path,
+      data: fileData,
+      mtime: file.lastModified,
+    });
   }
 
   if (cancelZipping) {
     throw new Error("Zipping cancelled by user");
   }
 
-  // Create ZIP synchronously (fast with level 0)
-  if (onProgress) onProgress(98);
-  const zipped = zipSync(zipData, { level: 0 });
+  // Compress using Web Worker (70-100%)
+  const workerPool = getZipWorkerPool();
+  const zipped = await workerPool.execute<Uint8Array>(
+    "zip",
+    { files: fileDataArray },
+    (workerProgress) => {
+      if (onProgress) {
+        // Map worker progress (0-100) to our range (70-100)
+        const mappedProgress = 70 + Math.floor(workerProgress * 0.3);
+        onProgress(mappedProgress);
+      }
+    }
+  );
 
-  // Create File object - cast to satisfy TypeScript's strict BlobPart type
-  const zipBlob = new Blob([zipped as unknown as BlobPart], { type: "application/zip" });
+  // Create File object - copy to ensure proper ArrayBuffer type
+  const zipData = new Uint8Array(zipped);
+  const zipBlob = new Blob([zipData], { type: "application/zip" });
   const zipFile = new File([zipBlob], `archive_${Date.now()}.zip`, { type: "application/zip" });
 
   if (onProgress) onProgress(100);

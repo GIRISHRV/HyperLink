@@ -22,15 +22,28 @@ vi.mock("@repo/utils", () => ({
 }));
 
 vi.mock("@/lib/utils/crypto", () => ({
-  deriveKey: vi.fn(async () => ({ type: "secret" } as unknown as CryptoKey)),
-  decryptChunk: vi.fn(async (data: ArrayBuffer) => data), // passthrough
+  deriveKey: vi.fn(async () => ({ type: "secret" }) as unknown as CryptoKey),
   base64ToArrayBuffer: vi.fn((_b64: string) => new Uint8Array(16)),
 }));
 
-const mockAddChunk = vi.fn(async (..._args: unknown[]) => { });
-const mockAssembleFileFromCursor = vi.fn(async (..._args: unknown[]) => new Blob(["assembled-file"]));
-const mockClearTransfer = vi.fn(async (..._args: unknown[]) => { });
-const mockAddFile = vi.fn(async (..._args: unknown[]) => { });
+vi.mock("@/lib/utils/encryption-worker-client", () => ({
+  encryptionWorkerClient: {
+    decrypt: vi.fn(async (data: ArrayBuffer) => data), // passthrough
+    encrypt: vi.fn(async (data: ArrayBuffer) => data),
+    deriveKey: vi.fn(async (_password: string, salt: ArrayBuffer) => ({
+      key: { type: "secret" } as unknown as CryptoKey,
+      salt,
+    })),
+    terminate: vi.fn(),
+  },
+}));
+
+const mockAddChunk = vi.fn(async (..._args: unknown[]) => {});
+const mockAssembleFileFromCursor = vi.fn(
+  async (..._args: unknown[]) => new Blob(["assembled-file"])
+);
+const mockClearTransfer = vi.fn(async (..._args: unknown[]) => {});
+const mockAddFile = vi.fn(async (..._args: unknown[]) => {});
 const mockGetLastReceivedChunkIndex = vi.fn(async (..._args: unknown[]) => -1);
 
 vi.mock("@/lib/storage/idb-manager", () => ({
@@ -52,7 +65,9 @@ function createMockConnection() {
 
 // ─── Helper: create offer message ──────────────────────────────────────
 
-function createOfferMessage(overrides: Partial<FileOfferPayload> = {}): PeerMessage<FileOfferPayload> {
+function createOfferMessage(
+  overrides: Partial<FileOfferPayload> = {}
+): PeerMessage<FileOfferPayload> {
   return {
     type: "file-offer",
     transferId: "test-transfer-1",
@@ -89,8 +104,22 @@ describe("FileReceiver", () => {
   let receiver: FileReceiver;
   let conn: ReturnType<typeof createMockConnection>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Reset encryptionWorkerClient mocks to default behavior
+    const { encryptionWorkerClient } = await import("@/lib/utils/encryption-worker-client");
+    (encryptionWorkerClient.decrypt as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new ArrayBuffer(65536)
+    );
+    (encryptionWorkerClient.encrypt as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new ArrayBuffer(65536)
+    );
+    (encryptionWorkerClient.deriveKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+      key: { type: "secret" } as unknown as CryptoKey,
+      salt: new Uint8Array(16),
+    });
+
     receiver = new FileReceiver();
     conn = createMockConnection();
     receiver.setConnection(conn as any);
@@ -161,8 +190,10 @@ describe("FileReceiver", () => {
     });
 
     it("throws if key derivation fails", async () => {
-      const { deriveKey } = await import("@/lib/utils/crypto");
-      (deriveKey as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("KDF failure"));
+      const { encryptionWorkerClient } = await import("@/lib/utils/encryption-worker-client");
+      (encryptionWorkerClient.deriveKey as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("KDF failure")
+      );
 
       const offer = createOfferMessage({ isEncrypted: true, salt: "bW9ja19zYWx0" });
       await receiver.handleOffer(offer);
@@ -227,10 +258,7 @@ describe("FileReceiver", () => {
       await receiver.handleChunk(createChunkMessage(1));
 
       expect(mockAssembleFileFromCursor).toHaveBeenCalled();
-      expect(completeCb).toHaveBeenCalledWith(
-        expect.any(Blob),
-        "document.pdf"
-      );
+      expect(completeCb).toHaveBeenCalledWith(expect.any(Blob), "document.pdf");
       expect(mockClearTransfer).toHaveBeenCalled();
     });
 
@@ -245,19 +273,22 @@ describe("FileReceiver", () => {
   // ─── Decryption flow ──────────────────────────────────────────────────
 
   describe("encrypted chunk handling", () => {
-    it("calls decryptChunk for encrypted chunks", async () => {
+    it("calls decrypt for encrypted chunks", async () => {
+      const { encryptionWorkerClient } = await import("@/lib/utils/encryption-worker-client");
+
       const offer = createOfferMessage({ isEncrypted: true, salt: "bW9ja19zYWx0" });
       await receiver.handleOffer(offer);
       await receiver.processPassword("pass");
 
       await receiver.handleChunk(createChunkMessage(0));
-      const { decryptChunk } = await import("@/lib/utils/crypto");
-      expect(decryptChunk).toHaveBeenCalled();
+      expect(encryptionWorkerClient.decrypt).toHaveBeenCalled();
     });
 
     it("cancels on decryption failure (wrong password)", async () => {
-      const { decryptChunk } = await import("@/lib/utils/crypto");
-      (decryptChunk as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Decryption failed"));
+      const { encryptionWorkerClient } = await import("@/lib/utils/encryption-worker-client");
+      (encryptionWorkerClient.decrypt as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Decryption failed")
+      );
 
       const offer = createOfferMessage({ isEncrypted: true, salt: "bW9ja19zYWx0" });
       await receiver.handleOffer(offer);
@@ -282,9 +313,7 @@ describe("FileReceiver", () => {
 
       await receiver.cancel();
       expect(receiver.getStatus()).toBe("cancelled");
-      expect(conn.send).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "transfer-cancel" })
-      );
+      expect(conn.send).toHaveBeenCalledWith(expect.objectContaining({ type: "transfer-cancel" }));
     });
 
     it("cleans up partial chunks from IDB", async () => {
@@ -311,9 +340,7 @@ describe("FileReceiver", () => {
 
       await receiver.pause();
       expect(receiver.getStatus()).toBe("paused");
-      expect(conn.send).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "transfer-pause" })
-      );
+      expect(conn.send).toHaveBeenCalledWith(expect.objectContaining({ type: "transfer-pause" }));
     });
 
     it("resumes and sends resume message", async () => {
@@ -324,9 +351,7 @@ describe("FileReceiver", () => {
 
       await receiver.resume();
       expect(receiver.getStatus()).toBe("transferring");
-      expect(conn.send).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "transfer-resume" })
-      );
+      expect(conn.send).toHaveBeenCalledWith(expect.objectContaining({ type: "transfer-resume" }));
     });
 
     it("resume is a no-op when not paused", async () => {

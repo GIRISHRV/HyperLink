@@ -22,7 +22,7 @@
     "test:e2e:webkit": "npm run test:e2e:webkit --workspace=apps/web",
     "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web",
     "validate": "npm run test && npm run lint && npx tsc --noEmit -p apps/web/tsconfig.json && npm run build",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "husky": "^9.1.7",

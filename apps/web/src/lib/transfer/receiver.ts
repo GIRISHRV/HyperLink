@@ -1,13 +1,19 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
 import type { FileChunk } from "@repo/types";
-import { addChunk, assembleFileFromCursor, clearTransfer, addFile, getLastReceivedChunkIndex } from "@/lib/storage/idb-manager";
+import {
+  addChunk,
+  assembleFileFromCursor,
+  clearTransfer,
+  addFile,
+  getLastReceivedChunkIndex,
+} from "@/lib/storage/idb-manager";
 import { logger } from "@repo/utils";
-import { deriveKey, decryptChunk, base64ToArrayBuffer } from "@/lib/utils/crypto";
+import { base64ToArrayBuffer } from "@/lib/utils/crypto";
+import { encryptionWorkerClient } from "@/lib/utils/encryption-worker-client";
 import type { TransferStatus } from "@/lib/hooks/use-transfer-state";
 
 const INITIAL_CHUNK_SIZE = 64 * 1024; // Must match sender's initial CHUNK_SIZE
-
 
 export class FileReceiver {
   private transferId: string = "";
@@ -97,7 +103,14 @@ export class FileReceiver {
 
     if (this.isEncrypted && message.payload.salt) {
       this.salt = base64ToArrayBuffer(message.payload.salt);
-      logger.debug("[RECEIVER] 🔒 File is encrypted, salt received");
+      logger.debug(
+        {
+          saltLength: this.salt.length,
+          saltBase64: message.payload.salt,
+          saltFirst4Bytes: Array.from(this.salt.slice(0, 4)),
+        },
+        "[RECEIVER] 🔒 File is encrypted, salt received"
+      );
       this.onLog?.("[SEC] 🔒 File is encrypted, salt received.");
     }
 
@@ -114,25 +127,33 @@ export class FileReceiver {
         this.receivedChunks = lastIndex + 1;
         this.bytesReceived = Math.min(this.receivedChunks * INITIAL_CHUNK_SIZE, this.fileSize);
         this.resumeFromChunk = lastIndex + 1;
-        logger.debug({
-          transferId: this.transferId,
-          resumeFrom: this.resumeFromChunk,
-          existingChunks: this.receivedChunks
-        }, "[RECEIVER] Found existing chunks in IDB, will resume");
-        this.onLog?.(`[DB] Found existing chunks in IDB. Resuming from chunk ${this.resumeFromChunk}.`);
+        logger.debug(
+          {
+            transferId: this.transferId,
+            resumeFrom: this.resumeFromChunk,
+            existingChunks: this.receivedChunks,
+          },
+          "[RECEIVER] Found existing chunks in IDB, will resume"
+        );
+        this.onLog?.(
+          `[DB] Found existing chunks in IDB. Resuming from chunk ${this.resumeFromChunk}.`
+        );
       }
     } catch (err) {
       logger.warn({ err }, "[RECEIVER] Failed to check for existing chunks, starting fresh");
     }
 
-    logger.debug({
-      transferId: this.transferId,
-      storageId: this.storageId,
-      filename: this.filename,
-      totalChunks: this.totalChunks,
-      isEncrypted: this.isEncrypted,
-      resumeFrom: this.resumeFromChunk
-    }, "[RECEIVER] handleOffer");
+    logger.debug(
+      {
+        transferId: this.transferId,
+        storageId: this.storageId,
+        filename: this.filename,
+        totalChunks: this.totalChunks,
+        isEncrypted: this.isEncrypted,
+        resumeFrom: this.resumeFromChunk,
+      },
+      "[RECEIVER] handleOffer"
+    );
   }
 
   /**
@@ -141,7 +162,9 @@ export class FileReceiver {
   async processPassword(password: string): Promise<void> {
     if (!this.isEncrypted || !this.salt) return;
     try {
-      this.cryptoKey = await deriveKey(password, this.salt);
+      logger.debug({ saltLength: this.salt.length }, "[RECEIVER] Processing password with salt");
+      const result = await encryptionWorkerClient.deriveKey(password, this.salt);
+      this.cryptoKey = result.key;
       logger.debug("[RECEIVER] 🔑 Key derived successfully");
       this.onLog?.("[SEC] 🔑 Key derived successfully.");
     } catch (e) {
@@ -165,8 +188,13 @@ export class FileReceiver {
     // For intermediate duplicates, we rely on the fact that we increment receivedChunks only for NEW ones.
     if (chunkIndex < this.resumeFromChunk) {
       if (isProbe) {
-        logger.debug({ chunkIndex }, "[RECEIVER] Received probe for already-processed chunk, re-ACKing");
-        this.onLog?.(`[NET] Received duplicate probe for chunk ${chunkIndex}. Re-ACKing to prevent deadlock.`);
+        logger.debug(
+          { chunkIndex },
+          "[RECEIVER] Received probe for already-processed chunk, re-ACKing"
+        );
+        this.onLog?.(
+          `[NET] Received duplicate probe for chunk ${chunkIndex}. Re-ACKing to prevent deadlock.`
+        );
       }
       this.sendAck(chunkIndex);
       return;
@@ -184,7 +212,7 @@ export class FileReceiver {
       }
 
       try {
-        chunkData = await decryptChunk(data, this.cryptoKey);
+        chunkData = await encryptionWorkerClient.decrypt(data, this.cryptoKey);
       } catch (e) {
         logger.error({ chunkIndex, e }, "[RECEIVER] Decryption failed! Wrong password?");
         this.onLog?.("[ERR] [SEC] Decryption failed! Incorrect password or corrupted data.");
@@ -207,7 +235,7 @@ export class FileReceiver {
         await this.writableStream.write({
           type: "write",
           position: offset,
-          data: chunkData
+          data: chunkData,
         });
       } else {
         // Fallback or Dual-Write: Store chunk to IndexedDB
@@ -246,7 +274,10 @@ export class FileReceiver {
     // Log progress every 10%
     const percentage = (this.bytesReceived / this.fileSize) * 100;
     if (this.receivedChunks % Math.ceil(this.totalChunks / 10) === 0) {
-      logger.debug({ percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks }, "[RECEIVER] Progress");
+      logger.debug(
+        { percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks },
+        "[RECEIVER] Progress"
+      );
     }
 
     // Update progress callback
@@ -319,7 +350,10 @@ export class FileReceiver {
       } else {
         this.onLog?.("[FS] Assembling chunks from IDB cursor stream...");
         finalBlob = await assembleFileFromCursor(this.transferId, this.fileType);
-        logger.debug({ size: finalBlob.size }, "[RECEIVER] assembleFile: Final blob constructed in memory");
+        logger.debug(
+          { size: finalBlob.size },
+          "[RECEIVER] assembleFile: Final blob constructed in memory"
+        );
         this.onLog?.(`[FS] Final Blob constructed in memory: ${finalBlob.size} bytes.`);
       }
 
@@ -348,9 +382,13 @@ export class FileReceiver {
 
       // Clear chunks from IndexedDB with batched progress reporting (Task #6)
       this.onLog?.("[DB] Initiating chunk garbage collection...");
-      await clearTransfer(this.transferId, (cleared, total) => {
-        this.cleanupCallback?.(cleared, total);
-      }, this.onLog);
+      await clearTransfer(
+        this.transferId,
+        (cleared, total) => {
+          this.cleanupCallback?.(cleared, total);
+        },
+        this.onLog
+      );
       logger.debug("[RECEIVER] Cleared chunks from IndexedDB");
     } catch (error) {
       logger.error({ error }, "Error assembling file");
@@ -405,9 +443,13 @@ export class FileReceiver {
       this.status = "cancelled";
       this.cancelCallback?.();
       // Clean up partial chunks from IndexedDB with batched progress reporting (Task #6)
-      clearTransfer(this.transferId, (cleared, total) => {
-        this.cleanupCallback?.(cleared, total);
-      }, this.onLog).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed"));
+      clearTransfer(
+        this.transferId,
+        (cleared, total) => {
+          this.cleanupCallback?.(cleared, total);
+        },
+        this.onLog
+      ).catch((err) => logger.error({ err }, "[RECEIVER] clearTransfer failed"));
       return true;
     }
 
@@ -508,7 +550,10 @@ export class FileReceiver {
             logger.debug("[RECEIVER] Partial file removed from disk");
             this.onLog?.("[FS] Partial file removed from disk.");
           } catch (removeErr) {
-            logger.warn({ removeErr }, "[RECEIVER] Failed to remove partial file via fileHandle.remove()");
+            logger.warn(
+              { removeErr },
+              "[RECEIVER] Failed to remove partial file via fileHandle.remove()"
+            );
           }
         }
         this.fileHandle = undefined;
@@ -518,9 +563,13 @@ export class FileReceiver {
     }
 
     // Clean up partial chunks from IndexedDB with batched progress reporting (Task #6)
-    clearTransfer(this.storageId || this.transferId, (cleared, total) => {
-      this.cleanupCallback?.(cleared, total);
-    }, this.onLog).catch(err => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
+    clearTransfer(
+      this.storageId || this.transferId,
+      (cleared, total) => {
+        this.cleanupCallback?.(cleared, total);
+      },
+      this.onLog
+    ).catch((err) => logger.error({ err }, "[RECEIVER] clearTransfer failed on cancel"));
     this.cancelCallback?.();
     logger.debug("[RECEIVER] Transfer cancelled");
   }

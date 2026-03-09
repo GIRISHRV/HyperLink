@@ -67,3 +67,4 @@ E2E_CI_CONFIGURATION.md
 *.png
 test-file-*.bin
 .auth
+*roadmap.md

@@ -4,23 +4,27 @@
  * Tests for: zipFiles (multi-file zip, progress callback, single file),
  * getFilesFromDataTransferItems (drag-and-drop flat files, directory recursion).
  *
- * fflate is mocked to avoid real compression and keep tests fast.
+ * Workers are mocked to avoid real worker instantiation in tests.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ─── Mock fflate ────────────────────────────────────────────────────────
+// ─── Mock Worker and WorkerPool ────────────────────────────────────────
 
-vi.mock("fflate", () => {
+const mockExecute = vi.fn().mockResolvedValue(new Uint8Array([80, 75, 5, 6]));
+const mockTerminate = vi.fn();
+const mockIsActive = vi.fn().mockReturnValue(true);
+
+vi.mock("@/lib/utils/worker-pool", () => {
   return {
-    zipSync: vi.fn((_data: unknown, _opts: unknown) => {
-      // Return a mock ZIP file as Uint8Array
-      return new Uint8Array([80, 75, 5, 6]); // Minimal ZIP signature
-    }),
+    WorkerPool: class MockWorkerPool {
+      execute = mockExecute;
+      terminate = mockTerminate;
+      isActive = mockIsActive;
+    },
   };
 });
 
 import { zipFiles, getFilesFromDataTransferItems } from "../zip-helper";
-import { zipSync } from "fflate";
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -31,6 +35,7 @@ function makeFile(name: string, content = "hello"): File {
 describe("zip-helper", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecute.mockResolvedValue(new Uint8Array([80, 75, 5, 6]));
   });
 
   // ─── zipFiles ─────────────────────────────────────────────────────────
@@ -45,14 +50,20 @@ describe("zip-helper", () => {
       expect(result.name).toMatch(/^archive_\d+\.zip$/);
     });
 
-    it("calls fflate zipSync with all input files", async () => {
+    it("calls worker pool execute with file data", async () => {
       const files = [makeFile("a.txt", "AAA"), makeFile("b.txt", "BBB")];
       await zipFiles(files);
 
-      expect(zipSync).toHaveBeenCalledOnce();
-      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("a.txt");
-      expect(Object.keys(zipData)).toContain("b.txt");
+      expect(mockExecute).toHaveBeenCalledWith(
+        "zip",
+        expect.objectContaining({
+          files: expect.arrayContaining([
+            expect.objectContaining({ path: "a.txt" }),
+            expect.objectContaining({ path: "b.txt" }),
+          ]),
+        }),
+        expect.any(Function)
+      );
     });
 
     it("calls onProgress with 100 on completion", async () => {
@@ -71,22 +82,22 @@ describe("zip-helper", () => {
 
       await zipFiles([file]);
 
-      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("folder/image.png");
+      const executeCall = mockExecute.mock.calls[mockExecute.mock.calls.length - 1];
+      const filesArg = executeCall[1].files;
+      expect(filesArg[0].path).toBe("folder/image.png");
     });
 
     it("falls back to file.name when webkitRelativePath is empty", async () => {
       const file = makeFile("plain.txt");
       await zipFiles([file]);
 
-      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("plain.txt");
+      const executeCall = mockExecute.mock.calls[mockExecute.mock.calls.length - 1];
+      const filesArg = executeCall[1].files;
+      expect(filesArg[0].path).toBe("plain.txt");
     });
 
-    it("rejects when fflate returns an error", async () => {
-      (zipSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
-        throw new Error("Compression failed");
-      });
+    it("rejects when worker returns an error", async () => {
+      mockExecute.mockRejectedValueOnce(new Error("Compression failed"));
 
       await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow("Compression failed");
     });
@@ -96,11 +107,10 @@ describe("zip-helper", () => {
       expect(result).toBeInstanceOf(File);
     });
 
-    it("uses level 0 (store) compression for speed", async () => {
+    it("uses worker for compression", async () => {
       await zipFiles([makeFile("fast.txt")]);
 
-      const [, opts] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(opts).toMatchObject({ level: 0 });
+      expect(mockExecute).toHaveBeenCalledWith("zip", expect.any(Object), expect.any(Function));
     });
   });
 
