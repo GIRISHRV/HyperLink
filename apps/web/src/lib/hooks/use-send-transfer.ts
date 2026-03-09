@@ -165,14 +165,14 @@ export function useSendTransfer({
 
       // Task #9: Generate a stable, user-linked Peer ID
       const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
-      
+
       // Add timeout wrapper for initialization
       const INIT_TIMEOUT = 45000; // 45 seconds (increased for slower browsers/networks)
       const initPromise = peerManagerRef.current.initialize(stablePeerId, token);
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("PeerManager initialization timed out")), INIT_TIMEOUT);
       });
-      
+
       const id = await Promise.race([initPromise, timeoutPromise]);
       setMyPeerId(id);
       setIsPeerReady(true);
@@ -260,7 +260,7 @@ export function useSendTransfer({
       connectionRef.current = conn;
 
       conn.on("open", async () => {
-        console.log(`[useSendTransfer] Connection opened to ${receiverPeerId}`);
+        logger.debug({ receiverPeerId }, "[useSendTransfer] Connection opened");
         try {
           addLog("✓ Connection established");
           playConnectionSound();
@@ -282,12 +282,12 @@ export function useSendTransfer({
           }
 
           addLog("Sending file offer...");
-          console.log(`[useSendTransfer] Sending file offer for ${file.name} (${file.size} bytes)`);
+          logger.debug({ filename: file.name, fileSize: file.size }, "[useSendTransfer] Sending file offer");
           await sender.sendOffer();
           dispatchTransfer({ type: "AWAIT_ACCEPTANCE" });
 
           sender.onAccepted(() => {
-            console.log(`[useSendTransfer] Peer accepted the file!`);
+            logger.debug("[useSendTransfer] Peer accepted the file");
             dispatchTransfer({
               type: "START_TRANSFER",
               totalBytes: file.size,
@@ -326,7 +326,7 @@ export function useSendTransfer({
               chunkSize: p.chunkSize,
               windowSize: p.windowSize,
             });
-            onDataRef.current?.(p);
+            // Removed redundant onData call here as Progress is handled via dispatch
           });
 
           if (dbId) {
@@ -346,7 +346,8 @@ export function useSendTransfer({
 
       conn.on("data", (data: unknown) => {
         try {
-          // Task: Fix Chat Reception
+          // Task: Fix Chat Reception - This listener handles chat messages 
+          // and other non-transfer control messages.
           onDataRef.current?.(data);
 
           const message = validatePeerMessage(data);

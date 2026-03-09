@@ -20,7 +20,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 3 : 1, // More retries in CI for flaky WebRTC tests
-  workers: 1, // Always use 1 worker to avoid resource contention
+  workers: 4, // Always use 1 worker to avoid resource contention
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   timeout: 60_000, // Increased to 60s for CI environments
 
@@ -74,7 +74,7 @@ export default defineConfig({
     },
     {
       name: "firefox",
-      use: { 
+      use: {
         ...devices["Desktop Firefox"],
         // Firefox needs longer timeouts for navigation
         navigationTimeout: 60_000,

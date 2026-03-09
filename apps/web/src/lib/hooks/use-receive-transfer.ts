@@ -226,14 +226,14 @@ export function useReceiveTransfer({
 
         // Generate a stable, user-linked Peer ID
         const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
-        
+
         // Add timeout wrapper for initialization
         const INIT_TIMEOUT = 45000; // 45 seconds (increased for slower browsers/networks)
         const initPromise = peerManagerRef.current.initialize(stablePeerId, token);
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("PeerManager initialization timed out")), INIT_TIMEOUT);
         });
-        
+
         const id = await Promise.race([initPromise, timeoutPromise]);
 
         if (!isMountedCheck()) {
@@ -300,7 +300,7 @@ export function useReceiveTransfer({
             dispatchTransfer({ type: "CONNECT" });
             setError("");
             setProgress(null);
-            console.log(`[useReceiveTransfer] Active connection set for peer ${connection.peer}`);
+            logger.debug({ peerId: connection.peer }, "[useReceiveTransfer] Active connection set");
             onLog?.("[SYS] Peer connected");
             logger.debug(
               "[CONNECTION] Incoming peer connection detected"
@@ -342,7 +342,7 @@ export function useReceiveTransfer({
               const message = data as PeerMessage;
 
               if (message.type === "file-offer") {
-                console.log(`[useReceiveTransfer] Received file-offer: ${JSON.stringify(message.payload)}`);
+                logger.debug({ payload: message.payload }, "[useReceiveTransfer] Received file-offer");
                 onLog?.("[SYS] File offer received");
                 logger.debug(
                   { message },
@@ -619,9 +619,9 @@ export function useReceiveTransfer({
   }
 
   async function handleAcceptOffer() {
-    console.log(`[useReceiveTransfer] handleAcceptOffer triggered`);
+    logger.debug("[useReceiveTransfer] handleAcceptOffer triggered");
     if (!pendingOffer) {
-      console.warn(`[useReceiveTransfer] handleAcceptOffer called but no pendingOffer!`);
+      logger.warn("[useReceiveTransfer] handleAcceptOffer called but no pendingOffer!");
       return;
     }
 

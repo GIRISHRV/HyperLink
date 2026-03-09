@@ -120,7 +120,7 @@ export class PeerManager {
         });
 
         this.peer.on("connection", (conn) => {
-          console.log(`[PeerManager] Incoming connection from ${conn.peer}`);
+          logger.debug({ peerId: conn.peer }, "[PeerManager] Incoming connection");
           this.handleIncomingConnection(conn);
         });
 
@@ -189,7 +189,7 @@ export class PeerManager {
       throw new Error("Peer not initialized");
     }
 
-    console.log(`[PeerManager] connectToPeer to ${remotePeerId}`);
+    logger.debug({ remotePeerId }, "[PeerManager] connectToPeer");
     this.config.onLog?.(`[NET] Initiating connection to remote peer: ${remotePeerId}`);
     const conn = this.peer.connect(remotePeerId, {
       reliable: true,
@@ -204,7 +204,7 @@ export class PeerManager {
    * Handle incoming peer connections
    */
   private handleIncomingConnection(conn: DataConnection) {
-    console.log(`[PeerManager] handleIncomingConnection for ${conn.peer}`);
+    logger.debug({ peerId: conn.peer }, "[PeerManager] handleIncomingConnection");
     this.config.onLog?.(`[NET] Incoming connection from peer: ${conn.peer}`);
     this.handleConnection(conn);
     this.emit("incoming-connection", conn);

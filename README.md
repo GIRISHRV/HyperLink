@@ -104,15 +104,28 @@ npm run format
 
 ## 📝 Documentation
 
-Detailed documentation is available in the [`docs/`](./docs) directory:
+Comprehensive documentation is available in the [`docs/`](./docs) directory:
 
-- [Main Concepts](./docs/README-main.md)
-- [Signaling Server](./docs/README-signaling.md)
-- [Supabase Setup](./docs/README-supabase.md)
-- [Testing Strategy](./docs/TESTING.md)
-- [Versioning Guidelines](./docs/VERSIONING.md)
-- [Non-Technical Explainer](./docs/EXPLAINER.md)
-- [Technical Audit (The "Holes")](./docs/APP_ANALYSIS.md)
+### 📚 Complete Documentation Index
+- **[Documentation Index](./docs/INDEX.md)** - Central hub for all documentation
+
+### 🤖 AI Assistant Context
+- **[Claude Context](./docs/claude.md)** - Quick reference for Claude AI
+- **[Gemini Context](./docs/gemini.md)** - Quick reference for Gemini AI
+
+### 📋 Requirements & Architecture
+- **[Software Requirements Specification (SRS)](./docs/SRS.md)** - Complete requirements document
+- **[System Architecture](./docs/architecture/SYSTEM_OVERVIEW.md)** - Technical architecture overview
+- **[Design Language](./docs/design-language/README.md)** - UI patterns and code conventions
+
+### 📖 Guides & References
+- [Main Concepts](./docs/README-main.md) - Project overview
+- [Signaling Server](./docs/README-signaling.md) - PeerServer setup
+- [Supabase Setup](./docs/README-supabase.md) - Database configuration
+- [Testing Strategy](./docs/TESTING.md) - Testing best practices
+- [Versioning Guidelines](./docs/VERSIONING.md) - Version management
+- [Non-Technical Explainer](./docs/EXPLAINER.md) - How HyperLink works
+
 
 ## 📝 License
 

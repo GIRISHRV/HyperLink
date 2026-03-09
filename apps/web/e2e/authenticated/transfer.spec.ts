@@ -25,14 +25,14 @@ test.afterEach(async () => {
 function calculateTransferTimeout(fileSizeBytes: number): number {
   // Base timeout: 30 seconds for connection establishment
   const baseTimeout = 30_000;
-  
+
   // Transfer rate assumption: 5 MB/s (conservative for localhost)
   const transferRateMBps = 5;
   const transferTimeMs = (fileSizeBytes / (1024 * 1024)) / transferRateMBps * 1000;
-  
+
   // Add 50% buffer for processing overhead (encryption, chunking, etc.)
   const bufferMultiplier = 1.5;
-  
+
   return Math.ceil(baseTimeout + (transferTimeMs * bufferMultiplier));
 }
 
@@ -47,21 +47,36 @@ async function waitForProgress(page: any, minProgress: number, timeout: number =
   let lastProgress = 0;
   let stuckCount = 0;
   const maxStuckIterations = 5; // Allow progress to be stuck for 5 iterations before failing
-  
+
   while (Date.now() - startTime < timeout) {
     try {
+      // Check for "Transfer Complete" or "100%" anywhere on the page first, 
+      // as the progress element might unmount immediately on completion.
+      const pageText = await page.textContent('body');
+      if (pageText?.includes("Transfer Complete") || pageText?.includes("100%")) {
+        console.log(`[TEST] Transfer confirmed complete via page content.`);
+        return;
+      }
+
       // Wait for progress element to be visible
       const progressElement = page.locator('[data-testid="progress"]');
-      await progressElement.waitFor({ state: 'visible', timeout: 5000 });
-      
+      const isVisible = await progressElement.isVisible({ timeout: 2000 }).catch(() => false);
+
+      if (!isVisible) {
+        // If not visible but we haven't reached minProgress, wait a bit and retry
+        // The transfer might have finished between our "pageText" check and locator check.
+        await page.waitForTimeout(500);
+        continue;
+      }
+
       const progressText = await progressElement.textContent({ timeout: 5000 });
       const currentProgress = parseInt(progressText?.replace("%", "") || "0");
-      
+
       // Verify progress is monotonically increasing or stable
       if (currentProgress < lastProgress) {
         throw new Error(`Progress decreased from ${lastProgress}% to ${currentProgress}%`);
       }
-      
+
       // Track if progress is stuck
       if (currentProgress === lastProgress && currentProgress < minProgress) {
         stuckCount++;
@@ -71,14 +86,14 @@ async function waitForProgress(page: any, minProgress: number, timeout: number =
       } else {
         stuckCount = 0; // Reset stuck counter if progress changed
       }
-      
+
       lastProgress = currentProgress;
-      
+
       if (currentProgress >= minProgress) {
         console.log(`[TEST] Progress reached ${currentProgress}% (target: ${minProgress}%)`);
         return;
       }
-      
+
       // Wait before next check
       await page.waitForTimeout(1000);
     } catch (error) {
@@ -90,7 +105,7 @@ async function waitForProgress(page: any, minProgress: number, timeout: number =
       await page.waitForTimeout(1000);
     }
   }
-  
+
   throw new Error(`Progress did not reach ${minProgress}% within ${timeout}ms (last: ${lastProgress}%)`);
 }
 
@@ -102,59 +117,59 @@ async function waitForProgress(page: any, minProgress: number, timeout: number =
  */
 async function waitForPeerConnectionWithRetry(page: any, maxRetries: number = 3): Promise<string> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[TEST] Attempting to establish peer connection (attempt ${attempt}/${maxRetries})...`);
-      
+
       // Wait for the peer ID element to be visible
       const peerIdElement = page.getByTestId("my-peer-id");
       await peerIdElement.waitFor({ state: 'visible', timeout: 30_000 });
-      
+
       // Wait for the peer ID to not be "Loading..."
       await expect(peerIdElement).not.toHaveText("Loading...", { timeout: 30_000 });
-      
+
       // Get the actual peer ID
       const peerId = await peerIdElement.textContent();
-      
+
       if (!peerId || peerId.trim() === '' || peerId.trim() === 'Loading...') {
         throw new Error('Peer ID is empty or still loading');
       }
-      
+
       // Verify peer ID format (should be alphanumeric)
       const peerIdTrimmed = peerId.trim();
       if (!/^[a-zA-Z0-9-_]+$/.test(peerIdTrimmed)) {
         throw new Error(`Invalid peer ID format: ${peerIdTrimmed}`);
       }
-      
+
       // Wait a bit to ensure connection is stable
       await page.waitForTimeout(1000);
-      
+
       // Verify peer ID hasn't changed (connection stability check)
       const peerIdAfterWait = await peerIdElement.textContent();
       if (peerIdAfterWait?.trim() !== peerIdTrimmed) {
         throw new Error('Peer ID changed during stability check - connection unstable');
       }
-      
+
       console.log(`[TEST] ✓ Peer connection established successfully on attempt ${attempt}: ${peerIdTrimmed}`);
       return peerIdTrimmed;
     } catch (error) {
       lastError = error as Error;
       console.log(`[TEST] ✗ Peer connection attempt ${attempt} failed: ${lastError.message}`);
-      
+
       if (attempt < maxRetries) {
         // Wait with exponential backoff before retry
         const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 10_000);
         console.log(`[TEST] Retrying in ${backoffMs}ms...`);
         await page.waitForTimeout(backoffMs);
-        
+
         // Reload page to reset WebRTC state
         console.log(`[TEST] Reloading page to reset WebRTC state...`);
         await page.reload({ waitUntil: "networkidle" });
       }
     }
   }
-  
+
   throw new Error(`Failed to establish peer connection after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
@@ -166,15 +181,15 @@ async function waitForPeerConnectionWithRetry(page: any, maxRetries: number = 3)
  */
 async function waitForSystemReady(page: any, browserName: string = "chromium", maxRetries: number = 3): Promise<void> {
   let lastError: Error | null = null;
-  
+
   // WebKit needs longer timeout and different selector strategy
   const baseTimeout = browserName === "webkit" ? 30_000 : 20_000;
   const retries = browserName === "webkit" ? 5 : maxRetries;
-  
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       console.log(`[TEST] Waiting for System Ready on ${browserName} (attempt ${attempt}/${retries})...`);
-      
+
       // Try multiple selector strategies for better browser compatibility
       const strategies = [
         // Strategy 1: Exact text match
@@ -186,7 +201,7 @@ async function waitForSystemReady(page: any, browserName: string = "chromium", m
         // Strategy 4: Any element with "System Ready" text
         () => page.getByText("System Ready", { exact: true }).first(),
       ];
-      
+
       // Try each strategy
       for (const strategy of strategies) {
         try {
@@ -199,14 +214,14 @@ async function waitForSystemReady(page: any, browserName: string = "chromium", m
           continue;
         }
       }
-      
+
       // If all strategies failed, throw error
       throw new Error("All selector strategies failed");
-      
+
     } catch (error) {
       lastError = error as Error;
       console.log(`[TEST] ✗ System Ready check failed on attempt ${attempt}: ${lastError.message}`);
-      
+
       if (attempt < retries) {
         const backoffMs = browserName === "webkit" ? 3000 : 2000;
         console.log(`[TEST] Retrying System Ready check in ${backoffMs}ms...`);
@@ -214,7 +229,7 @@ async function waitForSystemReady(page: any, browserName: string = "chromium", m
       }
     }
   }
-  
+
   throw new Error(`System Ready not detected after ${retries} attempts on ${browserName}: ${lastError?.message}`);
 }
 
@@ -231,355 +246,355 @@ async function waitForSystemReady(page: any, browserName: string = "chromium", m
  *    playwright.config.ts webServer[1])
  */
 test("complete file transfer between two authenticated peers", async ({ browserName }) => {
-    // Skip on Firefox - WebRTC timing is too unreliable
-    test.skip(browserName === 'firefox', 'Firefox has WebRTC timing issues');
-    
-    // Calculate dynamic timeout based on 10MB file size
-    const fileSizeBytes = 10 * 1024 * 1024; // 10MB
-    const transferTimeout = calculateTransferTimeout(fileSizeBytes);
-    test.setTimeout(transferTimeout + 30_000); // Add extra buffer for setup
+  // Skip on Firefox - WebRTC timing is too unreliable
+  test.skip(browserName === 'firefox', 'Firefox has WebRTC timing issues');
 
-    // Create two independent browser contexts from the same saved auth session
-    const browser = await chromium.launch({ slowMo: 500 }); // Match abort test slowMo
+  // Calculate dynamic timeout based on 10MB file size
+  const fileSizeBytes = 10 * 1024 * 1024; // 10MB
+  const transferTimeout = calculateTransferTimeout(fileSizeBytes);
+  test.setTimeout(transferTimeout + 30_000); // Add extra buffer for setup
 
-    const receiverContext = await browser.newContext({
-        storageState: RECEIVER_AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
-    const senderContext = await browser.newContext({
-        storageState: AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
+  // Create two independent browser contexts from the same saved auth session
+  const browser = await chromium.launch({ slowMo: 500 }); // Match abort test slowMo
 
-    const receiverPage = await receiverContext.newPage();
-    const senderPage = await senderContext.newPage();
+  const receiverContext = await browser.newContext({
+    storageState: RECEIVER_AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
+  const senderContext = await browser.newContext({
+    storageState: AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
 
-    try {
-        // ── STEP 1: Receiver opens /receive and waits for WebRTC to initialize ──
-        await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
+  const receiverPage = await receiverContext.newPage();
+  const senderPage = await senderContext.newPage();
 
-        // Wait for peer connection with retry logic
-        const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
-        console.log("[TEST] Receiver peer ID:", receiverPeerId);
+  try {
+    // ── STEP 1: Receiver opens /receive and waits for WebRTC to initialize ──
+    await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
 
-        // ── STEP 2: Sender opens /send and waits for system ready ──
-        await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
+    // Wait for peer connection with retry logic
+    const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
+    console.log("[TEST] Receiver peer ID:", receiverPeerId);
 
-        // Wait for WebRTC to initialize on sender side with retry and browser-specific handling
-        await waitForSystemReady(senderPage, browserName);
+    // ── STEP 2: Sender opens /send and waits for system ready ──
+    await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
 
-        // Upload the fixture file
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+    // Wait for WebRTC to initialize on sender side with retry and browser-specific handling
+    await waitForSystemReady(senderPage, browserName);
 
-        // File name heading should appear in the drop zone / selected file card
-        await expect(
-            senderPage.getByRole("heading", { name: "test-file-10mb.bin" })
-        ).toBeVisible({ timeout: 5_000 });
+    // Upload the fixture file
+    await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
 
-        // ── STEP 3: Sender enters receiver's peer ID and connects ──
-        const peerInput = senderPage.getByPlaceholder("Enter hash...");
-        await expect(peerInput).toBeVisible({ timeout: 5_000 });
-        await peerInput.fill(receiverPeerId.trim());
+    // File name heading should appear in the drop zone / selected file card
+    await expect(
+      senderPage.getByRole("heading", { name: "test-file-10mb.bin" })
+    ).toBeVisible({ timeout: 5_000 });
 
-        // Click the connect/send button
-        const connectBtn = senderPage.getByRole("button", {
-            name: /connect|send|initiate/i,
-        }).first();
-        await connectBtn.click();
-        
-        console.log("[TEST] Sender initiated connection, waiting for receiver to see offer...");
+    // ── STEP 3: Sender enters receiver's peer ID and connects ──
+    const peerInput = senderPage.getByPlaceholder("Enter hash...");
+    await expect(peerInput).toBeVisible({ timeout: 5_000 });
+    await peerInput.fill(receiverPeerId.trim());
 
-        // ── STEP 4: Receiver sees incoming offer and accepts ──
-        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
-        await expect(acceptBtn).toBeVisible({ timeout: 60_000 }); // Increased to 60s for CI
-        await acceptBtn.click();
-        console.log("[TEST] Receiver accepted transfer");
+    // Click the connect/send button
+    const connectBtn = senderPage.getByRole("button", {
+      name: /connect|send|initiate/i,
+    }).first();
+    await connectBtn.click();
 
-        // ── STEP 5: Monitor transfer progress ──
-        console.log("[TEST] Monitoring transfer progress...");
-        
-        // Wait for transfer to reach 50% on sender side
-        await waitForProgress(senderPage, 50, transferTimeout / 2);
-        console.log("[TEST] Transfer reached 50% on sender");
-        
-        // Just log progress for debugging - don't enforce strict sync
-        const senderProgress = await senderPage.locator('[data-testid="progress"]').textContent();
-        const receiverProgress = await receiverPage.locator('[data-testid="progress"]').textContent();
-        const senderPercent = parseInt(senderProgress?.replace("%", "") || "0");
-        const receiverPercent = parseInt(receiverProgress?.replace("%", "") || "0");
-        
-        console.log(`[TEST] Progress sync check - Sender: ${senderPercent}%, Receiver: ${receiverPercent}%`);
+    console.log("[TEST] Sender initiated connection, waiting for receiver to see offer...");
 
-        // ── STEP 6: Both sides complete ──
-        // Sender shows transfer complete state
-        await expect(
-            senderPage.getByText(/transfer complete|complete|100%/i).first()
-        ).toBeVisible({ timeout: transferTimeout });
+    // ── STEP 4: Receiver sees incoming offer and accepts ──
+    const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+    await expect(acceptBtn).toBeVisible({ timeout: 60_000 }); // Increased to 60s for CI
+    await acceptBtn.click();
+    console.log("[TEST] Receiver accepted transfer");
 
-        // Receiver shows transfer complete state
-        await expect(
-            receiverPage.getByText(/transfer complete|complete|download/i).first()
-        ).toBeVisible({ timeout: transferTimeout });
+    // ── STEP 5: Monitor transfer progress ──
+    console.log("[TEST] Monitoring transfer progress...");
 
-        console.log("[TEST] ✅ Full transfer E2E completed successfully");
-    } finally {
-        await receiverContext.close();
-        await senderContext.close();
-        await browser.close();
-    }
+    // Wait for transfer to reach 50% on sender side
+    await waitForProgress(senderPage, 50, transferTimeout / 2);
+    console.log("[TEST] Transfer reached 50% on sender");
+
+    // Just log progress for debugging - don't enforce strict sync
+    const senderProgress = await senderPage.locator('[data-testid="progress"]').textContent();
+    const receiverProgress = await receiverPage.locator('[data-testid="progress"]').textContent();
+    const senderPercent = parseInt(senderProgress?.replace("%", "") || "0");
+    const receiverPercent = parseInt(receiverProgress?.replace("%", "") || "0");
+
+    console.log(`[TEST] Progress sync check - Sender: ${senderPercent}%, Receiver: ${receiverPercent}%`);
+
+    // ── STEP 6: Both sides complete ──
+    // Sender shows transfer complete state
+    await expect(
+      senderPage.getByText(/transfer complete|complete|100%/i).first()
+    ).toBeVisible({ timeout: transferTimeout });
+
+    // Receiver shows transfer complete state
+    await expect(
+      receiverPage.getByText(/transfer complete|complete|download/i).first()
+    ).toBeVisible({ timeout: transferTimeout });
+
+    console.log("[TEST] ✅ Full transfer E2E completed successfully");
+  } finally {
+    await receiverContext.close();
+    await senderContext.close();
+    await browser.close();
+  }
 });
 
 test("abort synchronization between peers", async ({ browserName }) => {
-    // Calculate dynamic timeout for 50MB file
-    const fileSizeBytes = 50 * 1024 * 1024; // 50MB
-    const transferTimeout = calculateTransferTimeout(fileSizeBytes);
-    test.setTimeout(transferTimeout + 30_000);
-    
-    const browser = await chromium.launch({ slowMo: 500 });
+  // Calculate dynamic timeout for 50MB file
+  const fileSizeBytes = 50 * 1024 * 1024; // 50MB
+  const transferTimeout = calculateTransferTimeout(fileSizeBytes);
+  test.setTimeout(transferTimeout + 30_000);
 
-    const receiverContext = await browser.newContext({
-        storageState: RECEIVER_AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
-    const senderContext = await browser.newContext({
-        storageState: AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
+  const browser = await chromium.launch({ slowMo: 500 });
 
-    const receiverPage = await receiverContext.newPage();
-    const senderPage = await senderContext.newPage();
+  const receiverContext = await browser.newContext({
+    storageState: RECEIVER_AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
+  const senderContext = await browser.newContext({
+    storageState: AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
 
-    try {
-        // Setup receiver with retry logic
-        await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
-        const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
-        console.log("[TEST] Receiver peer ID:", receiverPeerId);
+  const receiverPage = await receiverContext.newPage();
+  const senderPage = await senderContext.newPage();
 
-        // Setup sender
-        await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
-        
-        // Wait for system ready with retry and browser-specific handling
-        await waitForSystemReady(senderPage, browserName);
-        
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
+  try {
+    // Setup receiver with retry logic
+    await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
+    const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
+    console.log("[TEST] Receiver peer ID:", receiverPeerId);
 
-        const peerInput = senderPage.getByPlaceholder("Enter hash...");
-        await expect(peerInput).toBeVisible({ timeout: 5_000 });
-        await peerInput.fill(receiverPeerId.trim());
+    // Setup sender
+    await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
 
-        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
-        await connectBtn.click();
+    // Wait for system ready with retry and browser-specific handling
+    await waitForSystemReady(senderPage, browserName);
 
-        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
-        await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
-        await acceptBtn.click();
+    await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
 
-        // Wait for transfer to start with explicit progress monitoring
-        console.log("[TEST] Waiting for transfer to start...");
-        await waitForProgress(senderPage, 5, 30_000); // Wait for at least 5% progress
-        console.log("[TEST] Transfer started, aborting...");
-        
-        // Verify abort button is visible
-        await expect(senderPage.getByRole("button", { name: /abort/i })).toBeVisible({ timeout: 15_000 });
+    const peerInput = senderPage.getByPlaceholder("Enter hash...");
+    await expect(peerInput).toBeVisible({ timeout: 5_000 });
+    await peerInput.fill(receiverPeerId.trim());
 
-        // Sender aborts transfer
-        await senderPage.getByRole("button", { name: /abort/i }).click();
+    const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+    await connectBtn.click();
 
-        // Confirm cancellation in the modal
-        await senderPage.getByRole("button", { name: /cancel transfer/i }).click();
+    const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+    await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
+    await acceptBtn.click();
 
-        // Sender should see failed/cancelled state
-        await expect(senderPage.getByText(/transfer cancelled by sender/i).first()).toBeVisible({ timeout: 5_000 });
+    // Wait for transfer to start with explicit progress monitoring
+    console.log("[TEST] Waiting for transfer to start...");
+    await waitForProgress(senderPage, 5, 30_000); // Wait for at least 5% progress
+    console.log("[TEST] Transfer started, aborting...");
 
-        // Receiver should automatically see cancelled state
-        await expect(receiverPage.getByText(/transfer cancelled by peer/i).first()).toBeVisible({ timeout: 5_000 });
+    // Verify abort button is visible
+    await expect(senderPage.getByRole("button", { name: /abort/i })).toBeVisible({ timeout: 15_000 });
 
-        console.log("[TEST] ✅ Abort synchronization test completed successfully");
-    } finally {
-        await receiverContext.close();
-        await senderContext.close();
-        await browser.close();
-    }
+    // Sender aborts transfer
+    await senderPage.getByRole("button", { name: /abort/i }).click();
+
+    // Confirm cancellation in the modal
+    await senderPage.getByRole("button", { name: /cancel transfer/i }).click();
+
+    // Sender should see failed/cancelled state
+    await expect(senderPage.getByText(/transfer cancelled by sender/i).first()).toBeVisible({ timeout: 5_000 });
+
+    // Receiver should automatically see cancelled state
+    await expect(receiverPage.getByText(/transfer cancelled by peer/i).first()).toBeVisible({ timeout: 5_000 });
+
+    console.log("[TEST] ✅ Abort synchronization test completed successfully");
+  } finally {
+    await receiverContext.close();
+    await senderContext.close();
+    await browser.close();
+  }
 });
 
 test("pause and resume synchronization between peers", async ({ browserName }) => {
-    // Calculate dynamic timeout for 50MB file
-    const fileSizeBytes = 50 * 1024 * 1024; // 50MB
-    const transferTimeout = calculateTransferTimeout(fileSizeBytes);
-    test.setTimeout(transferTimeout + 30_000);
-    
-    const browser = await chromium.launch({ slowMo: 500 });
+  // Calculate dynamic timeout for 50MB file
+  const fileSizeBytes = 50 * 1024 * 1024; // 50MB
+  const transferTimeout = calculateTransferTimeout(fileSizeBytes);
+  test.setTimeout(transferTimeout + 30_000);
 
-    const receiverContext = await browser.newContext({
-        storageState: RECEIVER_AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
-    const senderContext = await browser.newContext({
-        storageState: AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
+  const browser = await chromium.launch({ slowMo: 500 });
 
-    const receiverPage = await receiverContext.newPage();
-    const senderPage = await senderContext.newPage();
+  const receiverContext = await browser.newContext({
+    storageState: RECEIVER_AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
+  const senderContext = await browser.newContext({
+    storageState: AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
 
-    try {
-        // Setup receiver with retry logic
-        await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
-        const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
-        console.log("[TEST] Receiver peer ID:", receiverPeerId);
+  const receiverPage = await receiverContext.newPage();
+  const senderPage = await senderContext.newPage();
 
-        // Setup sender
-        await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
-        
-        // Wait for system ready with retry and browser-specific handling
-        await waitForSystemReady(senderPage, browserName);
-        
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
+  try {
+    // Setup receiver with retry logic
+    await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
+    const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
+    console.log("[TEST] Receiver peer ID:", receiverPeerId);
 
-        const peerInput = senderPage.getByPlaceholder("Enter hash...");
-        await expect(peerInput).toBeVisible({ timeout: 5_000 });
-        await peerInput.fill(receiverPeerId.trim());
+    // Setup sender
+    await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
 
-        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
-        await connectBtn.click();
+    // Wait for system ready with retry and browser-specific handling
+    await waitForSystemReady(senderPage, browserName);
 
-        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
-        await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
-        await acceptBtn.click();
+    await senderPage.locator('[data-testid="file-input"]').setInputFiles(LARGE_FIXTURE_FILE);
 
-        // Wait for transfer to start with explicit progress monitoring
-        console.log("[TEST] Waiting for transfer to start...");
-        await waitForProgress(senderPage, 5, 30_000); // Wait for at least 5% progress
-        console.log("[TEST] Transfer started");
+    const peerInput = senderPage.getByPlaceholder("Enter hash...");
+    await expect(peerInput).toBeVisible({ timeout: 5_000 });
+    await peerInput.fill(receiverPeerId.trim());
 
-        // Wait for pause buttons to be visible
-        const senderPauseBtn = senderPage.locator('button:has-text("Pause")');
-        const receiverPauseBtn = receiverPage.locator('button:has-text("Halt")');
+    const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+    await connectBtn.click();
 
-        await expect(senderPauseBtn).toBeVisible({ timeout: 15_000 });
-        await expect(receiverPauseBtn).toBeVisible({ timeout: 15_000 });
+    const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+    await expect(acceptBtn).toBeVisible({ timeout: 30_000 });
+    await acceptBtn.click();
 
-        // Receiver pauses the transfer
-        console.log("[TEST] Receiver pausing transfer...");
-        await receiverPauseBtn.click();
+    // Wait for transfer to start with explicit progress monitoring
+    console.log("[TEST] Waiting for transfer to start...");
+    await waitForProgress(senderPage, 5, 30_000); // Wait for at least 5% progress
+    console.log("[TEST] Transfer started");
 
-        // Receiver's button should change to Resume
-        await expect(receiverPage.locator('button:has-text("RESUME DOWNLINK")')).toBeVisible({ timeout: 5_000 });
+    // Wait for pause buttons to be visible
+    const senderPauseBtn = senderPage.locator('button:has-text("Pause")');
+    const receiverPauseBtn = receiverPage.locator('button:has-text("Halt")');
 
-        // Sender shouldn't be able to resume (button disabled or says "Paused by peer")
-        const senderPausedBtn = senderPage.locator('button:has-text("Paused by Peer")');
-        await expect(senderPausedBtn).toBeVisible({ timeout: 5_000 });
-        await expect(senderPausedBtn).toBeDisabled();
+    await expect(senderPauseBtn).toBeVisible({ timeout: 15_000 });
+    await expect(receiverPauseBtn).toBeVisible({ timeout: 15_000 });
 
-        // Receiver resumes the transfer
-        console.log("[TEST] Receiver resuming transfer...");
-        await receiverPage.locator('button:has-text("RESUME DOWNLINK")').click();
+    // Receiver pauses the transfer
+    console.log("[TEST] Receiver pausing transfer...");
+    await receiverPauseBtn.click();
 
-        // Both should be back to initial state
-        await expect(senderPage.locator('button:has-text("Pause")')).toBeVisible({ timeout: 5_000 });
-        await expect(receiverPage.locator('button:has-text("Halt")')).toBeVisible({ timeout: 5_000 });
+    // Receiver's button should change to Resume
+    await expect(receiverPage.locator('button:has-text("RESUME DOWNLINK")')).toBeVisible({ timeout: 5_000 });
 
-        console.log("[TEST] ✅ Pause and resume synchronization test completed successfully");
-    } finally {
-        await receiverContext.close();
-        await senderContext.close();
-        await browser.close();
-    }
+    // Sender shouldn't be able to resume (button disabled or says "Paused by peer")
+    const senderPausedBtn = senderPage.locator('button:has-text("Paused by Peer")');
+    await expect(senderPausedBtn).toBeVisible({ timeout: 5_000 });
+    await expect(senderPausedBtn).toBeDisabled();
+
+    // Receiver resumes the transfer
+    console.log("[TEST] Receiver resuming transfer...");
+    await receiverPage.locator('button:has-text("RESUME DOWNLINK")').click();
+
+    // Both should be back to initial state
+    await expect(senderPage.locator('button:has-text("Pause")')).toBeVisible({ timeout: 5_000 });
+    await expect(receiverPage.locator('button:has-text("Halt")')).toBeVisible({ timeout: 5_000 });
+
+    console.log("[TEST] ✅ Pause and resume synchronization test completed successfully");
+  } finally {
+    await receiverContext.close();
+    await senderContext.close();
+    await browser.close();
+  }
 });
 
 test("complete encrypted file transfer with password", async ({ browserName }) => {
-    // Skip on Firefox - encryption + WebRTC timing is too unreliable
-    test.skip(browserName === 'firefox', 'Firefox has encryption + WebRTC timing issues');
-    
-    // Calculate dynamic timeout for 10MB file with encryption overhead
-    const fileSizeBytes = 10 * 1024 * 1024; // 10MB
-    const transferTimeout = calculateTransferTimeout(fileSizeBytes);
-    // Encryption adds processing time, add 50% more buffer
-    test.setTimeout(Math.ceil(transferTimeout * 1.5) + 30_000);
-    
-    const browser = await chromium.launch({ slowMo: 500 });
+  // Skip on Firefox - encryption + WebRTC timing is too unreliable
+  test.skip(browserName === 'firefox', 'Firefox has encryption + WebRTC timing issues');
 
-    const receiverContext = await browser.newContext({
-        storageState: RECEIVER_AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
-    const senderContext = await browser.newContext({
-        storageState: AUTH_FILE,
-        baseURL: "http://localhost:3000",
-    });
+  // Calculate dynamic timeout for 10MB file with encryption overhead
+  const fileSizeBytes = 10 * 1024 * 1024; // 10MB
+  const transferTimeout = calculateTransferTimeout(fileSizeBytes);
+  // Encryption adds processing time, add 50% more buffer
+  test.setTimeout(Math.ceil(transferTimeout * 1.5) + 30_000);
 
-    const receiverPage = await receiverContext.newPage();
-    const senderPage = await senderContext.newPage();
+  const browser = await chromium.launch({ slowMo: 500 });
 
-    try {
-        // 1. Receiver opens /receive with retry logic
-        await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
-        const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
-        console.log("[TEST] Receiver peer ID:", receiverPeerId);
+  const receiverContext = await browser.newContext({
+    storageState: RECEIVER_AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
+  const senderContext = await browser.newContext({
+    storageState: AUTH_FILE,
+    baseURL: "http://localhost:3000",
+  });
 
-        // 2. Sender opens /send and waits for system ready
-        await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
-        
-        // Wait for system ready with retry and browser-specific handling
-        await waitForSystemReady(senderPage, browserName);
-        
-        // Select file
-        await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
+  const receiverPage = await receiverContext.newPage();
+  const senderPage = await senderContext.newPage();
 
-        // 3. Sender enters receiver ID
-        const peerInput = senderPage.getByPlaceholder("Enter hash...");
-        await peerInput.fill(receiverPeerId);
+  try {
+    // 1. Receiver opens /receive with retry logic
+    await receiverPage.goto("http://localhost:3000/receive", { waitUntil: "networkidle" });
+    const receiverPeerId = await waitForPeerConnectionWithRetry(receiverPage);
+    console.log("[TEST] Receiver peer ID:", receiverPeerId);
 
-        // 4. Sender sets password
-        await senderPage.getByRole("button", { name: /set encryption password/i }).click();
-        const senderPasswordInput = senderPage.locator("#password-modal-input");
-        await expect(senderPasswordInput).toBeVisible();
-        await senderPasswordInput.fill("test-password-123");
-        await senderPage.getByRole("button", { name: /set password/i }).click();
+    // 2. Sender opens /send and waits for system ready
+    await senderPage.goto("http://localhost:3000/send", { waitUntil: "networkidle" });
 
-        // Verify "Encrypted" status badge appears
-        await expect(senderPage.getByTestId("encryption-status-badge")).toBeVisible();
+    // Wait for system ready with retry and browser-specific handling
+    await waitForSystemReady(senderPage, browserName);
 
-        // 5. Sender initiates transfer
-        const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
-        await connectBtn.click();
+    // Select file
+    await senderPage.locator('[data-testid="file-input"]').setInputFiles(FIXTURE_FILE);
 
-        console.log("[TEST] Sender initiated connection, waiting for receiver to see offer...");
-        
-        // 6. Receiver accepts offer - wait longer for WebRTC connection
-        const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
-        await expect(acceptBtn).toBeVisible({ timeout: 60_000 }); // Increased to 60s for CI
-        
-        console.log("[TEST] Receiver sees accept button, clicking...");
-        await acceptBtn.click();
+    // 3. Sender enters receiver ID
+    const peerInput = senderPage.getByPlaceholder("Enter hash...");
+    await peerInput.fill(receiverPeerId);
 
-        // 7. Receiver enters password to decrypt (modal appears after accepting)
-        const receiverPasswordInput = receiverPage.locator("#password-modal-input");
-        await expect(receiverPasswordInput).toBeVisible({ timeout: 10_000 });
-        await receiverPasswordInput.fill("test-password-123");
-        await receiverPage.getByRole("button", { name: /decrypt/i }).click();
+    // 4. Sender sets password
+    await senderPage.getByRole("button", { name: /set encryption password/i }).click();
+    const senderPasswordInput = senderPage.locator("#password-modal-input");
+    await expect(senderPasswordInput).toBeVisible();
+    await senderPasswordInput.fill("test-password-123");
+    await senderPage.getByRole("button", { name: /set password/i }).click();
 
-        // 8. Monitor transfer progress - encryption is slower, just verify it starts
-        console.log("[TEST] Monitoring encrypted transfer progress...");
-        
-        // For encrypted transfers, just wait for any progress (>5%)
-        // Encryption overhead makes progress tracking unreliable
-        await waitForProgress(senderPage, 5, 30_000); // Just verify transfer started
-        console.log("[TEST] Encrypted transfer started");
+    // Verify "Encrypted" status badge appears
+    await expect(senderPage.getByTestId("encryption-status-badge")).toBeVisible();
 
-        // 9. Verify both sides complete - give plenty of time
-        await expect(
-            senderPage.getByText(/transfer complete|complete|100%/i).first()
-        ).toBeVisible({ timeout: transferTimeout * 2 }); // Double timeout for encryption
+    // 5. Sender initiates transfer
+    const connectBtn = senderPage.getByRole("button", { name: /connect|send|initiate/i }).first();
+    await connectBtn.click();
 
-        await expect(
-            receiverPage.getByText(/transfer complete|complete|download/i).first()
-        ).toBeVisible({ timeout: transferTimeout * 2 });
+    console.log("[TEST] Sender initiated connection, waiting for receiver to see offer...");
 
-        console.log("[TEST] ✅ Encrypted transfer E2E completed successfully");
-    } finally {
-        await receiverContext.close();
-        await senderContext.close();
-        await browser.close();
-    }
+    // 6. Receiver accepts offer - wait longer for WebRTC connection
+    const acceptBtn = receiverPage.getByRole("button", { name: /accept/i });
+    await expect(acceptBtn).toBeVisible({ timeout: 60_000 }); // Increased to 60s for CI
+
+    console.log("[TEST] Receiver sees accept button, clicking...");
+    await acceptBtn.click();
+
+    // 7. Receiver enters password to decrypt (modal appears after accepting)
+    const receiverPasswordInput = receiverPage.locator("#password-modal-input");
+    await expect(receiverPasswordInput).toBeVisible({ timeout: 10_000 });
+    await receiverPasswordInput.fill("test-password-123");
+    await receiverPage.getByRole("button", { name: /decrypt/i }).click();
+
+    // 8. Monitor transfer progress - encryption is slower, just verify it starts
+    console.log("[TEST] Monitoring encrypted transfer progress...");
+
+    // For encrypted transfers, just wait for any progress (>5%)
+    // Encryption overhead makes progress tracking unreliable
+    await waitForProgress(senderPage, 5, 30_000); // Just verify transfer started
+    console.log("[TEST] Encrypted transfer started");
+
+    // 9. Verify both sides complete - give plenty of time
+    await expect(
+      senderPage.getByText(/transfer complete|complete|100%/i).first()
+    ).toBeVisible({ timeout: transferTimeout * 2 }); // Double timeout for encryption
+
+    await expect(
+      receiverPage.getByText(/transfer complete|complete|download/i).first()
+    ).toBeVisible({ timeout: transferTimeout * 2 });
+
+    console.log("[TEST] ✅ Encrypted transfer E2E completed successfully");
+  } finally {
+    await receiverContext.close();
+    await senderContext.close();
+    await browser.close();
+  }
 });

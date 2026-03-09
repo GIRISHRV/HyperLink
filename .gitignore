@@ -47,7 +47,6 @@ coverage/
 
 # AI/Agent
 .agent/
-.gemini/
 .antigravity/
 tomorrow.md
 
@@ -57,6 +56,12 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
-.kiro
+# Kiro specs (keep these in version control for team collaboration)
+# Only ignore the .kiro/cache if it exists
+.kiro/cache/
+
+# Test files
 E2E_CI_CONFIGURATION.md
 *.png
+test-file-*.bin
+.auth
