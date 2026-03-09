@@ -52,13 +52,13 @@ interface MyComponentProps {
 export const MyComponent: FC<MyComponentProps> = ({ title, onAction }) => {
   // 4. State
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // 5. Callbacks
   const handleClick = useCallback(() => {
     logger.info('Button clicked');
     onAction();
   }, [onAction]);
-  
+
   // 6. Render
   return (
     <div>
@@ -78,10 +78,10 @@ export function useCustomHook(initialValue: string) {
   // 1. State
   const [value, setValue] = useState(initialValue);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // 2. Refs
   const timeoutRef = useRef<NodeJS.Timeout>();
-  
+
   // 3. Effects
   useEffect(() => {
     return () => {
@@ -90,14 +90,14 @@ export function useCustomHook(initialValue: string) {
       }
     };
   }, []);
-  
+
   // 4. Callbacks
   const updateValue = useCallback((newValue: string) => {
     setIsLoading(true);
     setValue(newValue);
     setIsLoading(false);
   }, []);
-  
+
   // 5. Return
   return { value, isLoading, updateValue };
 }
@@ -107,92 +107,83 @@ export function useCustomHook(initialValue: string) {
 
 ```typescript
 // apps/web/src/app/api/my-endpoint/route.ts
-import { createClient } from '@/lib/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@repo/utils';
+import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@repo/utils";
 
 export async function GET(request: NextRequest) {
   try {
     // 1. Authenticate
     const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     // 2. Validate input
     const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get('id');
-    
+    const id = searchParams.get("id");
+
     if (!id) {
-      return NextResponse.json(
-        { error: 'Missing id parameter' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
     }
-    
+
     // 3. Fetch data
     const { data, error } = await supabase
-      .from('my_table')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
+      .from("my_table")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", user.id)
       .single();
-    
+
     if (error) {
-      logger.error('Database error', { error, userId: user.id });
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+      logger.error("Database error", { error, userId: user.id });
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
-    
+
     // 4. Return response
     return NextResponse.json({ data });
   } catch (error) {
-    logger.error('Unexpected error', { error });
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error("Unexpected error", { error });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 ```
 
 ## Naming Conventions
 
-| Type | Convention | Example |
-|------|-----------|---------|
-| Components | PascalCase | `FileTransfer`, `SendButton` |
-| Hooks | camelCase with `use` prefix | `useSendTransfer`, `usePeerConnection` |
-| Functions | camelCase | `sendFile`, `handleConnection` |
-| Constants | UPPER_SNAKE_CASE | `CHUNK_SIZE`, `MAX_RETRIES` |
-| Types/Interfaces | PascalCase | `TransferState`, `PeerConfig` |
-| Files (components) | PascalCase.tsx | `FileTransfer.tsx` |
-| Files (utilities) | kebab-case.ts | `file-utils.ts` |
+| Type               | Convention                  | Example                                |
+| ------------------ | --------------------------- | -------------------------------------- |
+| Components         | PascalCase                  | `FileTransfer`, `SendButton`           |
+| Hooks              | camelCase with `use` prefix | `useSendTransfer`, `usePeerConnection` |
+| Functions          | camelCase                   | `sendFile`, `handleConnection`         |
+| Constants          | UPPER_SNAKE_CASE            | `CHUNK_SIZE`, `MAX_RETRIES`            |
+| Types/Interfaces   | PascalCase                  | `TransferState`, `PeerConfig`          |
+| Files (components) | PascalCase.tsx              | `FileTransfer.tsx`                     |
+| Files (utilities)  | kebab-case.ts               | `file-utils.ts`                        |
 
 ## Import Organization
 
 ```typescript
 // 1. External dependencies
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 // 2. Internal dependencies (absolute imports)
-import { logger } from '@repo/utils';
-import { TransferState } from '@repo/types';
+import { logger } from "@repo/utils";
+import { TransferState } from "@repo/types";
 
 // 3. Local imports (relative)
-import { PeerManager } from '../peer/PeerManager';
-import { sendChunk } from './utils';
+import { PeerManager } from "../peer/PeerManager";
+import { sendChunk } from "./utils";
 
 // 4. Types
-import type { FC } from 'react';
-import type { Transfer } from '@/types';
+import type { FC } from "react";
+import type { Transfer } from "@/types";
 ```
 
 ## Logging
@@ -200,19 +191,20 @@ import type { Transfer } from '@/types';
 **CRITICAL**: Never use `console.log`. Always use the centralized logger:
 
 ```typescript
-import { logger } from '@repo/utils';
+import { logger } from "@repo/utils";
 
 // Good ✅
-logger.info('Transfer started', { transferId, fileSize });
-logger.warn('Connection unstable', { peerId, latency });
-logger.error('Transfer failed', { error, transferId });
+logger.info("Transfer started", { transferId, fileSize });
+logger.warn("Connection unstable", { peerId, latency });
+logger.error("Transfer failed", { error, transferId });
 
 // Bad ❌
-console.log('Transfer started');
+console.log("Transfer started");
 console.error(error);
 ```
 
 **Logger Benefits:**
+
 - Structured logging (JSON in production)
 - Automatic Sentry integration
 - Consistent formatting
@@ -226,13 +218,13 @@ console.error(error);
 try {
   await riskyOperation();
 } catch (error) {
-  logger.error('Operation failed', { error, context });
-  
+  logger.error("Operation failed", { error, context });
+
   // Show user-friendly message
-  toast.error('Something went wrong. Please try again.');
-  
+  toast.error("Something went wrong. Please try again.");
+
   // Update state
-  setState('error');
+  setState("error");
 }
 ```
 
@@ -243,12 +235,9 @@ export async function POST(request: NextRequest) {
   try {
     // Implementation
   } catch (error) {
-    logger.error('API error', { error, path: request.url });
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error("API error", { error, path: request.url });
+
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 ```
@@ -266,19 +255,19 @@ describe('MyComponent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  
+
   it('renders with title', () => {
     render(<MyComponent title="Test" onAction={() => {}} />);
     expect(screen.getByText('Test')).toBeInTheDocument();
   });
-  
+
   it('calls onAction when button clicked', async () => {
     const onAction = vi.fn();
     const user = userEvent.setup();
-    
+
     render(<MyComponent title="Test" onAction={onAction} />);
     await user.click(screen.getByRole('button'));
-    
+
     expect(onAction).toHaveBeenCalledOnce();
   });
 });
@@ -287,15 +276,15 @@ describe('MyComponent', () => {
 ### E2E Tests
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('user can send file', async ({ page }) => {
-  await page.goto('/app/send');
-  
-  await page.setInputFiles('input[type="file"]', 'test-file.txt');
+test("user can send file", async ({ page }) => {
+  await page.goto("/app/send");
+
+  await page.setInputFiles('input[type="file"]', "test-file.txt");
   await page.click('button:has-text("Send")');
-  
-  await expect(page.locator('text=Transfer Complete')).toBeVisible();
+
+  await expect(page.locator("text=Transfer Complete")).toBeVisible();
 });
 ```
 
@@ -332,7 +321,7 @@ const HeavyComponent = lazy(() => import('./HeavyComponent'));
 ```typescript
 useEffect(() => {
   const subscription = subscribe();
-  
+
   // Always cleanup
   return () => {
     subscription.unsubscribe();
@@ -362,6 +351,7 @@ footer (optional)
 **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 **Examples:**
+
 ```
 feat(transfer): add pause/resume functionality
 fix(auth): resolve token expiration issue
@@ -388,12 +378,12 @@ const handleAction = async () => {
 ### Form Handling
 
 ```typescript
-const [formData, setFormData] = useState({ email: '', password: '' });
+const [formData, setFormData] = useState({ email: "", password: "" });
 
 const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-  setFormData(prev => ({
+  setFormData((prev) => ({
     ...prev,
-    [e.target.name]: e.target.value
+    [e.target.name]: e.target.value,
   }));
 };
 
@@ -445,5 +435,3 @@ const handleSubmit = async (e: FormEvent) => {
 - [Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 
 ---
-
-**Last Updated**: 2024

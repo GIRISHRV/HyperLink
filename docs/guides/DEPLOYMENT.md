@@ -5,6 +5,7 @@ This guide covers deploying HyperLink to production environments.
 ## Overview
 
 HyperLink consists of three main components:
+
 1. **Frontend** (Next.js) - Deployed to Vercel
 2. **Signaling Server** (Node.js) - Deployed to Railway
 3. **Database** (PostgreSQL) - Hosted on Supabase
@@ -93,11 +94,13 @@ HyperLink consists of three main components:
 ### Health Check
 
 Verify deployment:
+
 ```bash
 curl https://your-app.railway.app/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "healthy",
@@ -125,10 +128,11 @@ Expected response:
 2. **Apply Migrations**
 
    **Option A: Using Supabase CLI**
+
    ```bash
    # Link to project
    supabase link --project-ref your_project_ref
-   
+
    # Apply migrations
    supabase db push
    ```
@@ -167,18 +171,18 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 
    ```typescript
    // apps/web/src/app/api/turn-credentials/route.ts
-   import { NextResponse } from 'next/server';
-   import twilio from 'twilio';
-   
+   import { NextResponse } from "next/server";
+   import twilio from "twilio";
+
    export async function GET() {
      const accountSid = process.env.TWILIO_ACCOUNT_SID!;
      const authToken = process.env.TWILIO_AUTH_TOKEN!;
-     
+
      const client = twilio(accountSid, authToken);
      const token = await client.tokens.create();
-     
+
      return NextResponse.json({
-       iceServers: token.iceServers
+       iceServers: token.iceServers,
      });
    }
    ```
@@ -209,11 +213,13 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
    - Note the DSN for each
 
 2. **Configure Frontend**
+
    ```env
    NEXT_PUBLIC_SENTRY_DSN=your_frontend_dsn
    ```
 
 3. **Configure Signaling Server**
+
    ```env
    SENTRY_DSN=your_backend_dsn
    ```
@@ -226,25 +232,25 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 
 ### Frontend (Vercel)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | `eyJhbGc...` |
-| `NEXT_PUBLIC_PEER_SERVER_HOST` | Signaling server host | `app.railway.app` |
-| `NEXT_PUBLIC_PEER_SERVER_PORT` | Signaling server port | `443` |
-| `NEXT_PUBLIC_PEER_SERVER_PATH` | Signaling server path | `/myapp` |
-| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN | `https://xxx@sentry.io/xxx` |
-| `TWILIO_ACCOUNT_SID` | Twilio account SID | `ACxxx` |
-| `TWILIO_AUTH_TOKEN` | Twilio auth token | `xxx` |
+| Variable                        | Description           | Example                     |
+| ------------------------------- | --------------------- | --------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL  | `https://xxx.supabase.co`   |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key     | `eyJhbGc...`                |
+| `NEXT_PUBLIC_PEER_SERVER_HOST`  | Signaling server host | `app.railway.app`           |
+| `NEXT_PUBLIC_PEER_SERVER_PORT`  | Signaling server port | `443`                       |
+| `NEXT_PUBLIC_PEER_SERVER_PATH`  | Signaling server path | `/myapp`                    |
+| `NEXT_PUBLIC_SENTRY_DSN`        | Sentry DSN            | `https://xxx@sentry.io/xxx` |
+| `TWILIO_ACCOUNT_SID`            | Twilio account SID    | `ACxxx`                     |
+| `TWILIO_AUTH_TOKEN`             | Twilio auth token     | `xxx`                       |
 
 ### Signaling Server (Railway)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PORT` | Server port | `9000` |
-| `SUPABASE_JWT_SECRET` | Supabase JWT secret | `xxx` |
-| `ALLOWED_ORIGIN` | Frontend URL | `https://app.vercel.app` |
-| `SENTRY_DSN` | Sentry DSN | `https://xxx@sentry.io/xxx` |
+| Variable              | Description         | Example                     |
+| --------------------- | ------------------- | --------------------------- |
+| `PORT`                | Server port         | `9000`                      |
+| `SUPABASE_JWT_SECRET` | Supabase JWT secret | `xxx`                       |
+| `ALLOWED_ORIGIN`      | Frontend URL        | `https://app.vercel.app`    |
+| `SENTRY_DSN`          | Sentry DSN          | `https://xxx@sentry.io/xxx` |
 
 ## Post-Deployment Checklist
 
@@ -267,6 +273,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: Build fails on Vercel
 
 **Solutions**:
+
 - Check build logs for errors
 - Verify all environment variables are set
 - Ensure `package.json` scripts are correct
@@ -275,6 +282,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: API routes return 500
 
 **Solutions**:
+
 - Check Vercel function logs
 - Verify Supabase credentials
 - Check environment variables
@@ -284,6 +292,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: Health check fails
 
 **Solutions**:
+
 - Check Railway logs
 - Verify server is running
 - Check port configuration
@@ -292,6 +301,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: WebRTC connections fail
 
 **Solutions**:
+
 - Verify CORS configuration
 - Check JWT secret matches Supabase
 - Ensure TURN servers are configured
@@ -302,6 +312,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: Migrations fail
 
 **Solutions**:
+
 - Check SQL syntax
 - Verify database permissions
 - Check for existing tables
@@ -310,6 +321,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 **Issue**: RLS policies blocking queries
 
 **Solutions**:
+
 - Verify user is authenticated
 - Check RLS policy conditions
 - Review Supabase logs
@@ -382,5 +394,3 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 - **Sentry**: Error tracking
 
 ---
-
-**Last Updated**: 2024

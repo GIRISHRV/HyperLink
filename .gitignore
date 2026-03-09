@@ -14,6 +14,7 @@ test-results
 playwright-report
 playwright
 coverage
+storybook-static/
 
 # Environment variables
 .env

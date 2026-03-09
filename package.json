@@ -21,12 +21,24 @@
     "test:e2e:firefox": "npm run test:e2e:firefox --workspace=apps/web",
     "test:e2e:webkit": "npm run test:e2e:webkit --workspace=apps/web",
     "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web",
-    "validate": "npm run test && npm run lint && npx tsc --noEmit -p apps/web/tsconfig.json && npm run build"
+    "validate": "npm run test && npm run lint && npx tsc --noEmit -p apps/web/tsconfig.json && npm run build",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
     "prettier": "^3.2.5",
     "turbo": "^2.0.0",
     "typescript": "^5.3.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "engines": {
     "node": ">=20.0.0",

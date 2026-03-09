@@ -1,0 +1,5 @@
+# Run lint-staged on staged files
+npx lint-staged
+
+# Type check the entire project (fast, no emit)
+npx tsc --noEmit -p apps/web/tsconfig.json

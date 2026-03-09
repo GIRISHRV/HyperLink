@@ -7,6 +7,7 @@
 **HyperLink** is a high-speed P2P file transfer application enabling direct browser-to-browser transfers of 10GB+ files using WebRTC, without storing files on any server.
 
 **Core Stack:**
+
 - **Frontend**: Next.js 14 (App Router), TypeScript, React 18, Tailwind CSS
 - **P2P**: PeerJS (WebRTC), WebRTC Data Channels
 - **Storage**: IndexedDB (via `idb`)
@@ -16,6 +17,7 @@
 - **Testing**: Vitest (unit), Playwright (E2E)
 
 **Monorepo Structure** (Turborepo):
+
 ```
 hyperlink/
 ├── apps/
@@ -40,11 +42,13 @@ hyperlink/
 **Solution**: Streaming architecture with chunking and backpressure control.
 
 **Key Components:**
+
 - `FileSender` (`apps/web/src/lib/transfer/sender.ts`): Reads file in 64KB chunks, sends via WebRTC
 - `FileReceiver` (`apps/web/src/lib/transfer/receiver.ts`): Receives chunks, writes to IndexedDB
 - **Sliding Window Protocol**: Max 16 chunks in-flight, waits for ACKs before sending more
 
 **Code Pattern:**
+
 ```typescript
 // Sender: Read chunk, send, wait for ACK
 const chunk = await readChunk(file, offset, CHUNK_SIZE);
@@ -61,12 +65,14 @@ dataChannel.onmessage = async (event) => {
 ### 2. WebRTC Connection Management
 
 **PeerManager** (`apps/web/src/lib/peer/PeerManager.ts`):
+
 - Singleton pattern (via React ref)
 - Manages PeerJS instance lifecycle
 - Handles connection state
 - Provides event-driven API
 
 **Connection Flow:**
+
 1. Both users authenticate with Supabase
 2. Sender creates Peer with ID from Supabase
 3. Sender generates connection code (Peer ID)
@@ -81,6 +87,7 @@ dataChannel.onmessage = async (event) => {
 **Database**: `hyperlink-db`
 
 **Stores:**
+
 - `chunks`: File chunks during transfer
   - Key: `${transferId}-${chunkIndex}`
   - Value: `Uint8Array`
@@ -89,37 +96,42 @@ dataChannel.onmessage = async (event) => {
   - Value: `{ fileName, fileSize, totalChunks, receivedChunks }`
 
 **Pattern:**
-```typescript
-import { openDB } from 'idb';
 
-const db = await openDB('hyperlink-db', 1, {
+```typescript
+import { openDB } from "idb";
+
+const db = await openDB("hyperlink-db", 1, {
   upgrade(db) {
-    db.createObjectStore('chunks');
-    db.createObjectStore('metadata');
-  }
+    db.createObjectStore("chunks");
+    db.createObjectStore("metadata");
+  },
 });
 
 // Write chunk
-await db.put('chunks', chunkData, `${transferId}-${chunkIndex}`);
+await db.put("chunks", chunkData, `${transferId}-${chunkIndex}`);
 
 // Read all chunks (for assembly)
-const keys = await db.getAllKeys('chunks');
-const chunks = await Promise.all(keys.map(k => db.get('chunks', k)));
+const keys = await db.getAllKeys("chunks");
+const chunks = await Promise.all(keys.map((k) => db.get("chunks", k)));
 ```
 
 ### 4. Supabase Integration
 
 **Tables:**
+
 - `profiles`: User profiles (linked to auth.users)
 - `transfers`: Transfer history metadata
 - `transfer_participants`: Many-to-many relationship
 
 **Auth Pattern:**
+
 ```typescript
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
 // All API routes use middleware for auth
 // See: apps/web/src/middleware.ts
@@ -130,6 +142,7 @@ const { data: { user } } = await supabase.auth.getUser();
 ### 5. Custom Hooks Pattern
 
 **Key Hooks:**
+
 - `useSendTransfer`: Manages file sending state and logic
 - `useReceiveTransfer`: Manages file receiving state and logic
 - `usePeerConnection`: Manages WebRTC connection state
@@ -137,15 +150,19 @@ const { data: { user } } = await supabase.auth.getUser();
 - `useWakeLock`: Prevents system sleep during transfers
 
 **Hook Pattern:**
+
 ```typescript
 export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
-  const [state, setState] = useState<TransferState>('idle');
+  const [state, setState] = useState<TransferState>("idle");
   const [progress, setProgress] = useState(0);
-  
-  const sendFile = useCallback(async (file: File) => {
-    // Implementation
-  }, [peerManagerRef]);
-  
+
+  const sendFile = useCallback(
+    async (file: File) => {
+      // Implementation
+    },
+    [peerManagerRef]
+  );
+
   return { state, progress, sendFile };
 }
 ```
@@ -155,6 +172,7 @@ export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
 ### Frontend (`apps/web/src/`)
 
 **Pages** (App Router):
+
 - `/` - Landing page (public)
 - `/app` - Main app (protected)
 - `/app/send` - Send file interface
@@ -163,6 +181,7 @@ export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
 - `/auth` - Authentication pages
 
 **Core Components:**
+
 - `FileTransfer` - Main transfer orchestrator
 - `SendTransfer` - File sending UI
 - `ReceiveTransfer` - File receiving UI
@@ -170,6 +189,7 @@ export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
 - `PeerConnectionStatus` - Connection indicator
 
 **Transfer Logic:**
+
 - `lib/transfer/sender.ts` - File sending protocol
 - `lib/transfer/receiver.ts` - File receiving protocol
 - `lib/peer/PeerManager.ts` - WebRTC management
@@ -180,26 +200,28 @@ export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
 **Purpose**: WebRTC signaling (peer discovery and connection establishment)
 
 **Key Features:**
+
 - JWT authentication (validates Supabase tokens)
 - Rate limiting (100 req/15min per IP)
 - CORS enabled for frontend origin
 - Health check endpoint
 
 **Code:**
+
 ```typescript
 // apps/signaling/src/index.ts
-import { ExpressPeerServer } from 'peer';
-import express from 'express';
+import { ExpressPeerServer } from "peer";
+import express from "express";
 
 const app = express();
 const server = app.listen(PORT);
 
 const peerServer = ExpressPeerServer(server, {
-  path: '/myapp',
+  path: "/myapp",
   allow_discovery: false, // Security: disable peer listing
 });
 
-app.use('/myapp', peerServer);
+app.use("/myapp", peerServer);
 ```
 
 ## Common Development Tasks
@@ -215,16 +237,18 @@ app.use('/myapp', peerServer);
 
 ```typescript
 // apps/web/src/app/api/my-endpoint/route.ts
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  
+
   // Implementation
   return Response.json({ data });
 }
@@ -248,12 +272,14 @@ export const MyComponent: FC<MyComponentProps> = ({ }) => {
 ### Task 4: Debug Transfer Issues
 
 **Common Issues:**
+
 1. **Transfer Stuck**: Check ACK handling in receiver
 2. **Connection Failed**: Check TURN server credentials
 3. **File Corrupted**: Verify chunk ordering and assembly
 4. **Memory Leak**: Check for missing cleanup in useEffect
 
 **Debugging Tools:**
+
 - Browser DevTools > Application > IndexedDB
 - Chrome > chrome://webrtc-internals
 - Sentry error logs
@@ -262,6 +288,7 @@ export const MyComponent: FC<MyComponentProps> = ({ }) => {
 ## File Structure Navigation
 
 **Finding Components:**
+
 - UI Components: `apps/web/src/components/`
 - Pages: `apps/web/src/app/`
 - Hooks: `apps/web/src/lib/hooks/`
@@ -269,11 +296,13 @@ export const MyComponent: FC<MyComponentProps> = ({ }) => {
 - API Routes: `apps/web/src/app/api/`
 
 **Finding Tests:**
+
 - Unit Tests: `__tests__/` next to source files
 - E2E Tests: `apps/web/e2e/`
 - Test Utilities: `apps/web/src/test-utils/`
 
 **Finding Configuration:**
+
 - TypeScript: `tsconfig.json` (per app)
 - ESLint: `.eslintrc.json` (per app)
 - Tailwind: `tailwind.config.ts` (web app)
@@ -294,13 +323,13 @@ describe('MyComponent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  
+
   it('handles user interaction', async () => {
     const user = userEvent.setup();
     render(<MyComponent />);
-    
+
     await user.click(screen.getByRole('button'));
-    
+
     await waitFor(() => {
       expect(screen.getByText('Success')).toBeInTheDocument();
     });
@@ -311,15 +340,15 @@ describe('MyComponent', () => {
 ### E2E Testing (Playwright)
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('user can send file', async ({ page }) => {
-  await page.goto('/app/send');
-  
-  await page.setInputFiles('input[type="file"]', 'test-file.txt');
+test("user can send file", async ({ page }) => {
+  await page.goto("/app/send");
+
+  await page.setInputFiles('input[type="file"]', "test-file.txt");
   await page.click('button:has-text("Send")');
-  
-  await expect(page.locator('text=Transfer Complete')).toBeVisible();
+
+  await expect(page.locator("text=Transfer Complete")).toBeVisible();
 });
 ```
 
@@ -328,16 +357,17 @@ test('user can send file', async ({ page }) => {
 **NEVER use `console.log`**. Always use the centralized logger:
 
 ```typescript
-import { logger } from '@repo/utils';
+import { logger } from "@repo/utils";
 
-logger.info('Transfer started', { transferId, fileSize });
-logger.warn('Connection unstable', { peerId });
-logger.error('Transfer failed', { error, transferId });
+logger.info("Transfer started", { transferId, fileSize });
+logger.warn("Connection unstable", { peerId });
+logger.error("Transfer failed", { error, transferId });
 ```
 
 ## Environment Variables
 
 **Web App** (`.env.local`):
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
@@ -348,6 +378,7 @@ NEXT_PUBLIC_SENTRY_DSN=xxx
 ```
 
 **Signaling Server** (`.env.local`):
+
 ```env
 PORT=9000
 SUPABASE_JWT_SECRET=xxx
@@ -357,12 +388,14 @@ ALLOWED_ORIGIN=http://localhost:3000
 ## Quick Reference
 
 **Start Development:**
+
 ```bash
 npm install
 npm run dev  # Starts all apps
 ```
 
 **Run Tests:**
+
 ```bash
 npm test              # Unit tests
 npm run test:e2e      # E2E tests
@@ -370,11 +403,13 @@ npm run test:coverage # Coverage report
 ```
 
 **Build:**
+
 ```bash
 npm run build  # Builds all apps
 ```
 
 **Lint & Format:**
+
 ```bash
 npm run lint          # Lint all apps
 npm run format        # Format all files
@@ -403,5 +438,4 @@ When generating code for HyperLink:
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: 2024  
 **Maintainer**: HyperLink Team

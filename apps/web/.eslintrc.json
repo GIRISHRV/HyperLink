@@ -1,6 +1,4 @@
 {
-    "root": true,
-    "extends": [
-        "@repo/eslint-config"
-    ]
+  "root": true,
+  "extends": ["@repo/eslint-config", "plugin:storybook/recommended"]
 }

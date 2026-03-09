@@ -75,6 +75,7 @@ npm run dev
 ```
 
 This starts:
+
 - **Frontend**: http://localhost:3000
 - **Signaling Server**: http://localhost:9000
 
@@ -115,6 +116,7 @@ curl http://localhost:9000/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "healthy",
@@ -173,5 +175,3 @@ lsof -ti:9000 | xargs kill -9
 - **Discussions**: [GitHub Discussions](https://github.com/GIRISHRV/HyperLink/discussions)
 
 ---
-
-**Last Updated**: 2024

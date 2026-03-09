@@ -1,6 +1,7 @@
 # HyperLink System Architecture Overview
 
 ## Table of Contents
+
 1. [High-Level Architecture](#high-level-architecture)
 2. [System Components](#system-components)
 3. [Data Flow](#data-flow)
@@ -19,20 +20,20 @@ graph TB
         A2[WebRTC]
         A3[IndexedDB]
     end
-    
+
     subgraph "User B Browser"
         B1[Next.js App]
         B2[WebRTC]
         B3[IndexedDB]
     end
-    
+
     subgraph "Cloud Services"
         C1[Vercel<br/>Frontend Host]
         C2[Railway<br/>Signaling Server]
         C3[Supabase<br/>Auth + DB]
         C4[STUN/TURN<br/>NAT Traversal]
     end
-    
+
     A1 -->|HTTPS| C1
     B1 -->|HTTPS| C1
     A1 -->|WebSocket| C2
@@ -65,12 +66,14 @@ graph TB
 **Purpose**: User interface and client-side logic
 
 **Key Features**:
+
 - Server-side rendering for fast initial load
 - App Router for file-based routing
 - React Server Components for data fetching
 - Client Components for interactivity
 
 **Structure**:
+
 ```
 apps/web/src/
 ├── app/                    # Next.js App Router
@@ -101,46 +104,49 @@ apps/web/src/
 **Technology**: Node.js + Express + PeerJS Server
 
 **Responsibilities**:
+
 - Register peers with unique IDs
 - Facilitate WebRTC signaling (SDP exchange)
 - Relay ICE candidates
 - Authenticate connections via JWT
 
 **Key Features**:
+
 - JWT authentication (validates Supabase tokens)
 - Rate limiting (100 requests per 15 minutes)
 - CORS protection
 - Health check endpoint
 
 **Code**:
+
 ```typescript
 // apps/signaling/src/index.ts
-import { ExpressPeerServer } from 'peer';
-import express from 'express';
-import jwt from 'jsonwebtoken';
+import { ExpressPeerServer } from "peer";
+import express from "express";
+import jwt from "jsonwebtoken";
 
 const app = express();
 
 // JWT authentication middleware
-app.use('/myapp', (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  
+app.use("/myapp", (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
   try {
     jwt.verify(token, process.env.SUPABASE_JWT_SECRET!);
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: "Invalid token" });
   }
 });
 
 const server = app.listen(PORT);
 const peerServer = ExpressPeerServer(server, {
-  path: '/myapp',
+  path: "/myapp",
   allow_discovery: false, // Security: disable peer listing
 });
 
-app.use('/myapp', peerServer);
+app.use("/myapp", peerServer);
 ```
 
 ### 3. Database (Supabase PostgreSQL)
@@ -182,6 +188,7 @@ CREATE TABLE transfer_participants (
 ```
 
 **Row Level Security (RLS)**:
+
 ```sql
 -- Users can only see their own transfers
 CREATE POLICY "Users can view own transfers"
@@ -200,21 +207,25 @@ CREATE POLICY "Users can view own transfers"
 **Purpose**: Secure user authentication
 
 **Features**:
+
 - Email/password authentication
 - Session management with JWT
 - Password reset via email
 - Email confirmation
 
 **Integration**:
+
 ```typescript
 // Client-side
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
 // Server-side (API routes, Server Components)
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from "@/lib/supabase/server";
 
 const supabase = createClient();
 // Automatically uses cookies for auth
@@ -227,16 +238,17 @@ const supabase = createClient();
 **Database**: `hyperlink-db`
 
 **Stores**:
+
 ```typescript
 // Chunk storage
 interface ChunkStore {
-  key: string;  // `${transferId}-${chunkIndex}`
-  value: Uint8Array;  // Chunk data
+  key: string; // `${transferId}-${chunkIndex}`
+  value: Uint8Array; // Chunk data
 }
 
 // Metadata storage
 interface MetadataStore {
-  key: string;  // transferId
+  key: string; // transferId
   value: {
     fileName: string;
     fileSize: number;
@@ -248,21 +260,22 @@ interface MetadataStore {
 ```
 
 **Usage**:
-```typescript
-import { openDB } from 'idb';
 
-const db = await openDB('hyperlink-db', 1, {
+```typescript
+import { openDB } from "idb";
+
+const db = await openDB("hyperlink-db", 1, {
   upgrade(db) {
-    db.createObjectStore('chunks');
-    db.createObjectStore('metadata');
-  }
+    db.createObjectStore("chunks");
+    db.createObjectStore("metadata");
+  },
 });
 
 // Write chunk
-await db.put('chunks', chunkData, `${transferId}-${chunkIndex}`);
+await db.put("chunks", chunkData, `${transferId}-${chunkIndex}`);
 
 // Read metadata
-const metadata = await db.get('metadata', transferId);
+const metadata = await db.get("metadata", transferId);
 ```
 
 ## Data Flow
@@ -276,14 +289,14 @@ sequenceDiagram
     participant SS as Signaling Server
     participant RC as Receiver's Browser
     participant R as Receiver
-    
+
     S->>SC: Select file
     SC->>SS: Register peer (Sender ID)
     SS-->>SC: Peer registered
     SC->>S: Display connection code
-    
+
     S->>R: Share code (out of band)
-    
+
     R->>RC: Enter code
     RC->>SS: Connect to Sender ID
     SS->>SC: Connection request
@@ -291,19 +304,19 @@ sequenceDiagram
     RC->>SC: WebRTC answer (SDP)
     SC<-->RC: ICE candidate exchange
     SC<-->RC: Data channel established
-    
+
     S->>SC: Start transfer
-    
+
     loop For each chunk
         SC->>SC: Read 64KB chunk
         SC->>RC: Send chunk
         RC->>RC: Write to IndexedDB
         RC->>SC: Send ACK
     end
-    
+
     RC->>RC: Assemble file
     RC->>R: Download file
-    
+
     SC->>Supabase: Save transfer metadata
     RC->>Supabase: Save transfer metadata
 ```
@@ -316,14 +329,14 @@ sequenceDiagram
     participant B as Browser
     participant V as Vercel (Next.js)
     participant S as Supabase
-    
+
     U->>B: Enter credentials
     B->>V: POST /auth/login
     V->>S: Verify credentials
     S-->>V: JWT token
     V->>B: Set cookie (token)
     B->>U: Redirect to /app
-    
+
     U->>B: Navigate to /app/send
     B->>V: GET /app/send
     V->>V: Middleware checks cookie
@@ -335,42 +348,47 @@ sequenceDiagram
 ## Technology Stack
 
 ### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 14.2+ | React framework with SSR |
-| React | 18.3+ | UI library |
-| TypeScript | 5.3+ | Type safety |
-| Tailwind CSS | 3.4+ | Styling |
-| PeerJS | 1.5+ | WebRTC wrapper |
-| idb | 8.0+ | IndexedDB wrapper |
+
+| Technology   | Version | Purpose                  |
+| ------------ | ------- | ------------------------ |
+| Next.js      | 14.2+   | React framework with SSR |
+| React        | 18.3+   | UI library               |
+| TypeScript   | 5.3+    | Type safety              |
+| Tailwind CSS | 3.4+    | Styling                  |
+| PeerJS       | 1.5+    | WebRTC wrapper           |
+| idb          | 8.0+    | IndexedDB wrapper        |
 
 ### Backend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Node.js | 20+ | Runtime |
-| Express | 4.18+ | Web framework |
-| PeerServer | 1.0+ | Signaling server |
-| jsonwebtoken | 9.0+ | JWT validation |
+
+| Technology   | Version | Purpose          |
+| ------------ | ------- | ---------------- |
+| Node.js      | 20+     | Runtime          |
+| Express      | 4.18+   | Web framework    |
+| PeerServer   | 1.0+    | Signaling server |
+| jsonwebtoken | 9.0+    | JWT validation   |
 
 ### Database & Auth
-| Technology | Purpose |
-|------------|---------|
-| Supabase | Auth + PostgreSQL |
-| PostgreSQL | 15+ | Relational database |
+
+| Technology | Purpose           |
+| ---------- | ----------------- | ------------------- |
+| Supabase   | Auth + PostgreSQL |
+| PostgreSQL | 15+               | Relational database |
 
 ### DevOps
-| Technology | Purpose |
-|------------|---------|
-| Vercel | Frontend hosting |
-| Railway | Signaling server hosting |
-| GitHub Actions | CI/CD |
-| Sentry | Error tracking |
+
+| Technology     | Purpose                  |
+| -------------- | ------------------------ |
+| Vercel         | Frontend hosting         |
+| Railway        | Signaling server hosting |
+| GitHub Actions | CI/CD                    |
+| Sentry         | Error tracking           |
 
 ### Testing
-| Technology | Purpose |
-|------------|---------|
-| Vitest | Unit testing |
-| Playwright | E2E testing |
+
+| Technology      | Purpose       |
+| --------------- | ------------- |
+| Vitest          | Unit testing  |
+| Playwright      | E2E testing   |
 | Testing Library | React testing |
 
 ## Deployment Architecture
@@ -382,24 +400,24 @@ graph TB
             V1[Next.js App<br/>Edge Functions]
             V2[Static Assets<br/>CDN]
         end
-        
+
         subgraph "Railway"
             R1[Signaling Server<br/>Node.js]
         end
-        
+
         subgraph "Supabase"
             S1[PostgreSQL<br/>Database]
             S2[Auth Service]
             S3[Storage]
         end
-        
+
         subgraph "Third-Party"
             T1[STUN Servers]
             T2[TURN Servers]
             T3[Sentry]
         end
     end
-    
+
     V1 --> S1
     V1 --> S2
     V1 --> R1
@@ -411,6 +429,7 @@ graph TB
 ### Deployment Details
 
 **Frontend (Vercel)**:
+
 - Auto-deploys from `main` branch
 - Edge functions for API routes
 - Global CDN for static assets
@@ -418,6 +437,7 @@ graph TB
 - Environment variables managed in dashboard
 
 **Signaling Server (Railway)**:
+
 - Auto-deploys from `main` branch
 - Single instance (stateless)
 - Health check endpoint: `/health`
@@ -425,6 +445,7 @@ graph TB
 - Automatic HTTPS
 
 **Database (Supabase)**:
+
 - Managed PostgreSQL instance
 - Automatic backups
 - Connection pooling
@@ -446,6 +467,7 @@ graph LR
 ```
 
 **Security Measures**:
+
 - Passwords hashed with bcrypt
 - JWT tokens with expiration
 - HTTP-only cookies
@@ -455,12 +477,14 @@ graph LR
 ### Data Transfer Security
 
 **WebRTC Security**:
+
 - DTLS encryption (mandatory)
 - SRTP for media (not used)
 - End-to-end encryption by default
 - No server can decrypt data
 
 **Signaling Security**:
+
 - JWT authentication required
 - Rate limiting (100 req/15min)
 - CORS restrictions
@@ -469,6 +493,7 @@ graph LR
 ### Database Security
 
 **Row Level Security (RLS)**:
+
 ```sql
 -- Example: Users can only access their own data
 CREATE POLICY "Users access own data"
@@ -478,6 +503,7 @@ CREATE POLICY "Users access own data"
 ```
 
 **API Security**:
+
 - All API routes check authentication
 - Input validation on all endpoints
 - SQL injection prevention (parameterized queries)
@@ -486,6 +512,7 @@ CREATE POLICY "Users access own data"
 ### Storage Security
 
 **IndexedDB**:
+
 - Origin-isolated (same-origin policy)
 - No cross-site access
 - Encrypted at rest by OS
@@ -493,6 +520,5 @@ CREATE POLICY "Users access own data"
 
 ---
 
-**Last Updated**: 2024  
 **Maintainer**: HyperLink Team  
 **Version**: 1.0.0

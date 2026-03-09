@@ -10,20 +10,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ─── Mock fflate ────────────────────────────────────────────────────────
 
-vi.mock("fflate", () => ({
-  zip: vi.fn(
-    (
-      _data: unknown,
-      _opts: unknown,
-      cb: (err: Error | null, data: Uint8Array) => void
-    ) => {
-      cb(null, new Uint8Array([80, 75, 5, 6])); // minimal ZIP end-of-central-dir signature
-    }
-  ),
-}));
+vi.mock("fflate", () => {
+  return {
+    zipSync: vi.fn((_data: unknown, _opts: unknown) => {
+      // Return a mock ZIP file as Uint8Array
+      return new Uint8Array([80, 75, 5, 6]); // Minimal ZIP signature
+    }),
+  };
+});
 
 import { zipFiles, getFilesFromDataTransferItems } from "../zip-helper";
-import { zip } from "fflate";
+import { zipSync } from "fflate";
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -48,12 +45,12 @@ describe("zip-helper", () => {
       expect(result.name).toMatch(/^archive_\d+\.zip$/);
     });
 
-    it("calls fflate zip with all input files", async () => {
+    it("calls fflate zipSync with all input files", async () => {
       const files = [makeFile("a.txt", "AAA"), makeFile("b.txt", "BBB")];
       await zipFiles(files);
 
-      expect(zip).toHaveBeenCalledOnce();
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(zipSync).toHaveBeenCalledOnce();
+      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(Object.keys(zipData)).toContain("a.txt");
       expect(Object.keys(zipData)).toContain("b.txt");
     });
@@ -74,7 +71,7 @@ describe("zip-helper", () => {
 
       await zipFiles([file]);
 
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(Object.keys(zipData)).toContain("folder/image.png");
     });
 
@@ -82,20 +79,16 @@ describe("zip-helper", () => {
       const file = makeFile("plain.txt");
       await zipFiles([file]);
 
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [zipData] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(Object.keys(zipData)).toContain("plain.txt");
     });
 
     it("rejects when fflate returns an error", async () => {
-      (zip as ReturnType<typeof vi.fn>).mockImplementationOnce(
-        (_: unknown, __: unknown, cb: (err: Error | null) => void) => {
-          cb(new Error("Compression failed"));
-        }
-      );
+      (zipSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error("Compression failed");
+      });
 
-      await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow(
-        "Compression failed"
-      );
+      await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow("Compression failed");
     });
 
     it("works with a single file", async () => {
@@ -106,7 +99,7 @@ describe("zip-helper", () => {
     it("uses level 0 (store) compression for speed", async () => {
       await zipFiles([makeFile("fast.txt")]);
 
-      const [, opts] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [, opts] = (zipSync as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(opts).toMatchObject({ level: 0 });
     });
   });
@@ -124,9 +117,7 @@ describe("zip-helper", () => {
       } as unknown as FileSystemFileEntry;
     }
 
-    function makeDataTransferItemList(
-      entries: (FileSystemEntry | null)[]
-    ): DataTransferItemList {
+    function makeDataTransferItemList(entries: (FileSystemEntry | null)[]): DataTransferItemList {
       const obj: Record<string | symbol, unknown> & { length: number } = {
         length: entries.length,
         [Symbol.iterator]: function* () {
@@ -145,13 +136,13 @@ describe("zip-helper", () => {
       const f1 = makeFile("drop1.txt");
       const f2 = makeFile("drop2.txt");
 
-      const items = makeDataTransferItemList([
-        makeFileEntry(f1),
-        makeFileEntry(f2),
-      ]);
+      const items = makeDataTransferItemList([makeFileEntry(f1), makeFileEntry(f2)]);
 
       // Access via index like the real impl
-      const itemsWithIndex = items as unknown as Record<number, { webkitGetAsEntry: () => FileSystemEntry }> & { length: number };
+      const itemsWithIndex = items as unknown as Record<
+        number,
+        { webkitGetAsEntry: () => FileSystemEntry }
+      > & { length: number };
 
       const files = await getFilesFromDataTransferItems(
         itemsWithIndex as unknown as DataTransferItemList
@@ -173,7 +164,7 @@ describe("zip-helper", () => {
               isDirectory: false,
               fullPath: "/subdir/note.txt",
               file: (success: (fi: File) => void) => success(f),
-            } as unknown as FileSystemFileEntry),
+            }) as unknown as FileSystemFileEntry,
         },
       } as unknown as DataTransferItemList;
 
