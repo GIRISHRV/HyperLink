@@ -10,7 +10,7 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 
 - **Zero-Memory Transfer** - Stream files in chunks, never load entire file into RAM
 - **No File Size Limits** - Transfer 10GB, 50GB, or more (disk space permitting)
-- **End-to-End Encryption** - WebRTC DTLS encryption by default
+- **End-to-End Encryption** - WebRTC DTLS encryption by default, with optional password protection
 - **No Server Storage** - Files never touch our servers, only metadata
 - **Transfer History** - Track your transfers with metadata in Supabase
 - **PWA Ready** - Install as app with offline support
@@ -19,11 +19,13 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 ## 🏗️ Tech Stack
 
 **Monorepo Structure** (Turborepo):
+
 - `apps/web` - Next.js 14 frontend (Vercel)
 - `apps/signaling` - Node.js PeerServer (Railway)
 - `packages/*` - Shared configs and utilities
 
 **Technologies:**
+
 - **Frontend:** Next.js 14, TypeScript, React 18, Tailwind CSS
 - **P2P:** PeerJS (WebRTC wrapper)
 - **Storage:** IndexedDB (via `idb`)
@@ -115,11 +117,11 @@ npm run build            # Build all apps
 Use the centralized logger from `@repo/utils`:
 
 ```typescript
-import { logger } from '@repo/utils';
+import { logger } from "@repo/utils";
 
-logger.info('Transfer started', { transferId, fileSize });
-logger.warn('Connection unstable', { peerId });
-logger.error('Transfer failed', { error });
+logger.info("Transfer started", { transferId, fileSize });
+logger.warn("Connection unstable", { peerId });
+logger.error("Transfer failed", { error });
 ```
 
 **Never use `console.log` in production code.**
