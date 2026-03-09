@@ -1,6 +1,6 @@
 {
   "name": "@hyperlink/web",
-  "version": "1.00.003",
+  "version": "1.00.004",
   "private": true,
   "type": "module",
   "scripts": {
