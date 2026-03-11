@@ -20,7 +20,7 @@ export default function PeerIdCard({ peerId, onCopy, onShowQR }: PeerIdCardProps
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-    } catch (err) {
+    } catch {
       // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = url;

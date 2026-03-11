@@ -134,7 +134,7 @@ export default function StatusPage() {
             return [...prev, newCheck].slice(-10);
           });
         }
-      } catch (err) {
+      } catch {
         setError(true);
         setResponseTime(null);
 
@@ -263,7 +263,7 @@ export default function StatusPage() {
           return [...prev, newCheck].slice(-10);
         });
       }
-    } catch (err) {
+    } catch {
       setError(true);
       setResponseTime(null);
 
