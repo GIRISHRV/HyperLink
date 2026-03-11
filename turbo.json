@@ -18,7 +18,7 @@
       "outputs": ["coverage/**"]
     },
     "test:e2e": {
-      "dependsOn": ["^test:e2e"],
+      "dependsOn": ["build", "^test:e2e"],
       "outputs": ["playwright-report/**", "test-results/**"]
     },
     "typecheck": {

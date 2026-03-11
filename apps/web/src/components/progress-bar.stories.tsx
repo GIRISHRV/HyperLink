@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/nextjs";
+import type { Meta, StoryObj } from "@storybook/react";
 import { ProgressBar } from "./progress-bar";
 
 const formatFileSize = (bytes: number): string => {

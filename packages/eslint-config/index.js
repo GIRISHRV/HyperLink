@@ -1,5 +1,5 @@
 module.exports = {
-  extends: ["next/core-web-vitals", "prettier"],
+  extends: ["plugin:@next/next/recommended", "plugin:react-hooks/recommended", "prettier"],
   settings: {
     next: {
       rootDir: ["apps/*/", "packages/*/"],

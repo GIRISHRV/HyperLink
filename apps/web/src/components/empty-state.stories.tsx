@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/nextjs";
-import { EmptyState } from "./empty-state";
+import type { Meta, StoryObj } from "@storybook/react";
+import EmptyState from "./empty-state";
 
 const meta = {
   title: "Components/EmptyState",
