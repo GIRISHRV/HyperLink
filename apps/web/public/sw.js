@@ -1485,15 +1485,15 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`);
         precacheEntries: [
           {
             revision: "0503b90c8a8760172430e0f8fe41141a",
-            url: "/_next/static/7rp4GJaihXxMNK0E5hT4J/_buildManifest.js",
+            url: "/_next/static/5Mf7e2Qq47sXfQN_YpJcf/_buildManifest.js",
           },
           {
             revision: "b6652df95db52feb4daf4eca35380933",
-            url: "/_next/static/7rp4GJaihXxMNK0E5hT4J/_ssgManifest.js",
+            url: "/_next/static/5Mf7e2Qq47sXfQN_YpJcf/_ssgManifest.js",
           },
           { revision: null, url: "/_next/static/chunks/2688.81049e4408a4e387.js" },
           { revision: null, url: "/_next/static/chunks/3085-d3ed6529a8050c34.js" },
-          { revision: null, url: "/_next/static/chunks/3451-9e7d6a5e9b1dc370.js" },
+          { revision: null, url: "/_next/static/chunks/3451-cfda7fd5f312dc83.js" },
           { revision: null, url: "/_next/static/chunks/4007-249fba7b763adaec.js" },
           { revision: null, url: "/_next/static/chunks/4242-717952de00eb45b5.js" },
           { revision: null, url: "/_next/static/chunks/4863-4134f3d50a495288.js" },
@@ -1552,8 +1552,8 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`);
           { revision: null, url: "/_next/static/chunks/app/status/page-d08fe00ffb75e4b2.js" },
           { revision: null, url: "/_next/static/chunks/framework-1139d1e5272ebfa2.js" },
           { revision: null, url: "/_next/static/chunks/main-5058bd1c0aaa591b.js" },
-          { revision: null, url: "/_next/static/chunks/main-app-ac5d27b4a2d78d7f.js" },
-          { revision: null, url: "/_next/static/chunks/pages/_app-cefe850b20f09f11.js" },
+          { revision: null, url: "/_next/static/chunks/main-app-0db2afbd9fbfed32.js" },
+          { revision: null, url: "/_next/static/chunks/pages/_app-1e2c090aafd24d44.js" },
           { revision: null, url: "/_next/static/chunks/pages/_error-6a781c1f65da9020.js" },
           {
             revision: "846118c33b2c0e922d7b3a7676f81f6f",
