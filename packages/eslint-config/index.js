@@ -1,5 +1,10 @@
 module.exports = {
   extends: ["next/core-web-vitals", "prettier"],
+  settings: {
+    next: {
+      rootDir: ["apps/*/", "packages/*/"],
+    },
+  },
   plugins: ["@typescript-eslint"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
@@ -15,5 +20,6 @@ module.exports = {
       },
     ],
     "no-console": ["warn", { allow: ["warn", "error"] }],
+    "@next/next/no-html-link-for-pages": "off",
   },
 };

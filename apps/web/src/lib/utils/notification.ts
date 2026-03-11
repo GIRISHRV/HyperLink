@@ -37,12 +37,18 @@ const playTone = (
  * Play a success chime sound (C5 -> E5)
  */
 export function playSuccessSound(): void {
+  // Check if sound is enabled in settings
+  if (typeof window !== "undefined") {
+    const soundEnabled = localStorage.getItem("hl_sound_enabled");
+    if (soundEnabled === "false") return;
+  }
+
   try {
     const ctx = createAudioContext();
     const now = ctx.currentTime;
 
     // Two ascending tones for a pleasant "complete" sound
-    playTone(ctx, 523.25, now, 0.15);        // C5
+    playTone(ctx, 523.25, now, 0.15); // C5
     playTone(ctx, 659.25, now + 0.15, 0.25); // E5
 
     setTimeout(() => ctx.close(), 500);
@@ -55,13 +61,19 @@ export function playSuccessSound(): void {
  * Play an error sound (E4 -> A3)
  */
 export function playErrorSound(): void {
+  // Check if sound is enabled in settings
+  if (typeof window !== "undefined") {
+    const soundEnabled = localStorage.getItem("hl_sound_enabled");
+    if (soundEnabled === "false") return;
+  }
+
   try {
     const ctx = createAudioContext();
     const now = ctx.currentTime;
 
     // Descending tones with sawtooth wave for "error" feel
     playTone(ctx, 329.63, now, 0.15, "triangle", 0.4); // E4
-    playTone(ctx, 220.00, now + 0.15, 0.3, "triangle", 0.4); // A3
+    playTone(ctx, 220.0, now + 0.15, 0.3, "triangle", 0.4); // A3
 
     setTimeout(() => ctx.close(), 600);
   } catch (e) {
@@ -73,19 +85,24 @@ export function playErrorSound(): void {
  * Play a connection established sound (High C6 ping)
  */
 export function playConnectionSound(): void {
+  // Check if sound is enabled in settings
+  if (typeof window !== "undefined") {
+    const soundEnabled = localStorage.getItem("hl_sound_enabled");
+    if (soundEnabled === "false") return;
+  }
+
   try {
     const ctx = createAudioContext();
     const now = ctx.currentTime;
 
     // Single high ping
-    playTone(ctx, 1046.50, now, 0.1, "sine", 0.2); // C6
+    playTone(ctx, 1046.5, now, 0.1, "sine", 0.2); // C6
 
     setTimeout(() => ctx.close(), 200);
   } catch (e) {
     logger.warn({ e }, "Could not play connection sound:");
   }
 }
-
 
 /**
  * Request browser notification permission
@@ -110,18 +127,22 @@ export async function requestNotificationPermission(): Promise<boolean> {
 /**
  * Show browser notification for transfer completion
  */
-export function showTransferNotification(
-  type: "sent" | "received",
-  filename: string
-): void {
+export function showTransferNotification(type: "sent" | "received", filename: string): void {
+  // Check if browser notifications are enabled in settings
+  if (typeof window !== "undefined") {
+    const notificationsEnabled = localStorage.getItem("hl_browser_notifications_enabled");
+    if (notificationsEnabled === "false") return;
+  }
+
   if (!("Notification" in window) || Notification.permission !== "granted") {
     return;
   }
 
   const title = type === "sent" ? "File Sent Successfully" : "File Received";
-  const body = type === "sent"
-    ? `"${filename}" has been transferred successfully.`
-    : `"${filename}" is ready to download.`;
+  const body =
+    type === "sent"
+      ? `"${filename}" has been transferred successfully.`
+      : `"${filename}" is ready to download.`;
 
   try {
     const notification = new Notification(title, {
@@ -147,10 +168,7 @@ export function showTransferNotification(
 /**
  * Notify user of transfer completion (sound + browser notification)
  */
-export function notifyTransferComplete(
-  type: "sent" | "received",
-  filename: string
-): void {
+export function notifyTransferComplete(type: "sent" | "received", filename: string): void {
   playSuccessSound();
   showTransferNotification(type, filename);
 }

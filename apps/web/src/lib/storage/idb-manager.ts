@@ -126,24 +126,23 @@ export async function clearTransfer(
 }
 
 /**
- * Get the highest chunk index received for a transfer (for resumption)
- * Returns -1 if no chunks exist
+ * Get the highest chunk index received for a transfer (for resumption).
+ * Returns -1 if no chunks exist.
+ *
+ * D2 fix: Uses a reverse cursor ('prev') so it reads only the last record
+ * in the index instead of scanning all chunks (was O(n), now O(1)).
+ * Relies on the key format `transferId:chunkIndex` sorting lexicographically
+ * such that the last key for a given transferId has the highest chunkIndex.
  */
 export async function getLastReceivedChunkIndex(transferId: string): Promise<number> {
   const db = await getDB();
   const tx = db.transaction(CHUNK_STORE, "readonly");
   const index = tx.store.index("transferId");
 
-  let maxIndex = -1;
-  let cursor = await index.openCursor(transferId);
-  while (cursor) {
-    if (cursor.value.chunkIndex > maxIndex) {
-      maxIndex = cursor.value.chunkIndex;
-    }
-    cursor = await cursor.continue();
-  }
+  // Open cursor in reverse — the first result IS the highest chunkIndex.
+  const cursor = await index.openCursor(transferId, "prev");
   await tx.done;
-  return maxIndex;
+  return cursor ? cursor.value.chunkIndex : -1;
 }
 
 /**
@@ -158,7 +157,7 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
   // Get all keys/values is too heavy for 2GB. We use openCursor.
   let cursor = await index.openCursor(transferId);
 
-  // We need to sort chunks, so we must collect them. Since we convert ArrayBuffer 
+  // We need to sort chunks, so we must collect them. Since we convert ArrayBuffer
   // to a Blob immediately, the RAM footprint of this object is minimal.
   const chunkBlobs: { index: number; blob: Blob }[] = [];
 
@@ -166,7 +165,7 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
     const chunk = cursor.value;
     chunkBlobs.push({
       index: chunk.chunkIndex,
-      blob: new Blob([chunk.data], { type: fileType })
+      blob: new Blob([chunk.data], { type: fileType }),
     });
     cursor = await cursor.continue();
   }
@@ -175,7 +174,7 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
   chunkBlobs.sort((a, b) => a.index - b.index);
 
   // Combine all small bloblets into one final Blob
-  const finalParts = chunkBlobs.map(c => c.blob);
+  const finalParts = chunkBlobs.map((c) => c.blob);
   return new Blob(finalParts, { type: fileType });
 }
 

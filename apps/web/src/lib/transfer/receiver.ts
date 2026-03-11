@@ -293,8 +293,8 @@ export class FileReceiver {
         percentage,
         speed,
         timeRemaining,
-        chunkSize: (message.payload as any).chunkSize,
-        windowSize: (message.payload as any).windowSize,
+        chunkSize: (message.payload as ChunkPayload).chunkSize,
+        windowSize: (message.payload as ChunkPayload).windowSize,
       });
     }
 

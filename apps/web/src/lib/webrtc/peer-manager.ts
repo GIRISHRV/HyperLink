@@ -26,8 +26,11 @@ export class PeerManager {
    */
   public static getRandomId(prefix: string = "hl"): string {
     try {
-      const cryptoObj = (typeof window !== "undefined" ? window.crypto : null) ||
-        (typeof global !== "undefined" ? (global as any).crypto : null);
+      const cryptoObj =
+        (typeof window !== "undefined" ? window.crypto : null) ||
+        (typeof global !== "undefined"
+          ? ((global as Record<string, unknown>).crypto as Crypto)
+          : null);
 
       if (cryptoObj && cryptoObj.randomUUID) {
         return `${prefix}-${cryptoObj.randomUUID().split("-")[0]}`;
@@ -39,14 +42,20 @@ export class PeerManager {
         return `${prefix}-${array[0].toString(16)}-${array[1].toString(16)}`;
       }
 
-      // Last resort fallback
-      return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36).slice(-5)}`;
+      // SEC-015: Do NOT fall back to Math.random() — it is not cryptographically
+      // secure and predictable peer IDs could enable targeted connection hijacking.
+      throw new Error(
+        "[PeerManager] Web Crypto API unavailable — cannot generate a secure peer ID. " +
+          "This browser is not supported."
+      );
     } catch (e) {
-      return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+      // Re-throw explicitly so callers surface the error rather than silently using
+      // an insecure ID. If the error came from our own throw above, propagate it.
+      throw e instanceof Error ? e : new Error(String(e));
     }
   }
 
-  constructor(private config: PeerConfig) { }
+  constructor(private config: PeerConfig) {}
 
   /**
    * Initialize PeerJS connection to signaling server
@@ -57,7 +66,16 @@ export class PeerManager {
 
     this.initializationPromise = new Promise((resolve, reject) => {
       try {
-        const options: any = {
+        // Typed PeerJS options — replaces `any` cast
+        const options: {
+          host: string;
+          port: number;
+          path: string;
+          secure: boolean;
+          debug: number;
+          config?: RTCConfiguration;
+          token?: string;
+        } = {
           host: this.config.host,
           port: this.config.port,
           path: this.config.path,
@@ -70,13 +88,19 @@ export class PeerManager {
           options.token = token;
         }
 
-        logger.debug({
-          ...options,
-          config: {
-            ...options.config,
-            iceServers: options.config?.iceServers?.map((s: any) => ({ ...s, credential: '***' }))
-          }
-        }, "[PeerManager] Initializing with config");
+        logger.debug(
+          {
+            ...options,
+            config: {
+              ...options.config,
+              iceServers: options.config?.iceServers?.map((s: any) => ({
+                ...s,
+                credential: "***",
+              })),
+            },
+          },
+          "[PeerManager] Initializing with config"
+        );
 
         this.config.onLog?.("[SYS] Initializing PeerManager...");
         this.config.onLog?.("[NET] Connecting to signaling server...");
@@ -151,7 +175,10 @@ export class PeerManager {
   private attemptReconnect(): void {
     if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
     if (this.reconnectAttempts >= PeerManager.MAX_RECONNECT_ATTEMPTS) {
-      logger.error({ attempts: this.reconnectAttempts }, "[PeerManager] Max reconnection attempts reached");
+      logger.error(
+        { attempts: this.reconnectAttempts },
+        "[PeerManager] Max reconnection attempts reached"
+      );
       this.config.onLog?.("[ERR] [NET] Max reconnection attempts reached. Offline.");
       this.emit("reconnect-failed");
       return;
@@ -166,13 +193,23 @@ export class PeerManager {
       PeerManager.MAX_DELAY_MS
     );
 
-    logger.debug({ attempt: this.reconnectAttempts, delayMs: Math.round(delay) }, "[PeerManager] Scheduling reconnection");
+    logger.debug(
+      { attempt: this.reconnectAttempts, delayMs: Math.round(delay) },
+      "[PeerManager] Scheduling reconnection"
+    );
     if (this.reconnectAttempts === 1) {
-      this.config.onLog?.(`[WARN] [NET] Signaling server disconnected. Scheduling reconnection in ${Math.round(delay)}ms...`);
+      this.config.onLog?.(
+        `[WARN] [NET] Signaling server disconnected. Scheduling reconnection in ${Math.round(delay)}ms...`
+      );
     } else {
-      this.config.onLog?.(`[NET] Reconnecting to signaling server (Attempt ${this.reconnectAttempts}/${PeerManager.MAX_RECONNECT_ATTEMPTS})...`);
+      this.config.onLog?.(
+        `[NET] Reconnecting to signaling server (Attempt ${this.reconnectAttempts}/${PeerManager.MAX_RECONNECT_ATTEMPTS})...`
+      );
     }
-    this.emit("reconnecting", { attempt: this.reconnectAttempts, maxAttempts: PeerManager.MAX_RECONNECT_ATTEMPTS });
+    this.emit("reconnecting", {
+      attempt: this.reconnectAttempts,
+      maxAttempts: PeerManager.MAX_RECONNECT_ATTEMPTS,
+    });
 
     this.reconnectTimer = setTimeout(() => {
       if (this.isDestroyed || !this.peer || this.peer.destroyed) return;
@@ -247,9 +284,11 @@ export class PeerManager {
           const protocol = event.candidate.protocol;
           // .address is the standard property; .ip is the legacy alias declared in global.d.ts
           const address = event.candidate.address ?? event.candidate.ip;
-          const safeAddress = process.env.NODE_ENV === 'production' ? '[REDACTED]' : address;
+          const safeAddress = process.env.NODE_ENV === "production" ? "[REDACTED]" : address;
           logger.debug({ type, protocol, address: safeAddress }, "[ICE] Candidate gathered");
-          this.config.onLog?.(`[ICE] Candidate gathered: ${type} (${protocol}) from ${safeAddress}`);
+          this.config.onLog?.(
+            `[ICE] Candidate gathered: ${type} (${protocol}) from ${safeAddress}`
+          );
           if (type === "relay") {
             this.config.onLog?.("[ICE] Relay server (TURN) allocated.");
           }
@@ -274,37 +313,49 @@ export class PeerManager {
         if (state === "failed") {
           // Task #4: Determine if firewall is blocking connection
           // If we only have 'host' candidates, it means STUN/TURN failed or was blocked.
-          const hasRemoteCandidates = this.lastIceCandidates.some(c => c.type !== 'host');
+          const hasRemoteCandidates = this.lastIceCandidates.some((c) => c.type !== "host");
           if (!hasRemoteCandidates && this.lastIceCandidates.length > 0) {
             logger.error("[ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely.");
-            this.config.onLog?.("[ERR] [ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely.");
+            this.config.onLog?.(
+              "[ERR] [ICE] Firewall Blocked: Only host candidates gathered. P2P unlikely."
+            );
             this.emit("firewall-blocked");
           }
 
-          logger.error({
-            iceGatheringState: pc.iceGatheringState,
-            candidateCount: this.lastIceCandidates.length,
-            signalingState: pc.signalingState,
-            localDescription: pc.localDescription?.type,
-            remoteDescription: pc.remoteDescription?.type,
-            isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : 'unknown'
-          }, "[ICE] Connection failed - diagnostics");
+          logger.error(
+            {
+              iceGatheringState: pc.iceGatheringState,
+              candidateCount: this.lastIceCandidates.length,
+              signalingState: pc.signalingState,
+              localDescription: pc.localDescription?.type,
+              remoteDescription: pc.remoteDescription?.type,
+              isSecureContext: typeof window !== "undefined" ? window.isSecureContext : "unknown",
+            },
+            "[ICE] Connection failed - diagnostics"
+          );
         } else if (state === "connected" || state === "completed") {
           // Log the selected candidate pair to see if TURN was used
-          pc.getStats(null).then((stats: RTCStatsReport) => {
-            stats.forEach((report: RTCStats) => {
-              if (report.type === "candidate-pair") {
-                const pair = report as RTCIceCandidatePairStats;
-                if (pair.state === "succeeded") {
-                  logger.debug({
-                    local: pair.localCandidateId,
-                    remote: pair.remoteCandidateId,
-                  }, "[ICE] Connected using candidate pair");
-                  this.config.onLog?.(`[ICE] Connected using candidate pair: ${pair.localCandidateId} -> ${pair.remoteCandidateId}`);
+          pc.getStats(null)
+            .then((stats: RTCStatsReport) => {
+              stats.forEach((report: RTCStats) => {
+                if (report.type === "candidate-pair") {
+                  const pair = report as RTCIceCandidatePairStats;
+                  if (pair.state === "succeeded") {
+                    logger.debug(
+                      {
+                        local: pair.localCandidateId,
+                        remote: pair.remoteCandidateId,
+                      },
+                      "[ICE] Connected using candidate pair"
+                    );
+                    this.config.onLog?.(
+                      `[ICE] Connected using candidate pair: ${pair.localCandidateId} -> ${pair.remoteCandidateId}`
+                    );
+                  }
                 }
-              }
-            });
-          }).catch((e: unknown) => logger.error({ e }, "[ICE] getStats failed"));
+              });
+            })
+            .catch((e: unknown) => logger.error({ e }, "[ICE] getStats failed"));
         }
       });
 

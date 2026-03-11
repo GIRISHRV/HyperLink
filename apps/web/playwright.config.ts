@@ -11,8 +11,6 @@ loadEnv({ path: path.resolve(__dirname, ".env.local") });
 
 const authFile = path.join(__dirname, "e2e/.auth/user.json");
 
-
-
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
@@ -20,10 +18,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 3 : 1, // More retries in CI for flaky WebRTC tests
-  workers: 4, // Always use 1 worker to avoid resource contention
+  workers: 4, // 4 workers to run browser projects in parallel
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   timeout: 60_000, // Increased to 60s for CI environments
-
 
   use: {
     baseURL: "http://localhost:3000",
@@ -88,6 +85,7 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run build && npm run start",
+      env: { NEXT_PUBLIC_DISABLE_SENTRY: "true" },
       url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

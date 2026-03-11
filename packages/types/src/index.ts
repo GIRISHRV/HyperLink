@@ -45,7 +45,8 @@ export interface PeerConfig {
   debug?: number;
   config?: {
     iceServers?: Array<{ urls: string | string[]; username?: string; credential?: string }>;
-    iceTransportPolicy?: string;
+    // Use the strict union type ('all' | 'relay') matching RTCIceTransportPolicy
+    iceTransportPolicy?: "all" | "relay";
     iceCandidatePoolSize?: number;
   };
   onLog?: (msg: string) => void;
@@ -124,14 +125,14 @@ export interface FileOfferPayload {
   dbTransferId?: string;
 
   /** Multi-file Batch Metadata */
-  batchId?: string;      // Unique ID for the group
-  batchSize?: number;    // Total number of files
-  batchIndex?: number;   // Current file index (0-based)
+  batchId?: string; // Unique ID for the group
+  batchSize?: number; // Total number of files
+  batchIndex?: number; // Current file index (0-based)
   totalBatchSize?: number; // Total bytes of all files (optional)
 
   /** End-to-End Encryption */
   isEncrypted?: boolean; // True if file is password protected
-  salt?: string;         // Base64 encoded salt for PBKDF2
+  salt?: string; // Base64 encoded salt for PBKDF2
 }
 
 /**
@@ -144,4 +145,3 @@ export interface ChunkPayload {
   chunkSize?: number;
   windowSize?: number;
 }
-

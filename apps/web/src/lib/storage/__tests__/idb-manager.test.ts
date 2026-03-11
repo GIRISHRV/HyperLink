@@ -30,13 +30,17 @@ const mockTxStore = {
   }),
   get: vi.fn(async (key: string) => mockStore.get(key)),
   index: vi.fn(() => ({
-    count: vi.fn(async (transferId: string) =>
-      Array.from(mockStore.keys()).filter((k) => k.startsWith(transferId + ":")).length
+    count: vi.fn(
+      async (transferId: string) =>
+        Array.from(mockStore.keys()).filter((k) => k.startsWith(transferId + ":")).length
     ),
-    openCursor: vi.fn(async (transferId: string) => {
-      const keys = Array.from(mockStore.keys())
+    openCursor: vi.fn(async (transferId: string, direction?: IDBCursorDirection) => {
+      let keys = Array.from(mockStore.keys())
         .filter((k) => k.startsWith(transferId + ":"))
-        .sort(); // Consistent order
+        .sort(); // Consistent forward order by default
+
+      // Honour 'prev' direction — reverse the key list
+      if (direction === "prev") keys = keys.reverse();
 
       if (keys.length === 0) return null;
       let idx = 0;

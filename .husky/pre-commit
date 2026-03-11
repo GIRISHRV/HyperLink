@@ -1,3 +1,9 @@
+# C1 fix: Block .env*.local files from being committed (credential guard)
+if git diff --cached --name-only | grep -qE '\.env.*\.local$'; then
+  echo "❌ Blocked: .env*.local files must not be committed. Remove them from staging and add to .gitignore."
+  exit 1
+fi
+
 # Run lint-staged on staged files
 npx lint-staged
 

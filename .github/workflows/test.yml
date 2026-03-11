@@ -2,7 +2,7 @@
 # HyperLink CI — Test Pipeline
 #
 # Runs on every push and pull request.
-# Stages: Lint → Type-check → Unit Tests (with coverage) → E2E → Build
+# Stages: Lint & Type-check (Parallel) → Unit Tests → E2E (Sharded) → Build
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: CI - Tests
@@ -19,38 +19,53 @@ concurrency:
 
 env:
   NODE_VERSION: "20"
+  TURBO_TELEMETRY_DISABLED: 1
 
 jobs:
-  # ─── Lint ─────────────────────────────────────────────────────────────
-  lint:
-    name: Lint
+  # ─── Foundation (Lint & Type Check) ──────────────────────────────────
+  foundation:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npx turbo lint
 
-  # ─── Type Check ──────────────────────────────────────────────────────
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Cache Turborepo outputs
+      - name: Cache Turborepo
+        uses: actions/cache@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npx tsc --noEmit -p apps/web/tsconfig.json
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
 
-  # ─── Unit & Integration Tests (with coverage) ───────────────────────
+      # SEC-006: Block high-severity dependency vulnerabilities
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      # SEC-006: Scan for accidentally committed secrets
+      - name: TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      # Concurrent lint and typecheck
+      - run: npx turbo run lint typecheck
+
+  # ─── Unit Tests ──────────────────────────────────────────────────────
   test:
-    name: Tests
+    name: Unit Tests
     runs-on: ubuntu-latest
+    needs: [foundation]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,10 +73,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
 
       - name: Run Vitest with coverage
-        working-directory: apps/web
-        run: npx vitest run --coverage
+        run: npx turbo run test
 
       - name: Upload coverage report
         if: always()
@@ -71,11 +93,16 @@ jobs:
           path: apps/web/coverage/
           retention-days: 14
 
-  # ─── E2E Tests (Playwright) ─────────────────────────────────────────
+  # ─── E2E Tests (Playwright Sharded) ─────────────────────────────────
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [foundation]
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -94,35 +121,35 @@ jobs:
           cache: npm
       - run: npm ci
 
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
       - name: Install Playwright browsers
         working-directory: apps/web
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
         working-directory: apps/web
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
 
-      - name: Upload Playwright report
-        if: failure()
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: apps/web/playwright-report/
-          retention-days: 7
-
-      - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-test-results
-          path: apps/web/test-results/
-          retention-days: 7
+          name: blob-report-${{ matrix.shardIndex }}
+          path: apps/web/blob-report
+          retention-days: 1
 
   # ─── Build ───────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, e2e]
+    needs: [foundation, test, e2e]
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

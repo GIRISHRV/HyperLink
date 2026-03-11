@@ -6,11 +6,14 @@ import type { Transfer } from "@repo/types";
 /**
  * Create a new transfer record
  */
-export async function createTransfer(userId: string, data: {
-  filename: string;
-  fileSize: number;
-  receiverId?: string;
-}): Promise<Transfer | null> {
+export async function createTransfer(
+  userId: string,
+  data: {
+    filename: string;
+    fileSize: number;
+    receiverId?: string;
+  }
+): Promise<Transfer | null> {
   const { data: transfer, error } = await withRetry(() =>
     supabase
       .from("transfers")
@@ -83,15 +86,22 @@ export async function claimTransferAsReceiver(transferId: string): Promise<Trans
 }
 
 /**
- * Get user's transfer history
+ * Get user's transfer history with pagination.
+ * Defaults to the first 50 records so existing callers are unaffected.
  */
-export async function getUserTransfers(userId: string): Promise<Transfer[]> {
+export async function getUserTransfers(
+  userId: string,
+  options: { limit?: number; offset?: number } = {}
+): Promise<Transfer[]> {
+  const { limit = 50, offset = 0 } = options;
+
   const { data, error } = await withRetry(() =>
     supabase
       .from("transfers")
       .select("*")
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
       .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
   );
 
   if (error) {
@@ -100,6 +110,25 @@ export async function getUserTransfers(userId: string): Promise<Transfer[]> {
   }
 
   return data || [];
+}
+
+/**
+ * Get total count of transfers for a user (for pagination UI).
+ */
+export async function getUserTransferCount(userId: string): Promise<number> {
+  const { count, error } = await withRetry(() =>
+    supabase
+      .from("transfers")
+      .select("id", { count: "exact", head: true })
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+  );
+
+  if (error) {
+    logger.error({ error }, "Error counting transfers");
+    return 0;
+  }
+
+  return count ?? 0;
 }
 
 /**
@@ -154,9 +183,7 @@ export async function getUserTransferStats(): Promise<{
   totalTransfers: number;
   totalBytesSent: number;
 }> {
-  const { data, error } = await withRetry(() =>
-    supabase.rpc("get_user_transfer_stats")
-  );
+  const { data, error } = await withRetry(() => supabase.rpc("get_user_transfer_stats"));
 
   if (error) {
     logger.error({ error }, "Error fetching user transfer stats");
@@ -164,7 +191,11 @@ export async function getUserTransferStats(): Promise<{
   }
 
   // Handle both possible RPC return formats depending on the database function version
-  const stats = data as { total_transfers?: number; total_bytes_sent?: number; total_bytes?: number }[];
+  const stats = data as {
+    total_transfers?: number;
+    total_bytes_sent?: number;
+    total_bytes?: number;
+  }[];
   if (!stats || stats.length === 0) {
     return { totalTransfers: 0, totalBytesSent: 0 };
   }

@@ -21,7 +21,7 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 **Monorepo Structure** (Turborepo):
 
 - `apps/web` - Next.js 14 frontend (Vercel)
-- `apps/signaling` - Node.js PeerServer (Railway)
+- `apps/signaling` - Node.js PeerServer (Render)
 - `packages/*` - Shared configs and utilities
 
 **Technologies:**
@@ -38,7 +38,7 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 
 - Node.js 20+ and npm 10+
 - Supabase account (free tier works)
-- Railway account (optional, for signaling server)
+- Render account (optional, for signaling server)
 
 ### Installation
 
@@ -159,7 +159,7 @@ Complete documentation is available in the [`docs/`](./docs) directory.
 HyperLink is deployed across three services:
 
 - **Frontend**: Vercel (auto-deploy from `main`)
-- **Signaling Server**: Railway (auto-deploy from `main`)
+- **Signaling Server**: Render (auto-deploy from `main`)
 - **Database**: Supabase (managed PostgreSQL)
 
 See [Deployment Guide](./docs/guides/DEPLOYMENT.md) for detailed instructions.
@@ -199,7 +199,7 @@ MIT License - see [LICENSE](./LICENSE) file for details
 - [Supabase](https://supabase.com/) - Backend infrastructure
 - [Next.js](https://nextjs.org/) - React framework
 - [Vercel](https://vercel.com/) - Frontend hosting
-- [Railway](https://railway.app/) - Signaling server hosting
+- [Render](https://render.com/) - Signaling server hosting
 
 ---
 

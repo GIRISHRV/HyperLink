@@ -1,29 +1,49 @@
 "use client";
 
 import { formatFileSize } from "@repo/utils";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { getFileType, getFileIcon, generateImageThumbnail } from "@/lib/utils/file-preview";
 
 interface SelectedFileCardProps {
   file: File;
   onRemove: () => void;
 }
 
-export default function SelectedFileCard({
-  file,
-  onRemove,
-}: SelectedFileCardProps) {
+export default function SelectedFileCard({ file, onRemove }: SelectedFileCardProps) {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const fileType = getFileType(file.type);
+  const icon = getFileIcon(fileType);
+
+  useEffect(() => {
+    // Reset thumbnail when file changes
+    setThumbnail(null);
+
+    if (fileType === "image") {
+      generateImageThumbnail(file).then(setThumbnail);
+    }
+  }, [file, fileType]);
+
   return (
     <div>
       <h3 className="font-mono text-muted text-sm mb-4 uppercase tracking-widest">
         Selected Payload
       </h3>
       <div className="corner-fold bg-surface-dark p-6 md:p-8 min-h-[200px] flex gap-6 shadow-2xl">
-        <div className="w-32 h-32 bg-surface-inset flex items-center justify-center shrink-0 border border-subtle-bauhaus">
-          <span
-            className="material-symbols-outlined text-white/50"
-            style={{ fontSize: "48px" }}
-          >
-            description
-          </span>
+        <div className="w-32 h-32 bg-surface-inset flex items-center justify-center shrink-0 border border-subtle-bauhaus overflow-hidden">
+          {thumbnail ? (
+            <Image
+              src={thumbnail}
+              alt={file.name}
+              width={128}
+              height={128}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="material-symbols-outlined text-white/50" style={{ fontSize: "48px" }}>
+              {icon}
+            </span>
+          )}
         </div>
         <div className="flex flex-col justify-between flex-1 py-1 min-w-0">
           <div>
@@ -44,10 +64,7 @@ export default function SelectedFileCard({
             }}
             className="self-start text-bauhaus-red hover:text-red-400 font-bold text-sm uppercase tracking-wider flex items-center gap-2 mt-4"
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: "18px" }}
-            >
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
               delete
             </span>
             Remove File

@@ -19,8 +19,9 @@ import RadarVisualizer from "@/components/transfer/radar-visualizer";
 import TerminalLog from "@/components/transfer/terminal-log";
 import ReceivedFileView from "@/components/transfer/received-file-view";
 import IncomingOfferCard from "@/components/transfer/incoming-offer-card";
-import DiagnosticPanel from "@/components/transfer/diagnostic-panel";
 import ChatFAB from "@/components/transfer/chat-fab";
+import ErrorDisplay from "@/components/ui/error-display";
+import { parseError, getErrorInfo } from "@/lib/utils/error-messages";
 import { getUserProfile, type UserProfile } from "@/lib/services/profile-service";
 import { logger } from "@repo/utils";
 
@@ -37,9 +38,11 @@ export default function ReceivePage() {
   // --- Fetch Profile ---
   useEffect(() => {
     if (user?.id) {
-      getUserProfile(user.id).then(setProfile).catch(err => {
-        logger.error({ err }, "Failed to fetch user profile for chat");
-      });
+      getUserProfile(user.id)
+        .then(setProfile)
+        .catch((err) => {
+          logger.error({ err }, "Failed to fetch user profile for chat");
+        });
     }
   }, [user?.id]);
 
@@ -71,7 +74,7 @@ export default function ReceivePage() {
     confirmBackNavigation,
     cancelBackNavigation,
     showShareFallback,
-    peerManagerRef,
+    peerManagerRef: _peerManagerRef,
     activeConnectionRef,
     handleAcceptOffer,
     handleRejectOffer,
@@ -111,7 +114,12 @@ export default function ReceivePage() {
         isPeerReady={!!myPeerId}
         status={transferState.status}
         onBackCheck={() => {
-          if (isReceiveTransferActive && !confirm("Transfer in progress. Are you sure you want to leave? This will cancel the transfer.")) {
+          if (
+            isReceiveTransferActive &&
+            !confirm(
+              "Transfer in progress. Are you sure you want to leave? This will cancel the transfer."
+            )
+          ) {
             return false;
           }
           if (isReceiveTransferActive) confirmCancel();
@@ -122,9 +130,10 @@ export default function ReceivePage() {
       <main className="flex-grow flex flex-col relative">
         <section className="flex-1 flex flex-col relative">
           <div className="flex-1 p-6 md:p-12 flex flex-col max-w-7xl mx-auto w-full gap-8">
-
             {/* === TRANSFERRING / PAUSED (Split View) === */}
-            {(transferState.status === "transferring" || transferState.status === "paused") && receivedFile && progress ? (
+            {(transferState.status === "transferring" || transferState.status === "paused") &&
+            receivedFile &&
+            progress ? (
               <div className="flex flex-col gap-8 w-full h-full">
                 {/* Page Header */}
                 <div className="flex flex-col gap-1">
@@ -152,7 +161,10 @@ export default function ReceivePage() {
                     chunkSize={transferState.chunkSize}
                     windowSize={transferState.windowSize}
                   />
-                  <TransferVisualizer isPaused={transferState.status === "paused"} direction="downlink" />
+                  <TransferVisualizer
+                    isPaused={transferState.status === "paused"}
+                    direction="downlink"
+                  />
                 </div>
                 <TerminalLog logs={logs} />
               </div>
@@ -184,12 +196,17 @@ export default function ReceivePage() {
                     <div className="flex flex-col gap-1">
                       <h4 className="text-white font-bold uppercase text-sm">How it works</h4>
                       <p className="text-muted text-sm leading-relaxed">
-                        Share your Peer ID with the sender. Keep this tab open. The transfer will start automatically once connected.
+                        Share your Peer ID with the sender. Keep this tab open. The transfer will
+                        start automatically once connected.
                       </p>
                     </div>
                   </div>
 
-                  <RadarVisualizer status={transferState.status} isPeerReady={!!myPeerId} className="flex-1" />
+                  <RadarVisualizer
+                    status={transferState.status}
+                    isPeerReady={!!myPeerId}
+                    className="flex-1"
+                  />
                 </section>
 
                 {/* Right Column */}
@@ -202,10 +219,16 @@ export default function ReceivePage() {
                     {transferState.status === "idle" && (
                       <div className="text-center py-12 text-gray-500 border-2 border-dashed border-white/5 rounded-sm bg-white/[0.02]">
                         <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center animate-pulse">
-                          <span className="material-symbols-outlined text-4xl opacity-50">wifi_tethering</span>
+                          <span className="material-symbols-outlined text-4xl opacity-50">
+                            wifi_tethering
+                          </span>
                         </div>
-                        <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-1">Receiver Active</h3>
-                        <p className="font-mono text-xs text-muted">Awaiting incoming secure handshake...</p>
+                        <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-1">
+                          Receiver Active
+                        </h3>
+                        <p className="font-mono text-xs text-muted">
+                          Awaiting incoming secure handshake...
+                        </p>
                       </div>
                     )}
 
@@ -226,12 +249,24 @@ export default function ReceivePage() {
                       />
                     )}
 
+                    {/* Error Display */}
+                    {error && (
+                      <div className="mb-6">
+                        <ErrorDisplay
+                          error={getErrorInfo(parseError(error))}
+                          onDismiss={() => resetReceive()}
+                        />
+                      </div>
+                    )}
+
                     {transferState.status === "cancelled" && (
                       <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
                             <div className="bg-white/5 p-2">
-                              <span className="material-symbols-outlined text-gray-400">cancel</span>
+                              <span className="material-symbols-outlined text-gray-400">
+                                cancel
+                              </span>
                             </div>
                             <div>
                               <p className="font-bold text-sm text-gray-300">Transfer Cancelled</p>
@@ -248,14 +283,6 @@ export default function ReceivePage() {
                           Ready for New Transfer
                         </button>
                       </div>
-                    )}
-
-                    {(transferState.error || error) && (
-                      <DiagnosticPanel
-                        error={transferState.error || error || ""}
-                        peerManagerRef={peerManagerRef}
-                        onClear={resetReceive}
-                      />
                     )}
                   </div>
 
@@ -304,34 +331,34 @@ export default function ReceivePage() {
         isOpen={chat.isChatOpen}
         onClose={() => chat.setIsChatOpen(false)}
         messages={chat.messages}
-        onSendMessage={(text) => chat.sendMessage(
-          text,
-          activeConnectionRef.current,
-          "",
-          profile?.display_name || "Receiver",
-          myPeerId
-        )}
+        onSendMessage={(text) =>
+          chat.sendMessage(
+            text,
+            activeConnectionRef.current,
+            "",
+            profile?.display_name || "Receiver",
+            myPeerId
+          )
+        }
         currentUserId={user?.id || "receiver"}
         peerId={activeConnectionRef.current?.peer || "sender"}
       />
 
-      {
-        transferState.status !== "idle" && (
-          <ChatFAB
-            hasUnread={chat.hasUnread}
-            onClick={() => {
-              chat.setIsChatOpen(true);
-              chat.setHasUnread(false);
-            }}
-          />
-        )
-      }
+      {transferState.status !== "idle" && (
+        <ChatFAB
+          hasUnread={chat.hasUnread}
+          onClick={() => {
+            chat.setIsChatOpen(true);
+            chat.setHasUnread(false);
+          }}
+        />
+      )}
 
       <QRCodeModal
         isOpen={showMyQRModal}
         peerId={myPeerId}
         onClose={() => setShowMyQRModal(false)}
       />
-    </div >
+    </div>
   );
 }

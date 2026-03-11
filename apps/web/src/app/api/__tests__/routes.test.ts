@@ -60,7 +60,7 @@ describe("GET /api/turn-credentials", () => {
   it("returns STUN servers and public TURN fallback when no TURN_URL env", async () => {
     delete process.env.TURN_URL;
     const { GET } = await import("../turn-credentials/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -86,7 +86,7 @@ describe("GET /api/turn-credentials", () => {
     process.env.TURN_CREDENTIAL = "secret";
 
     const { GET } = await import("../turn-credentials/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
     const body = await response.json();
 
     const privateTurn = body.iceServers.find(
@@ -106,7 +106,7 @@ describe("GET /api/turn-credentials", () => {
     process.env.TURN_CREDENTIAL_2 = "pass2";
 
     const { GET } = await import("../turn-credentials/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
     const body = await response.json();
 
     const p1 = body.iceServers.find((s: RTCIceServer) => s.urls === "turn:provider1.com:3478");
@@ -120,7 +120,7 @@ describe("GET /api/turn-credentials", () => {
 
   it("sets proper Cache-Control header", async () => {
     const { GET } = await import("../turn-credentials/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
 
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=60");
   });

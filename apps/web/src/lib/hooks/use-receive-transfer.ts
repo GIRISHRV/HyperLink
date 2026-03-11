@@ -3,10 +3,7 @@ import { toast } from "sonner";
 import { PeerManager } from "@/lib/webrtc/peer-manager";
 import { FileReceiver } from "@/lib/transfer/receiver";
 import { getIceServers, getPeerConfigAsync } from "@/lib/config/webrtc";
-import {
-  claimTransferAsReceiver,
-  updateTransferStatus,
-} from "@/lib/services/transfer-service";
+import { claimTransferAsReceiver, updateTransferStatus } from "@/lib/services/transfer-service";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
 import { useTransferState } from "@/lib/hooks/use-transfer-state";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
@@ -22,12 +19,7 @@ import { logger } from "@repo/utils";
 import { getMimeType } from "@/lib/utils/mime";
 import { supabase } from "@/lib/supabase/client";
 import { updateUserProfile } from "@/lib/services/profile-service";
-import type {
-  PeerMessage,
-  TransferProgress,
-  ChunkPayload,
-  FileOfferPayload,
-} from "@repo/types";
+import type { PeerMessage, TransferProgress, ChunkPayload, FileOfferPayload } from "@repo/types";
 import type { DataConnection } from "peerjs";
 
 export interface PendingOffer {
@@ -46,15 +38,8 @@ interface UseReceiveTransferOptions {
   onLog?: (msg: string) => void;
 }
 
-export function useReceiveTransfer({
-  user,
-  onData,
-  onLog,
-}: UseReceiveTransferOptions) {
-  const {
-    state: transferState,
-    dispatch: dispatchTransfer,
-  } = useTransferState();
+export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOptions) {
+  const { state: transferState, dispatch: dispatchTransfer } = useTransferState();
 
   const [myPeerId, setMyPeerId] = useState("");
   const [error, setError] = useState("");
@@ -72,9 +57,7 @@ export function useReceiveTransfer({
   const [pendingOffer, setPendingOffer] = useState<PendingOffer | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [preparedShareData, setPreparedShareData] = useState<ShareData | null>(
-    null
-  );
+  const [preparedShareData, setPreparedShareData] = useState<ShareData | null>(null);
   const [showShareFallback, setShowShareFallback] = useState(false);
 
   const peerManagerRef = useRef<PeerManager | null>(null);
@@ -103,7 +86,11 @@ export function useReceiveTransfer({
     onLogRef.current?.(message);
   }, []);
 
-  const { request: requestWakeLock, release: releaseWakeLock, isLocked: isWakeLockActive } = useWakeLock();
+  const {
+    request: requestWakeLock,
+    release: releaseWakeLock,
+    isLocked: isWakeLockActive,
+  } = useWakeLock();
   const { vibrate } = useHaptics();
 
   const isReceiveTransferActive =
@@ -112,16 +99,16 @@ export function useReceiveTransfer({
     transferState.status === "transferring" ||
     transferState.status === "paused";
 
-  const { showBackModal, confirmBackNavigation, cancelBackNavigation } =
-    useTransferGuard(transferId || "", isReceiveTransferActive);
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(
+    transferId || "",
+    isReceiveTransferActive
+  );
 
   // Notification permission & secure context check
   useEffect(() => {
     requestNotificationPermission();
     if (!isSecureContext() && window.location.hostname !== "localhost") {
-      setError(
-        "Insecure Context: WebRTC is likely blocked. Please use HTTPS."
-      );
+      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
     }
   }, []);
 
@@ -148,13 +135,7 @@ export function useReceiveTransfer({
     } else {
       releaseWakeLock();
     }
-  }, [
-    transferState.status,
-    progress,
-    receivedFile,
-    requestWakeLock,
-    releaseWakeLock,
-  ]);
+  }, [transferState.status, progress, receivedFile, requestWakeLock, releaseWakeLock]);
 
   function resetReceive() {
     dispatchTransfer({ type: "RESET" });
@@ -214,14 +195,17 @@ export function useReceiveTransfer({
         // Listen for firewall blocked events
         peerManagerRef.current.on("firewall-blocked", () => {
           toast.error("Firewall Blocked", {
-            description: "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
+            description:
+              "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
             duration: 10000,
           });
         });
 
         logger.debug("[RECEIVE] Initializing PeerManager...");
         // Fetch Supabase JWT for signaling authentication
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         const token = session?.access_token;
 
         // Generate a stable, user-linked Peer ID
@@ -237,9 +221,7 @@ export function useReceiveTransfer({
         const id = await Promise.race([initPromise, timeoutPromise]);
 
         if (!isMountedCheck()) {
-          logger.debug(
-            "[RECEIVE] Component unmounted during peer initialization"
-          );
+          logger.debug("[RECEIVE] Component unmounted during peer initialization");
           return;
         }
 
@@ -256,160 +238,148 @@ export function useReceiveTransfer({
         // Reconnection event listeners
         peerManagerRef.current.on("reconnecting", (data: unknown) => {
           const info = data as { attempt: number; maxAttempts: number };
-          toast.warning(
-            `Reconnecting to server... (${info.attempt}/${info.maxAttempts})`,
-            { id: "reconnect" }
-          );
+          toast.warning(`Reconnecting to server... (${info.attempt}/${info.maxAttempts})`, {
+            id: "reconnect",
+          });
         });
         peerManagerRef.current.on("reconnected", () => {
           toast.success("Reconnected to server", { id: "reconnect" });
         });
         peerManagerRef.current.on("reconnect-failed", () => {
-          toast.error(
-            "Failed to reconnect to server. Please refresh the page.",
-            { id: "reconnect" }
-          );
+          toast.error("Failed to reconnect to server. Please refresh the page.", {
+            id: "reconnect",
+          });
         });
 
-        peerManagerRef.current.on(
-          "incoming-connection",
-          async (rawConnection: unknown) => {
-            const connection = rawConnection as DataConnection;
-            const currentStatus = statusRef.current;
-            const isBusy =
-              currentStatus === "connecting" ||
-              currentStatus === "offering" ||
-              currentStatus === "transferring" ||
-              currentStatus === "paused";
+        peerManagerRef.current.on("incoming-connection", async (rawConnection: unknown) => {
+          const connection = rawConnection as DataConnection;
+          const currentStatus = statusRef.current;
+          const isBusy =
+            currentStatus === "connecting" ||
+            currentStatus === "offering" ||
+            currentStatus === "transferring" ||
+            currentStatus === "paused";
 
-            if (isBusy) {
-              connection.on("open", () => {
-                connection.send({
-                  type: "receiver-busy",
-                  transferId: "",
-                  payload: null,
-                  timestamp: Date.now(),
-                });
-                setTimeout(() => connection.close(), 100);
+          if (isBusy) {
+            connection.on("open", () => {
+              connection.send({
+                type: "receiver-busy",
+                transferId: "",
+                payload: null,
+                timestamp: Date.now(),
               });
+              setTimeout(() => connection.close(), 100);
+            });
+            return;
+          }
+
+          activeConnectionRef.current = connection;
+          fileReceiverRef.current = null;
+          dispatchTransfer({ type: "CONNECT" });
+          setError("");
+          setProgress(null);
+          logger.debug({ peerId: connection.peer }, "[useReceiveTransfer] Active connection set");
+          onLog?.("[SYS] Peer connected");
+          logger.debug("[CONNECTION] Incoming peer connection detected");
+
+          connection.on("open", () => {
+            if (activeConnectionRef.current !== connection) return;
+          });
+
+          connection.on("close", () => {
+            if (activeConnectionRef.current !== connection) return;
+            logger.debug("[CONNECTION] Peer connection closed");
+
+            if (statusRef.current === "complete") {
+              activeConnectionRef.current = null;
               return;
             }
 
-            activeConnectionRef.current = connection;
-            fileReceiverRef.current = null;
-            dispatchTransfer({ type: "CONNECT" });
-            setError("");
-            setProgress(null);
-            logger.debug({ peerId: connection.peer }, "[useReceiveTransfer] Active connection set");
-            onLog?.("[SYS] Peer connected");
-            logger.debug(
-              "[CONNECTION] Incoming peer connection detected"
-            );
-
-            connection.on("open", () => {
-              if (activeConnectionRef.current !== connection) return;
+            // Show error instead of resetting
+            setError("Peer disconnected");
+            onLog?.("[ERR] Peer disconnected");
+            dispatchTransfer({
+              type: "FAIL",
+              error: "Peer disconnected",
             });
+            activeConnectionRef.current = null;
+          });
 
-            connection.on("close", () => {
-              if (activeConnectionRef.current !== connection) return;
-              logger.debug("[CONNECTION] Peer connection closed");
+          connection.on("error", (err: unknown) => {
+            if (activeConnectionRef.current !== connection) return;
+            logger.error({ err }, "[RECEIVE PAGE] Connection ERROR");
+            setError(`Connection error: ${err}`);
+            dispatchTransfer({
+              type: "FAIL",
+              error: `Connection error: ${err}`,
+            });
+          });
 
-              if (statusRef.current === "complete") {
-                activeConnectionRef.current = null;
+          connection.on("data", async (data: unknown) => {
+            if (activeConnectionRef.current !== connection) return;
+            onDataRef.current?.(data); // Forward chat messages
+            const message = data as PeerMessage;
+
+            if (message.type === "file-offer") {
+              logger.debug(
+                { payload: message.payload },
+                "[useReceiveTransfer] Received file-offer"
+              );
+              onLog?.("[SYS] File offer received");
+              logger.debug({ message }, "[RECEIVE] 🎯 FILE-OFFER received");
+              setShowCancelModal(false);
+
+              const transferData = message.payload as FileOfferPayload;
+              const offerData: PendingOffer = {
+                filename: transferData.filename,
+                fileSize: transferData.fileSize,
+                fileType: transferData.fileType,
+                connection,
+                message: message as PeerMessage<FileOfferPayload>,
+                dbTransferId: transferData.dbTransferId,
+              };
+              setPendingOffer(offerData);
+              setReceivedFile({
+                name: transferData.filename,
+                size: transferData.fileSize,
+              });
+
+              dispatchTransfer({ type: "OFFER" });
+            } else if (message.type === "chunk" || message.type === "chunk-probe") {
+              if (fileReceiverRef.current) {
+                await fileReceiverRef.current.handleChunk(message as PeerMessage<ChunkPayload>);
+              }
+            } else if (
+              message.type === "transfer-cancel" ||
+              message.type === "transfer-pause" ||
+              message.type === "transfer-resume"
+            ) {
+              if (message.type === "transfer-cancel" && !fileReceiverRef.current) {
+                setPendingOffer(null);
+                setReceivedFile(null);
+                dispatchTransfer({ type: "CANCEL" });
                 return;
               }
+              if (fileReceiverRef.current) {
+                fileReceiverRef.current.handleControlMessage(message);
 
-              resetReceive();
-              activeConnectionRef.current = null;
-            });
-
-            connection.on("error", (err: unknown) => {
-              if (activeConnectionRef.current !== connection) return;
-              logger.error(
-                { err },
-                "[RECEIVE PAGE] Connection ERROR"
-              );
-              setError(`Connection error: ${err}`);
-              dispatchTransfer({
-                type: "FAIL",
-                error: `Connection error: ${err}`,
-              });
-            });
-
-            connection.on("data", async (data: unknown) => {
-              if (activeConnectionRef.current !== connection) return;
-              onDataRef.current?.(data); // Forward chat messages
-              const message = data as PeerMessage;
-
-              if (message.type === "file-offer") {
-                logger.debug({ payload: message.payload }, "[useReceiveTransfer] Received file-offer");
-                onLog?.("[SYS] File offer received");
-                logger.debug(
-                  { message },
-                  "[RECEIVE] 🎯 FILE-OFFER received"
-                );
-                setShowCancelModal(false);
-
-                const transferData =
-                  message.payload as FileOfferPayload;
-                const offerData: PendingOffer = {
-                  filename: transferData.filename,
-                  fileSize: transferData.fileSize,
-                  fileType: transferData.fileType,
-                  connection,
-                  message:
-                    message as PeerMessage<FileOfferPayload>,
-                  dbTransferId: transferData.dbTransferId,
-                };
-                setPendingOffer(offerData);
-                setReceivedFile({
-                  name: transferData.filename,
-                  size: transferData.fileSize,
-                });
-
-                dispatchTransfer({ type: "OFFER" });
-              } else if (message.type === "chunk" || message.type === "chunk-probe") {
-                if (fileReceiverRef.current) {
-                  await fileReceiverRef.current.handleChunk(
-                    message as PeerMessage<ChunkPayload>
-                  );
-                }
-              } else if (
-                message.type === "transfer-cancel" ||
-                message.type === "transfer-pause" ||
-                message.type === "transfer-resume"
-              ) {
-                if (
-                  message.type === "transfer-cancel" &&
-                  !fileReceiverRef.current
-                ) {
-                  setPendingOffer(null);
-                  setReceivedFile(null);
+                // Update UI state based on control message
+                if (message.type === "transfer-cancel") {
                   dispatchTransfer({ type: "CANCEL" });
-                  return;
-                }
-                if (fileReceiverRef.current) {
-                  fileReceiverRef.current.handleControlMessage(message);
-
-                  // Update UI state based on control message
-                  if (message.type === "transfer-cancel") {
-                    dispatchTransfer({ type: "CANCEL" });
-                    setReceivedFile(null);
-                  } else if (message.type === "transfer-pause") {
-                    dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
-                  } else if (message.type === "transfer-resume") {
-                    dispatchTransfer({ type: "RESUME" });
-                  }
+                  setReceivedFile(null);
+                } else if (message.type === "transfer-pause") {
+                  dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
+                } else if (message.type === "transfer-resume") {
+                  dispatchTransfer({ type: "RESUME" });
                 }
               }
-            });
-          }
-        );
+            }
+          });
+        });
       } catch (err: unknown) {
         logger.error({ err }, "[RECEIVE] Initialization failed:");
         if (isMountedCheck()) {
-          const errMsg =
-            err instanceof Error ? err.message : String(err);
+          const errMsg = err instanceof Error ? err.message : String(err);
           setError(`Failed to initialize: ${errMsg}`);
         }
       } finally {
@@ -438,11 +408,7 @@ export function useReceiveTransfer({
   async function startTransferSequence(pw?: string, writableStream?: any, fileHandle?: any) {
     if (!pendingOffer) return;
 
-    const {
-      connection,
-      message,
-      dbTransferId: senderDbId,
-    } = pendingOffer;
+    const { connection, message, dbTransferId: senderDbId } = pendingOffer;
 
     logger.debug("[RECEIVE PAGE] Creating FileReceiver...");
     const receiver = new FileReceiver();
@@ -455,9 +421,7 @@ export function useReceiveTransfer({
     if (senderDbId) {
       receiver.setStorageId(senderDbId);
     }
-    logger.debug(
-      "[RECEIVE PAGE] FileReceiver created and assigned to ref"
-    );
+    logger.debug("[RECEIVE PAGE] FileReceiver created and assigned to ref");
 
     let dbTransferId: string | null = null;
 
@@ -488,14 +452,9 @@ export function useReceiveTransfer({
       try {
         const type = getMimeType(pendingOffer.filename);
         const nameParts = pendingOffer.filename.split(".");
-        const extension =
-          nameParts.length > 1 ? nameParts.pop() : "";
-        const baseName = nameParts
-          .join(".")
-          .replace(/[^a-z0-9]/gi, "_");
-        const cleanName = extension
-          ? `${baseName}.${extension}`
-          : baseName;
+        const extension = nameParts.length > 1 ? nameParts.pop() : "";
+        const baseName = nameParts.join(".").replace(/[^a-z0-9]/gi, "_");
+        const cleanName = extension ? `${baseName}.${extension}` : baseName;
 
         const fileToShow = new File([blob], cleanName, {
           type,
@@ -517,7 +476,8 @@ export function useReceiveTransfer({
       if (dbTransferId) await updateTransferStatus(dbTransferId, "complete");
 
       if ("setAppBadge" in navigator) {
-        navigator.setAppBadge(1)
+        navigator
+          .setAppBadge(1)
           .catch((err: unknown) => logger.error({ err }, "[RECEIVE] setAppBadge failed:"));
       }
       onLog?.("[SYS] Transfer complete");
@@ -580,9 +540,7 @@ export function useReceiveTransfer({
       }
     }
 
-    logger.debug(
-      "[RECEIVE PAGE] Receiver setup complete, ready for chunks"
-    );
+    logger.debug("[RECEIVE PAGE] Receiver setup complete, ready for chunks");
 
     dispatchTransfer({
       type: "START_TRANSFER",
@@ -604,9 +562,7 @@ export function useReceiveTransfer({
 
     // Give the receiver a moment to fully initialize before sending acceptance
     await new Promise((resolve) => setTimeout(resolve, 100));
-    logger.debug(
-      "[RECEIVE PAGE] Sending file-accept message to sender..."
-    );
+    logger.debug("[RECEIVE PAGE] Sending file-accept message to sender...");
 
     const acceptMessage: PeerMessage = {
       type: "file-accept",
@@ -625,13 +581,8 @@ export function useReceiveTransfer({
       return;
     }
 
-    if (
-      pendingOffer.message.payload.isEncrypted &&
-      !pendingOffer.password
-    ) {
-      logger.debug(
-        "[RECEIVE PAGE] File is encrypted, prompting for password..."
-      );
+    if (pendingOffer.message.payload.isEncrypted && !pendingOffer.password) {
+      logger.debug("[RECEIVE PAGE] File is encrypted, prompting for password...");
       setShowPasswordModal(true);
       return;
     }
@@ -640,25 +591,29 @@ export function useReceiveTransfer({
     const STREAMING_THRESHOLD = 100 * 1024 * 1024; // 100MB
     let writableStream: any = undefined;
 
-    logger.debug({
-      fileSize: pendingOffer.fileSize,
-      threshold: STREAMING_THRESHOLD,
-      hasPicker: "showSaveFilePicker" in window,
-      isSecure: isSecureContext()
-    }, "[RECEIVE] Direct-to-Disk trigger check");
+    logger.debug(
+      {
+        fileSize: pendingOffer.fileSize,
+        threshold: STREAMING_THRESHOLD,
+        hasPicker: "showSaveFilePicker" in window,
+        isSecure: isSecureContext(),
+      },
+      "[RECEIVE] Direct-to-Disk trigger check"
+    );
 
     if (pendingOffer.fileSize > STREAMING_THRESHOLD) {
       if (!("showSaveFilePicker" in window)) {
-        addLog("⚠️ Browser lacks Direct-to-Disk support. Falling back to IndexedDB (Warning: Large files may be slow).");
+        addLog(
+          "⚠️ Browser lacks Direct-to-Disk support. Falling back to IndexedDB (Warning: Large files may be slow)."
+        );
       } else {
-        addLog(`[SYS] Direct-to-Disk criteria: ${pendingOffer.fileSize > STREAMING_THRESHOLD ? 'MET' : 'NOT MET'} (Size: ${Math.round(pendingOffer.fileSize / 1024 / 1024)}MB)`);
+        addLog(
+          `[SYS] Direct-to-Disk criteria: ${pendingOffer.fileSize > STREAMING_THRESHOLD ? "MET" : "NOT MET"} (Size: ${Math.round(pendingOffer.fileSize / 1024 / 1024)}MB)`
+        );
       }
     }
 
-    if (
-      pendingOffer.fileSize > STREAMING_THRESHOLD &&
-      "showSaveFilePicker" in window
-    ) {
+    if (pendingOffer.fileSize > STREAMING_THRESHOLD && "showSaveFilePicker" in window) {
       try {
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: pendingOffer.filename,
@@ -708,11 +663,7 @@ export function useReceiveTransfer({
   function handleRejectOffer() {
     if (!pendingOffer) return;
 
-    const {
-      connection,
-      message,
-      dbTransferId: senderDbId,
-    } = pendingOffer;
+    const { connection, message, dbTransferId: senderDbId } = pendingOffer;
 
     const rejectMessage: PeerMessage = {
       type: "file-reject",
@@ -760,9 +711,7 @@ export function useReceiveTransfer({
       logger.error(`✗ Share Error: ${shareError.name}`);
 
       setShowShareFallback(true);
-      toast.info(
-        "System blocked the file share. Tap the 'Share Link' button that just appeared."
-      );
+      toast.info("System blocked the file share. Tap the 'Share Link' button that just appeared.");
     }
   }
 

@@ -29,7 +29,7 @@ export class FileSender {
   private bytesSent: number = 0;
   private bytesProcessed: number = 0; // Cumulative file bytes read/sent
   private startTime: number = 0;
-  private chunkRanges: Map<number, { start: number; end: number }> = new Map();
+  private chunkRanges: Map<number, { start: number; end: number; startTime: number }> = new Map();
   private fastAckCount: number = 0;
   private dbTransferId?: string;
   private progressCallback?: (progress: TransferProgress) => void;
@@ -243,7 +243,7 @@ export class FileSender {
           this.lastAckTimestamp = Date.now();
           this.probeCount = 0;
 
-          const startTime = (range as any).startTime;
+          const startTime = range.startTime;
           if (startTime) {
             const rtt = Date.now() - startTime;
             this.handleAdaptiveScaling(rtt);
@@ -353,7 +353,7 @@ export class FileSender {
     this.currentChunk++;
     this.activeChunks++;
     this.bytesProcessed = end;
-    this.chunkRanges.set(chunkIndex, { start, end, startTime: Date.now() } as any);
+    this.chunkRanges.set(chunkIndex, { start, end, startTime: Date.now() });
 
     let arrayBuffer: ArrayBuffer;
     try {

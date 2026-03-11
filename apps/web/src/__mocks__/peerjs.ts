@@ -22,7 +22,7 @@ export class MockDataConnection {
     bufferedAmount: 0,
     readyState: "open" as string,
   };
-  peerConnection = {
+  peerConnection: Record<string, any> = {
     signalingState: "stable" as string,
     iceConnectionState: "connected" as string,
     iceGatheringState: "complete" as string,
@@ -65,7 +65,7 @@ export class MockDataConnection {
     delete this._onceEvents[event];
   }
 
-  send = vi.fn();
+  send: any = vi.fn();
 
   close() {
     this.open = false;

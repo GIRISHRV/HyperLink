@@ -1,16 +1,14 @@
-import withPWAInit from "@ducanh2912/next-pwa";
+import withSerwistInit from "@serwist/next";
 import withBundleAnalyzerInit from "@next/bundle-analyzer";
 
 const withBundleAnalyzer = withBundleAnalyzerInit({
   enabled: process.env.ANALYZE === "true",
 });
 
-const withPWA = withPWAInit({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  customWorkerSrc: "worker",
-  disable: false,
+const withSerwist = withSerwistInit({
+  swSrc: "worker/index.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
 });
 
 // Build peer server origin for CSP connect-src from env vars
@@ -37,10 +35,14 @@ const nextConfig = {
       net: false,
       tls: false,
     };
+
+    // Silence PackFileCacheStrategy big string warnings during build
+    config.infrastructureLogging = {
+      ...config.infrastructureLogging,
+      level: "error",
+    };
+
     return config;
-  },
-  experimental: {
-    instrumentationHook: true,
   },
   async rewrites() {
     return [
@@ -64,7 +66,10 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com",
+              // SEC-008: Removed 'unsafe-eval' — eliminates eval()/new Function() XSS attack vector.
+              // 'unsafe-inline' kept temporarily (required by Next.js App Router inline scripts).
+              // TODO: migrate to nonce-based CSP when Next.js natively supports it in App Router.
+              "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
@@ -85,7 +90,7 @@ const nextConfig = {
 import { withSentryConfig } from "@sentry/nextjs";
 
 export default withSentryConfig(
-  withBundleAnalyzer(withPWA(nextConfig)),
+  withBundleAnalyzer(withSerwist(nextConfig)),
   {
     // For all available options, see:
     // https://github.com/getsentry/sentry-webpack-plugin#options

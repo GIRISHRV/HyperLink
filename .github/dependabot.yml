@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # Monitor root package.json for standard lint/typescript updates
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      lint-and-typescript:
+        patterns:
+          - "eslint*"
+          - "typescript*"
+  
+  # Monitor Web App dependencies
+  - package-ecosystem: "npm"
+    directory: "/apps/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+      playwright:
+        patterns:
+          - "@playwright/test"
+
+  # Monitor Signaling Server dependencies
+  - package-ecosystem: "npm"
+    directory: "/apps/signaling"
+    schedule:
+      interval: "weekly"
+
+  # Monitor GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

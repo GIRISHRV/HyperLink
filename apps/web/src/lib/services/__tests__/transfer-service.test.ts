@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 function createQueryBuilder(resolvedData: unknown = null, resolvedError: unknown = null) {
   const builder: Record<string, ReturnType<typeof vi.fn>> = {};
 
-  for (const m of ["select", "insert", "update", "delete", "eq", "in", "or", "order"]) {
+  for (const m of ["select", "insert", "update", "delete", "eq", "in", "or", "order", "range"]) {
     builder[m] = vi.fn().mockReturnValue(builder);
   }
 
@@ -21,7 +21,10 @@ function createQueryBuilder(resolvedData: unknown = null, resolvedError: unknown
 
   // Allow direct await
   builder.then = vi.fn((resolve) =>
-    resolve({ data: resolvedData ? (Array.isArray(resolvedData) ? resolvedData : [resolvedData]) : [], error: resolvedError })
+    resolve({
+      data: resolvedData ? (Array.isArray(resolvedData) ? resolvedData : [resolvedData]) : [],
+      error: resolvedError,
+    })
   );
 
   return builder;
@@ -189,9 +192,7 @@ describe("Transfer Service", () => {
       ];
       currentBuilder = createQueryBuilder(transfers);
       // Override then to return flat array
-      currentBuilder.then = vi.fn((resolve) =>
-        resolve({ data: transfers, error: null })
-      );
+      currentBuilder.then = vi.fn((resolve) => resolve({ data: transfers, error: null }));
       mockSupabase.from.mockReturnValue(currentBuilder);
 
       const result = await getUserTransfers("u1");
@@ -247,7 +248,9 @@ describe("Transfer Service", () => {
       const builder = createQueryBuilder();
       builder.delete = vi.fn().mockReturnValue(builder);
       builder.in = vi.fn().mockReturnValue(builder);
-      builder.select = vi.fn().mockResolvedValue({ data: [{ id: "t1" }, { id: "t2" }], error: null });
+      builder.select = vi
+        .fn()
+        .mockResolvedValue({ data: [{ id: "t1" }, { id: "t2" }], error: null });
       mockSupabase.from.mockReturnValue(builder);
 
       const result = await deleteMultipleTransfers(["t1", "t2"]);

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import BackgroundGrid from "@/components/background-grid";
@@ -16,16 +16,39 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon/favicon.ico", sizes: "any" }
+      { url: "/favicon/favicon.ico", sizes: "any" },
     ],
     apple: "/favicon/apple-touch-icon.png",
   },
   manifest: "/favicon/site.webmanifest",
+  openGraph: {
+    title: "HyperLink - P2P File Transfer",
+    description: "Direct peer-to-peer file transfer. Pure speed. No storage limits.",
+    url: "https://hyperlink.vercel.app",
+    siteName: "HyperLink",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HyperLink - P2P File Transfer",
+    description: "Direct peer-to-peer file transfer. Pure speed. No storage limits.",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "HyperLink",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#050511", // Deep surface color from tailwind config
 };
 
 import { ClipboardListener } from "@/components/clipboard-listener";
 import { Toaster } from "sonner";
 import { GlobalFooter } from "@/components/global-footer";
+import { KeyboardShortcutsProvider } from "@/components/keyboard-shortcuts-provider";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -43,7 +66,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to main content
         </a>
-        <div id="main-content" className="relative z-10 flex-1 flex flex-col">{children}</div>
+        <div id="main-content" className="relative z-10 flex-1 flex flex-col">
+          {children}
+        </div>
         {process.env.NODE_ENV !== "production" && (
           <script
             dangerouslySetInnerHTML={{
@@ -63,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
         <BackgroundGrid />
         <ClipboardListener />
+        <KeyboardShortcutsProvider />
         {process.env.NODE_ENV === "production" && (
           <>
             <Analytics />
@@ -76,4 +102,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-

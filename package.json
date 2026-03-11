@@ -1,6 +1,6 @@
 {
   "name": "hyperlink",
-  "version": "1.00.004",
+  "version": "1.01.000",
   "private": true,
   "description": "HyperLink: High-Speed P2P File Engine using WebRTC and IndexedDB",
   "workspaces": [
@@ -15,21 +15,24 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "clean": "turbo clean && rm -rf node_modules",
-    "test": "npm test --workspace=apps/web && npm run test:e2e --workspace=apps/web",
+    "typecheck": "npx tsc --noEmit -p apps/web/tsconfig.json",
+    "test": "npm test --workspace=apps/web && npm test --workspace=apps/signaling && npm run test:e2e --workspace=apps/web",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "test:e2e:chromium": "npm run test:e2e:chromium --workspace=apps/web",
     "test:e2e:firefox": "npm run test:e2e:firefox --workspace=apps/web",
     "test:e2e:webkit": "npm run test:e2e:webkit --workspace=apps/web",
     "test:e2e:ui": "npm run test:e2e:ui --workspace=apps/web",
-    "validate": "npm run test && npm run lint && npx tsc --noEmit -p apps/web/tsconfig.json && npm run build",
-    "prepare": "husky || true"
+    "validate": "turbo run lint typecheck test test:e2e build",
+    "prepare": "husky || true",
+    "db:reset": "bash scripts/reset-db.sh",
+    "db:make-admin": "echo 'Run in Supabase SQL Editor: SELECT make_user_admin('\"'your-email@example.com'\"');'"
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "lint-staged": "^15.2.11",
-    "prettier": "^3.2.5",
-    "turbo": "^2.0.0",
-    "typescript": "^5.3.3"
+    "lint-staged": "^16.3.3",
+    "prettier": "^3.8.1",
+    "turbo": "^2.8.16",
+    "typescript": "^5.9.3"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -44,5 +47,9 @@
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
-  "packageManager": "npm@10.5.0"
+  "overrides": {
+    "serialize-javascript": "^7.0.4",
+    "elliptic": "^6.6.1"
+  },
+  "packageManager": "npm@11.11.0"
 }
