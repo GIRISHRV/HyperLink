@@ -2,7 +2,9 @@ import { test, expect } from "@playwright/test";
 
 test.describe("History Page (authenticated)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/history");
+    await page.goto("/history", { waitUntil: "domcontentloaded" });
+    // Wait for auth to settle — storageState cookies need a moment to apply
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test("loads the history page", async ({ page }) => {

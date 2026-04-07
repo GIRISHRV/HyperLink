@@ -64,10 +64,12 @@ export default defineConfig({
 
     // 3. Unauthenticated tests — existing specs in e2e/ root (no session)
     // Runs on Chromium and Firefox only
+    // NOTE: testIgnore excludes the authenticated/ subfolder (Windows-safe)
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+      testMatch: "**/e2e/**/*.spec.ts",
+      testIgnore: "**/e2e/authenticated/**",
     },
     {
       name: "firefox",
@@ -77,7 +79,8 @@ export default defineConfig({
         navigationTimeout: 60_000,
         actionTimeout: 15_000,
       },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+      testMatch: "**/e2e/**/*.spec.ts",
+      testIgnore: "**/e2e/authenticated/**",
     },
   ],
 
