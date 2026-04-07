@@ -163,6 +163,29 @@ describe("JWT authentication middleware (SEC-011 / SEC-012)", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects an expired token with 403", async () => {
+    const app = await importApp();
+    const expiredToken = jwt.sign(
+      { sub: "user-123", role: "authenticated" },
+      TEST_SECRET,
+      { algorithm: "HS256", expiresIn: "-1h" } // Expired 1 hour ago
+    );
+    const res = await request(app)
+      .get("/protected-path")
+      .set("Authorization", `Bearer ${expiredToken}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("Invalid or expired token");
+  });
+
+  it("rejects a malformed token (not JWT format) with 403", async () => {
+    const app = await importApp();
+    const res = await request(app)
+      .get("/protected-path")
+      .set("Authorization", "Bearer this.is.malformed");
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("Invalid or expired token");
+  });
+
   it("rejects a bad token passed via query param with 403", async () => {
     const app = await importApp();
     const res = await request(app).get("/protected-path?token=garbage");

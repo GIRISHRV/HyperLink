@@ -24,7 +24,11 @@ vi.mock("@/lib/supabase/server", () => ({
 describe("GET /api/health", () => {
   it("returns 200 with status ok", async () => {
     const { GET } = await import("../health/route");
-    const response = await GET();
+    const request = new Request("http://localhost/api/health");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -35,11 +39,28 @@ describe("GET /api/health", () => {
 
   it("returns a valid ISO timestamp", async () => {
     const { GET } = await import("../health/route");
-    const response = await GET();
+    const request = new Request("http://localhost/api/health");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
     const body = await response.json();
 
     const date = new Date(body.timestamp);
     expect(date.toISOString()).toBe(body.timestamp);
+  });
+
+  it("performs deep health check when deep=true", async () => {
+    const { GET } = await import("../health/route");
+    const request = new Request("http://localhost/api/health?deep=true");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
+    const body = await response.json();
+
+    expect(body.checks).toBeDefined();
+    expect(body.checks.supabase).toBeDefined();
   });
 });
 

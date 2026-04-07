@@ -4,6 +4,7 @@ import { generateTransferId, logger } from "@repo/utils";
 import { generateSalt, arrayBufferToBase64 } from "@/lib/utils/crypto";
 import { encryptionWorkerClient } from "@/lib/utils/encryption-worker-client";
 import { validatePeerMessage } from "@/lib/utils/peer-message-validator";
+import { transferMetrics } from "@/lib/monitoring/transfer-metrics";
 import type { TransferStatus } from "@/lib/hooks/use-transfer-state";
 
 const MIN_CHUNK_SIZE = 64 * 1024; // 64KB minimum
@@ -150,6 +151,9 @@ export class FileSender {
     this.progressCallback = onProgress;
     this.startTime = Date.now();
 
+    // Start metrics collection
+    transferMetrics.startTransfer(this.transferId, this.file.size);
+
     return new Promise((resolve, reject) => {
       this.rejectTransfer = reject;
 
@@ -175,6 +179,8 @@ export class FileSender {
         this.connection.off("error", onError);
         if (this.status === "transferring" || this.status === "paused") {
           this.status = "failed";
+          // AUDIT FIX: Clear chunkRanges Map on failure to prevent memory leak
+          this.chunkRanges.clear();
         }
       };
 
@@ -256,6 +262,7 @@ export class FileSender {
           // Completion check: All file bytes processed AND all active chunks acked
           if (this.bytesProcessed >= this.file.size && this.activeChunks <= 0) {
             cleanup();
+            transferMetrics.completeTransfer(this.transferId, true);
             this.sendComplete()
               .catch((err) => {
                 logger.error({ err }, "[SENDER] Final complete failed");
@@ -372,6 +379,21 @@ export class FileSender {
 
     if ((this.status as string) === "cancelled") return;
 
+    // AUDIT FIX: Check data channel state after async read to avoid TOCTOU gap
+    const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
+    if (peerConn.dataChannel?.readyState !== "open") {
+      logger.warn(
+        { chunkIndex, readyState: peerConn.dataChannel?.readyState },
+        "[SENDER] Data channel closed during chunk read"
+      );
+      this.onLog?.(`[WARN] [NET] Data channel closed during chunk ${chunkIndex} read`);
+      this.sendError("Connection closed").catch((err) =>
+        logger.error({ err }, "[SENDER] sendError failed")
+      );
+      this.rejectTransfer?.(new Error("Connection closed during transfer"));
+      return;
+    }
+
     // Encrypt if key is present
     if (this.cryptoKey) {
       try {
@@ -386,6 +408,9 @@ export class FileSender {
     }
 
     this.sendChunk(arrayBuffer, chunkIndex, start);
+
+    // Update metrics
+    transferMetrics.updateProgress(this.transferId, this.bytesSent, arrayBuffer.byteLength);
   }
 
   /**
@@ -544,6 +569,10 @@ export class FileSender {
     if (this.status === "cancelled" || this.status === "complete") return;
     // Stop the pump loop immediately so no more chunks are sent
     this.status = "paused";
+
+    // Record cancellation in metrics
+    transferMetrics.completeTransfer(this.transferId, false);
+
     // Send the cancel message BEFORE setting status to cancelled,
     // because safeSend() short-circuits if status is already "cancelled".
     const cancelMessage: PeerMessage = {
@@ -557,6 +586,10 @@ export class FileSender {
     } catch (e) {
       logger.warn({ e }, "[SENDER] Failed to send cancel message");
     }
+
+    // AUDIT FIX: Clear chunkRanges Map to prevent memory leak
+    this.chunkRanges.clear();
+
     this.status = "cancelled";
     this.cancelCallback?.();
     this.rejectTransfer?.(new Error("Transfer cancelled by sender"));
@@ -568,6 +601,7 @@ export class FileSender {
   async pause(): Promise<void> {
     if (this.status === "paused" || this.status === "cancelled") return;
     this.status = "paused";
+    transferMetrics.recordPause(this.transferId);
     const pauseMessage: PeerMessage = {
       type: "transfer-pause",
       transferId: this.transferId,
@@ -584,6 +618,7 @@ export class FileSender {
   async resume(): Promise<void> {
     if (this.status !== "paused") return;
     this.status = "transferring";
+    transferMetrics.recordResume(this.transferId);
     const resumeMessage: PeerMessage = {
       type: "transfer-resume",
       transferId: this.transferId,

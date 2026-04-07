@@ -264,6 +264,11 @@ GRANT EXECUTE ON FUNCTION public.get_user_transfer_stats() TO authenticated;
 -- 7. ADMIN ROLE — incidents write policies
 -- ─────────────────────────────────────────────────────────────
 
+-- AUDIT FIX: Added DROP POLICY IF EXISTS for idempotency
+DROP POLICY IF EXISTS "Allow admin users to insert incidents" ON public.incidents;
+DROP POLICY IF EXISTS "Allow admin users to update incidents" ON public.incidents;
+DROP POLICY IF EXISTS "Allow admin users to delete incidents" ON public.incidents;
+
 CREATE POLICY "Allow admin users to insert incidents"
   ON public.incidents FOR INSERT TO authenticated
   WITH CHECK (

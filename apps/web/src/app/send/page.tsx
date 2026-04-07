@@ -204,15 +204,12 @@ function SendPageContent() {
     if (peerId) setReceiverPeerId(peerId);
   }, [searchParams]);
 
-  // Expose myPeerId to window for Playwright E2E tests
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      (window as any).myPeerId = myPeerId;
-    }
-  }, [myPeerId]);
-
   return (
-    <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div
+      className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col"
+      data-testid="send-page"
+      data-peer-id={myPeerId || ""}
+    >
       <ConfirmLeaveModal
         isOpen={showBackModal}
         onConfirm={confirmBackNavigation}

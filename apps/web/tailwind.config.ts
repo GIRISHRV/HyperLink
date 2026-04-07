@@ -13,7 +13,7 @@ const config: Config = {
         // Bauhaus Color Palette
         primary: {
           DEFAULT: "#ffd900", // Bauhaus Yellow
-          hover: "#ffea2e",   // Primary hover state
+          hover: "#ffea2e", // Primary hover state
           400: "#ffd900",
           500: "#ffd900",
           600: "#e6c400",
@@ -33,11 +33,11 @@ const config: Config = {
         },
         // Surface tokens (cards, modals, interactive elements)
         surface: {
-          DEFAULT: "#1a1a1a",   // Cards, modals, panels
-          elevated: "#242424",  // Buttons, interactive surfaces
-          deep: "#0a0a0a",      // Deep backgrounds, overlays
-          inset: "#11110f",     // Inset panels, code blocks
-          preview: "#0f0f0f",   // Preview areas
+          DEFAULT: "#1a1a1a", // Cards, modals, panels
+          elevated: "#242424", // Buttons, interactive surfaces
+          deep: "#0a0a0a", // Deep backgrounds, overlays
+          inset: "#11110f", // Inset panels, code blocks
+          preview: "#0f0f0f", // Preview areas
         },
         "background-dark": "#121212",
         "background-light": "#f5f5f5",
@@ -45,14 +45,14 @@ const config: Config = {
         "surface-light": "#2a2614",
         // Text tokens
         muted: {
-          DEFAULT: "#bcb89a",   // Muted gold text (labels, captions)
-          dim: "#a1a1a1",       // Dimmer text
+          DEFAULT: "#bcb89a", // Muted gold text (labels, captions)
+          dim: "#a1a1a1", // Dimmer text
         },
         // Border tokens
         subtle: {
-          DEFAULT: "#333333",   // Standard subtle borders
-          bauhaus: "#3a3827",   // Bauhaus-themed borders
-          gold: "#6b6644",      // Gold-tinted borders
+          DEFAULT: "#333333", // Standard subtle borders
+          bauhaus: "#3a3827", // Bauhaus-themed borders
+          gold: "#6b6644", // Gold-tinted borders
         },
         accent: {
           DEFAULT: "#dc2626",
@@ -65,7 +65,16 @@ const config: Config = {
         sans: ["var(--font-inter)", "Space Grotesk", "sans-serif"],
         display: ["Space Grotesk", "sans-serif"],
         body: ["Space Grotesk", "sans-serif"],
-        mono: ["Space Grotesk", "monospace"],
+        mono: [
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "Liberation Mono",
+          "Courier New",
+          "monospace",
+        ],
       },
       borderRadius: {
         DEFAULT: "0px", // Bauhaus sharp edges

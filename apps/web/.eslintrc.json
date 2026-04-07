@@ -1,6 +1,6 @@
 {
   "root": true,
-  "extends": ["@repo/eslint-config", "plugin:storybook/recommended"],
+  "extends": ["@repo/eslint-config"],
   "ignorePatterns": ["public/sw.js", "public/swe-worker.js", "public/workbox-*.js"],
   "rules": {
     "@next/next/no-html-link-for-pages": "off"

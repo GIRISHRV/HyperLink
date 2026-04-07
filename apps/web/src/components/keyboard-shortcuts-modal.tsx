@@ -14,7 +14,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShor
   if (!isOpen) return null;
 
   const isMac =
-    typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+    typeof navigator !== "undefined" && navigator.userAgent.toUpperCase().indexOf("MAC") >= 0;
   const modifierKey = isMac ? "⌘" : "Ctrl";
 
   return (

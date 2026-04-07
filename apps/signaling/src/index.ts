@@ -19,13 +19,11 @@ const peerCountBox = { value: 0 };
 const app = createApp(() => peerCountBox.value);
 const server = http.createServer(app);
 
-// Boot PeerServer — it will mutate peerCountBox on connect/disconnect
-const { getPeerCount } = createPeerServer(server, app);
-
-// Keep the box in sync (simple binding)
-setInterval(() => {
-  peerCountBox.value = getPeerCount();
-}, 500);
+// AUDIT FIX: Event-driven peer count updates instead of polling
+// Boot PeerServer with callback that updates the box on connect/disconnect
+createPeerServer(server, app, (count) => {
+  peerCountBox.value = count;
+});
 
 // Graceful shutdown
 const shutdown = () => {

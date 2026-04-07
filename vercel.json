@@ -1,6 +1,12 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "github": {
-        "enabled": false
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "github": {
+    "enabled": false
+  },
+  "crons": [
+    {
+      "path": "/api/keep-alive",
+      "schedule": "0 0 */3 * *"
     }
+  ]
 }

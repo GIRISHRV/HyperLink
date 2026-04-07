@@ -8,21 +8,21 @@ interface ConfirmLeaveModalProps {
   onCancel: () => void;
 }
 
-export default function ConfirmLeaveModal({
-  isOpen,
-  onConfirm,
-  onCancel,
-}: ConfirmLeaveModalProps) {
+export default function ConfirmLeaveModal({ isOpen, onConfirm, onCancel }: ConfirmLeaveModalProps) {
   const { modalRef, handleKeyDown } = useModalAccessibility(isOpen, onCancel);
   if (!isOpen) return null;
 
   return (
-    <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="Transfer In Progress" className="fixed inset-0 z-[100] flex items-center justify-center">
+    <div
+      ref={modalRef}
+      onKeyDown={handleKeyDown}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Transfer In Progress"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+    >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onCancel}
-      />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
 
       {/* Modal */}
       <div className="relative bg-surface border border-white/10 rounded-none shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -33,19 +33,14 @@ export default function ConfirmLeaveModal({
         <div className="p-6 flex flex-col items-center text-center gap-4">
           {/* Warning icon */}
           <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center border border-red-500/30">
-            <span className="material-symbols-outlined text-3xl text-red-400">
-              warning
-            </span>
+            <span className="material-symbols-outlined text-3xl text-red-400">warning</span>
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-white">
-              Transfer In Progress
-            </h3>
+            <h3 className="text-xl font-bold text-white">Transfer In Progress</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              A file transfer is currently active. If you leave this page, the
-              transfer will be <span className="text-red-400 font-semibold">cancelled</span> and
-              marked as failed.
+              A file transfer is currently active. If you leave this page, the transfer will be{" "}
+              <span className="text-red-400 font-semibold">cancelled</span> and marked as failed.
             </p>
           </div>
         </div>

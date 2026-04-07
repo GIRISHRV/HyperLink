@@ -1,6 +1,4 @@
 {
-    "root": true,
-    "extends": [
-        "@repo/eslint-config/library"
-    ]
+  "root": true,
+  "extends": ["@repo/eslint-config/library"]
 }

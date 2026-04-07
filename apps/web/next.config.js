@@ -1,14 +1,8 @@
-import withSerwistInit from "@serwist/next";
 import withBundleAnalyzerInit from "@next/bundle-analyzer";
+import path from "path";
 
 const withBundleAnalyzer = withBundleAnalyzerInit({
   enabled: process.env.ANALYZE === "true",
-});
-
-const withSerwist = withSerwistInit({
-  swSrc: "worker/index.ts",
-  swDest: "public/sw.js",
-  disable: process.env.NODE_ENV === "development",
 });
 
 // Build peer server origin for CSP connect-src from env vars
@@ -23,6 +17,9 @@ import packageJson from "./package.json" with { type: "json" };
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fix workspace root warning
+  outputFileTracingRoot: path.join(process.cwd(), "../../"),
+
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
@@ -69,7 +66,8 @@ const nextConfig = {
               // SEC-008: Removed 'unsafe-eval' — eliminates eval()/new Function() XSS attack vector.
               // 'unsafe-inline' kept temporarily (required by Next.js App Router inline scripts).
               // TODO: migrate to nonce-based CSP when Next.js natively supports it in App Router.
-              "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+              // Allow 'unsafe-eval' in development for Next.js hot reloading
+              `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
@@ -90,7 +88,7 @@ const nextConfig = {
 import { withSentryConfig } from "@sentry/nextjs";
 
 export default withSentryConfig(
-  withBundleAnalyzer(withSerwist(nextConfig)),
+  withBundleAnalyzer(nextConfig),
   {
     // For all available options, see:
     // https://github.com/getsentry/sentry-webpack-plugin#options

@@ -10,7 +10,7 @@ import { turnCredentialsLimiter } from "@/lib/middleware/rate-limit";
  */
 export async function GET(request: Request) {
   // Rate limiting — applied before auth to reduce load on Supabase
-  const { limited, headers, message } = turnCredentialsLimiter(request);
+  const { limited, headers, message } = await turnCredentialsLimiter(request);
   if (limited) {
     return NextResponse.json({ error: message }, { status: 429, headers });
   }

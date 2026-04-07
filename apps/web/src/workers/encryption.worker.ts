@@ -29,8 +29,10 @@ export interface EncryptionWorkerResponse {
   error?: string;
 }
 
+const ctx = self as any;
+
 // Handle messages from main thread
-self.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
+ctx.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
   const { id, type, payload } = event.data;
 
   try {
@@ -47,7 +49,7 @@ self.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
           payload: { key, salt: payload.salt },
         };
         // CryptoKey and Uint8Array are cloneable but not transferable
-        self.postMessage(response);
+        ctx.postMessage(response);
         break;
       }
 
@@ -61,8 +63,16 @@ self.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
           type: "success",
           payload: { data: encrypted },
         };
+
+        const transferables: Transferable[] = [];
+        if (encrypted instanceof ArrayBuffer) {
+          transferables.push(encrypted);
+        } else if (encrypted && (encrypted as any).buffer instanceof ArrayBuffer) {
+          transferables.push((encrypted as any).buffer);
+        }
+
         // Use transferable objects for performance
-        self.postMessage(response, [encrypted]);
+        ctx.postMessage(response, transferables);
         break;
       }
 
@@ -76,8 +86,16 @@ self.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
           type: "success",
           payload: { data: decrypted },
         };
+
+        const transferables: Transferable[] = [];
+        if (decrypted instanceof ArrayBuffer) {
+          transferables.push(decrypted);
+        } else if (decrypted && (decrypted as any).buffer instanceof ArrayBuffer) {
+          transferables.push((decrypted as any).buffer);
+        }
+
         // Use transferable objects for performance
-        self.postMessage(response, [decrypted]);
+        ctx.postMessage(response, transferables);
         break;
       }
 
@@ -90,7 +108,7 @@ self.onmessage = async (event: MessageEvent<EncryptionWorkerMessage>) => {
       type: "error",
       error: error instanceof Error ? error.message : String(error),
     };
-    self.postMessage(response);
+    ctx.postMessage(response);
   }
 };
 

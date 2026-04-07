@@ -3,11 +3,15 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/app-header";
-import { signIn, signUp, signInWithMagicLink, resetPassword } from "@/lib/services/auth-service";
+import {
+  signIn,
+  signUp,
+  signInWithMagicLink,
+  resetPassword,
+  getCurrentUser,
+} from "@/lib/services/auth-service";
 import { getSafeRedirect } from "@/lib/utils/auth-redirect";
 import { logger } from "@repo/utils";
-
-const MIN_PASSWORD_LENGTH = 8;
 
 /** SEC-005: Normalize Supabase error messages to prevent user enumeration */
 function normalizeAuthError(message: string): string {
@@ -31,7 +35,6 @@ function normalizeAuthError(message: string): string {
   }
   return "Authentication failed. Please try again.";
 }
-
 
 export default function AuthPage() {
   const router = useRouter();
@@ -57,11 +60,10 @@ export default function AuthPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { getCurrentUser } = await import("@/lib/services/auth-service");
       const user = await getCurrentUser();
 
       // Artificial slight delay for smoother skeleton feeling
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       if (user) {
         const target = getRedirect();
@@ -101,17 +103,18 @@ export default function AuthPage() {
       return;
     }
 
-    // SEC-003: Password strength validation
-    if (!useMagicLink && !showForgotPassword && isSignUp && password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
-
     setLoading(true);
     setError("");
     setSuccess("");
 
     try {
+      // SEC-003: Client-side password length validation for sign-up
+      if (!showForgotPassword && !useMagicLink && password.length < 8) {
+        setError("Password must be at least 8 characters.");
+        setLoading(false);
+        return;
+      }
+
       if (showForgotPassword) {
         await resetPassword(email);
         setSuccess("Password reset link sent to your email!");
@@ -142,7 +145,7 @@ export default function AuthPage() {
       logger.error({ err }, "Auth error:");
       // Debug: log the raw error object to console for normalization tuning
       // eslint-disable-next-line no-console
-      logger.debug({ err }, 'Supabase error (raw):');
+      logger.debug({ err }, "Supabase error (raw):");
       // SEC-004: Exponential backoff after repeated failures
       // Remove failedAttempts logic, just set lockout
       if (lockoutUntil === 0) {
@@ -195,16 +198,36 @@ export default function AuthPage() {
             <div className="relative z-10">
               <div className="flex items-center gap-2 mb-6">
                 <div className="h-1 w-12 bg-bauhaus-red"></div>
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Authentication Portal</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                  Authentication Portal
+                </span>
               </div>
 
               <h1 className="text-5xl md:text-7xl font-black leading-[0.9] tracking-tighter uppercase mb-6">
                 {showForgotPassword ? (
-                  <>Reset<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">Password.</span></>
+                  <>
+                    Reset
+                    <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">
+                      Password.
+                    </span>
+                  </>
                 ) : isSignUp ? (
-                  <>Create<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">Account.</span></>
+                  <>
+                    Create
+                    <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">
+                      Account.
+                    </span>
+                  </>
                 ) : (
-                  <>Access<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">Network.</span></>
+                  <>
+                    Access
+                    <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-bauhaus-blue">
+                      Network.
+                    </span>
+                  </>
                 )}
               </h1>
 
@@ -220,7 +243,9 @@ export default function AuthPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </div>
-                <span className="text-sm font-mono text-gray-400">Network Online // 128-bit AES</span>
+                <span className="text-sm font-mono text-gray-400">
+                  Network Online // 256-bit AES
+                </span>
               </div>
             </div>
 
@@ -238,7 +263,10 @@ export default function AuthPage() {
             <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto space-y-6">
               {/* Email Input */}
               <div className="space-y-2">
-                <label htmlFor="auth-email" className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                <label
+                  htmlFor="auth-email"
+                  className="text-xs font-bold uppercase tracking-widest text-gray-500"
+                >
                   Email Address
                 </label>
                 <input
@@ -256,7 +284,10 @@ export default function AuthPage() {
               {!useMagicLink && !showForgotPassword && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label htmlFor="auth-password" className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                    <label
+                      htmlFor="auth-password"
+                      className="text-xs font-bold uppercase tracking-widest text-gray-500"
+                    >
                       Password
                     </label>
                     <button
@@ -296,7 +327,7 @@ export default function AuthPage() {
 
               {/* Submit Button */}
               <button
-                className={`w-full bg-bauhaus-blue hover:bg-blue-600 text-white font-bold h-14 flex items-center justify-center gap-3 group transition-all duration-300 uppercase tracking-wider text-sm relative overflow-hidden${lockoutUntil > Date.now() ? ' opacity-60 cursor-not-allowed' : ''}`}
+                className={`w-full bg-bauhaus-blue hover:bg-blue-600 text-white font-bold h-14 flex items-center justify-center gap-3 group transition-all duration-300 uppercase tracking-wider text-sm relative overflow-hidden${lockoutUntil > Date.now() ? " opacity-60 cursor-not-allowed" : ""}`}
                 type="submit"
                 disabled={loading || lockoutUntil > Date.now()}
               >
@@ -366,8 +397,6 @@ export default function AuthPage() {
           </div>
         </div>
       </main>
-
-
     </div>
   );
 }

@@ -335,3 +335,20 @@ MIT License - see [LICENSE](../../LICENSE) file for details
 - **Issues**: [GitHub Issues](https://github.com/GIRISHRV/HyperLink/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/GIRISHRV/HyperLink/discussions)
 - **Documentation**: [Main Docs](../../docs/README.md)
+
+## Future Improvements
+
+### Express v5 Migration
+
+The server currently uses Express v4. Express v5 is stable and offers improved performance and security features. However, migration is blocked by:
+
+- **express-rate-limit**: The rate limiting middleware (v8.3.1) has type incompatibilities with Express v5
+- **Waiting for**: express-rate-limit to release Express v5 compatible types
+
+Once express-rate-limit supports Express v5, upgrade with:
+
+```bash
+npm install express@5 @types/express@5
+```
+
+No code changes should be required as Express v5 is mostly backward compatible.

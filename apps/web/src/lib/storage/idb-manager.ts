@@ -129,20 +129,26 @@ export async function clearTransfer(
  * Get the highest chunk index received for a transfer (for resumption).
  * Returns -1 if no chunks exist.
  *
- * D2 fix: Uses a reverse cursor ('prev') so it reads only the last record
- * in the index instead of scanning all chunks (was O(n), now O(1)).
- * Relies on the key format `transferId:chunkIndex` sorting lexicographically
- * such that the last key for a given transferId has the highest chunkIndex.
+ * AUDIT FIX: Scans all chunks to find the max chunkIndex instead of relying
+ * on lexicographic key ordering (which fails when "9" > "10" as strings).
  */
 export async function getLastReceivedChunkIndex(transferId: string): Promise<number> {
   const db = await getDB();
   const tx = db.transaction(CHUNK_STORE, "readonly");
   const index = tx.store.index("transferId");
 
-  // Open cursor in reverse — the first result IS the highest chunkIndex.
-  const cursor = await index.openCursor(transferId, "prev");
+  let cursor = await index.openCursor(transferId);
+  let maxIndex = -1;
+
+  while (cursor) {
+    if (cursor.value.chunkIndex > maxIndex) {
+      maxIndex = cursor.value.chunkIndex;
+    }
+    cursor = await cursor.continue();
+  }
+
   await tx.done;
-  return cursor ? cursor.value.chunkIndex : -1;
+  return maxIndex;
 }
 
 /**
@@ -157,8 +163,14 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
   // Get all keys/values is too heavy for 2GB. We use openCursor.
   let cursor = await index.openCursor(transferId);
 
-  // We need to sort chunks, so we must collect them. Since we convert ArrayBuffer
-  // to a Blob immediately, the RAM footprint of this object is minimal.
+  // We need to sort chunks because:
+  // 1. The transferId index doesn't guarantee chunkIndex order
+  // 2. Chunks may arrive out of order due to network conditions
+  // 3. The primary key format (transferId:chunkIndex) has lexicographic ordering issues
+  // Since we convert ArrayBuffer to Blob immediately, RAM footprint is minimal.
+  // For very large files (millions of chunks), this O(n log n) sort is acceptable
+  // because the alternative (iterating primary keys in order) would require zero-padded
+  // chunk indices in the key format, which would need a migration.
   const chunkBlobs: { index: number; blob: Blob }[] = [];
 
   while (cursor) {

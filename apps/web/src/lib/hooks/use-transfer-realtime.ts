@@ -5,73 +5,10 @@ import { supabase } from "@/lib/supabase/client";
 import { logger } from "@repo/utils";
 import type { Transfer } from "@repo/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { deleteTransfer as deleteTransferFromDB, deleteMultipleTransfers as deleteMultipleFromDB } from "@/lib/services/transfer-service";
-
-/**
- * Subscribe to real-time updates for a specific transfer
- */
-export function useTransferRealtime(transferId: string | null) {
-  const [transfer, setTransfer] = useState<Transfer | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!transferId) {
-      setLoading(false);
-      return;
-    }
-
-    let channel: RealtimeChannel;
-
-    async function setupRealtimeSubscription() {
-      // Fetch initial transfer data
-      const { data } = await supabase.from("transfers").select("*").eq("id", transferId).single();
-
-      if (data) {
-        setTransfer(data);
-      }
-      setLoading(false);
-
-      // Subscribe to changes (UPDATE + DELETE)
-      channel = supabase
-        .channel(`transfer:${transferId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "transfers",
-            filter: `id=eq.${transferId}`,
-          },
-          (payload) => {
-            setTransfer(payload.new as Transfer);
-          }
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "public",
-            table: "transfers",
-            filter: `id=eq.${transferId}`,
-          },
-          () => {
-            setTransfer(null);
-          }
-        )
-        .subscribe();
-    }
-
-    setupRealtimeSubscription();
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [transferId]);
-
-  return { transfer, loading };
-}
+import {
+  deleteTransfer as deleteTransferFromDB,
+  deleteMultipleTransfers as deleteMultipleFromDB,
+} from "@/lib/services/transfer-service";
 
 /**
  * Subscribe to all transfers for the current user
@@ -84,49 +21,52 @@ export function useUserTransfersRealtime(initialLimit = 20) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const userIdRef = useRef<string | null>(null);
 
-  const fetchTransfers = useCallback(async (userId: string, targetPage = 0, append = false) => {
-    const offset = targetPage * initialLimit;
-    const { data } = await supabase
-      .from("transfers")
-      .select("*")
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + initialLimit - 1);
+  const fetchTransfers = useCallback(
+    async (userId: string, targetPage = 0, append = false) => {
+      const offset = targetPage * initialLimit;
+      const { data } = await supabase
+        .from("transfers")
+        .select("*")
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + initialLimit - 1);
 
-    if (data) {
-      if (data.length < initialLimit) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
+      if (data) {
+        if (data.length < initialLimit) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+
+        // Filter to only show final statuses (completed, failed, cancelled)
+        const finalTransfers = data.filter(
+          (t) => t.status === "complete" || t.status === "failed" || t.status === "cancelled"
+        );
+
+        // Deduplicate transfers
+        const seen = new Map<string, Transfer>();
+        for (const transfer of finalTransfers) {
+          seen.set(transfer.id, transfer);
+        }
+
+        const newTransfers = Array.from(seen.values());
+
+        if (append) {
+          setTransfers((prev) => {
+            const combined = new Map<string, Transfer>();
+            prev.forEach((t) => combined.set(t.id, t));
+            newTransfers.forEach((t) => combined.set(t.id, t));
+            return Array.from(combined.values()).sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          });
+        } else {
+          setTransfers(newTransfers);
+        }
       }
-
-      // Filter to only show final statuses (completed, failed, cancelled)
-      const finalTransfers = data.filter((t) =>
-        t.status === "complete" || t.status === "failed" || t.status === "cancelled"
-      );
-
-      // Deduplicate transfers
-      const seen = new Map<string, Transfer>();
-      for (const transfer of finalTransfers) {
-        seen.set(transfer.id, transfer);
-      }
-
-      const newTransfers = Array.from(seen.values());
-
-      if (append) {
-        setTransfers((prev) => {
-          const combined = new Map<string, Transfer>();
-          prev.forEach(t => combined.set(t.id, t));
-          newTransfers.forEach(t => combined.set(t.id, t));
-          return Array.from(combined.values()).sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-        });
-      } else {
-        setTransfers(newTransfers);
-      }
-    }
-  }, [initialLimit]);
+    },
+    [initialLimit]
+  );
 
   useEffect(() => {
     const instanceId = crypto.randomUUID();
@@ -203,8 +143,8 @@ export function useUserTransfersRealtime(initialLimit = 20) {
                 }
               } else if (isFinal) {
                 // If it wasn't there but is now final, add it at the top
-                return [updatedTransfer, ...prev].sort((a, b) =>
-                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                return [updatedTransfer, ...prev].sort(
+                  (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                 );
               }
               return prev;
@@ -219,9 +159,7 @@ export function useUserTransfersRealtime(initialLimit = 20) {
             table: "transfers",
           },
           (payload) => {
-            setTransfers((prev) =>
-              prev.filter((t) => t.id !== payload.old.id)
-            );
+            setTransfers((prev) => prev.filter((t) => t.id !== payload.old.id));
           }
         )
         .subscribe();
@@ -284,18 +222,13 @@ export function useUserTransfersRealtime(initialLimit = 20) {
     }
   }, [fetchTransfers, page, hasMore]);
 
-  return { transfers, loading, removeTransfer, removeMultipleTransfers, refresh, loadMore, hasMore };
-}
-
-/**
- * Subscribe to transfer status changes
- */
-export function useTransferStatus(transferId: string | null) {
-  const { transfer, loading } = useTransferRealtime(transferId);
-
   return {
-    status: transfer?.status,
-    completedAt: transfer?.completed_at,
+    transfers,
     loading,
+    removeTransfer,
+    removeMultipleTransfers,
+    refresh,
+    loadMore,
+    hasMore,
   };
 }

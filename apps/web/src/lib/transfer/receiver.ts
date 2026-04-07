@@ -28,7 +28,7 @@ export class FileReceiver {
   private connection: DataConnection | null = null;
   private status: TransferStatus = "idle";
   private progressCallback?: (progress: TransferProgress) => void;
-  private completeCallback?: (blob: Blob, filename: string) => void;
+  private completeCallback?: (blob: Blob | undefined, filename: string) => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private errorCallback?: (error: Error | string) => void;
@@ -374,8 +374,8 @@ export class FileReceiver {
       // Callback with completed file/blob
       if (this.completeCallback) {
         logger.debug("[RECEIVER] Calling completeCallback");
-        // For streaming, we pass undefined blob but the filename
-        this.completeCallback(finalBlob as Blob, this.filename);
+        // For streaming, finalBlob is undefined; for IDB assembly, it's the Blob
+        this.completeCallback(finalBlob, this.filename);
       } else {
         logger.warn("[RECEIVER] No completeCallback set!");
       }
@@ -405,7 +405,7 @@ export class FileReceiver {
   /**
    * Register completion callback
    */
-  onComplete(callback: (blob: Blob, filename: string) => void): void {
+  onComplete(callback: (blob: Blob | undefined, filename: string) => void): void {
     this.completeCallback = callback;
   }
 
@@ -472,7 +472,7 @@ export class FileReceiver {
     if (message.type === "transfer-complete") {
       logger.debug("[RECEIVER] Sender signaled transfer complete, assembling...");
       this.onLog?.("[SYS] Sender signaled transfer complete.");
-      this.assembleFile();
+      this.assembleFile().catch((err) => logger.error({ err }, "[RECEIVER] assembleFile failed"));
       return true;
     }
 
@@ -504,7 +504,8 @@ export class FileReceiver {
     try {
       this.connection.send(message);
       // Small buffer drain wait helper
-      const dc = (this.connection as any).dataChannel as RTCDataChannel;
+      const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
+      const dc = peerConn.dataChannel;
       if (dc && dc.bufferedAmount > 0) {
         await new Promise<void>((resolve) => {
           const check = () => {

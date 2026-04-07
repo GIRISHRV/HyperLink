@@ -8,13 +8,14 @@
 
 **Core Stack:**
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, React 18, Tailwind CSS
+- **Frontend**: Next.js 15 (App Router), TypeScript, React 19, Tailwind CSS
 - **P2P**: PeerJS (WebRTC), WebRTC Data Channels
 - **Storage**: IndexedDB (via `idb`)
 - **Auth & DB**: Supabase (PostgreSQL + Auth)
 - **Signaling**: Custom PeerServer (Node.js + Express)
-- **Monitoring**: Sentry
-- **Testing**: Vitest (unit), Playwright (E2E)
+- **Monitoring**: Sentry (optimized), Transfer Metrics, Structured Logging
+- **Rate Limiting**: Redis (Upstash) with in-memory fallback
+- **Testing**: Vitest (unit), Playwright (E2E), Storybook (components)
 
 **Monorepo Structure** (Turborepo):
 
@@ -22,7 +23,7 @@
 hyperlink/
 ├── apps/
 │   ├── web/              # Next.js frontend (Vercel)
-│   └── signaling/        # PeerServer backend (Railway)
+│   └── signaling/        # PeerServer backend (Render)
 ├── packages/
 │   ├── types/            # Shared TypeScript types
 │   ├── utils/            # Shared utilities (logger)
@@ -30,8 +31,28 @@ hyperlink/
 │   └── typescript-config/# Shared TS config
 ├── supabase/
 │   └── migrations/       # Database schema
-└── docs/                 # Documentation
+└── docs/                 # Documentation (including Master Guide)
 ```
+
+## 🚀 Recent Major Updates (March 2026)
+
+### **Production-Ready Rate Limiting**
+
+- **Location**: `apps/web/src/lib/middleware/rate-limit.ts`
+- **Technology**: Redis (Upstash) with graceful fallback
+- **Usage**: Distributed protection across serverless instances
+
+### **Transfer Performance Monitoring**
+
+- **Location**: `apps/web/src/lib/monitoring/transfer-metrics.ts`
+- **Features**: Speed analysis, connection quality, automatic recommendations
+- **Integration**: Built into FileSender/FileReceiver
+
+### **Structured Logging System**
+
+- **Replaced**: All `console.*` calls with `logger` from `@repo/utils`
+- **Format**: `logger.info({ context }, "message")`
+- **Benefits**: Better debugging, Sentry integration, production monitoring
 
 ## Critical Architecture Patterns
 
@@ -119,9 +140,10 @@ const chunks = await Promise.all(keys.map((k) => db.get("chunks", k)));
 
 **Tables:**
 
-- `profiles`: User profiles (linked to auth.users)
+- `user_profiles`: User profiles (linked to auth.users)
 - `transfers`: Transfer history metadata
-- `transfer_participants`: Many-to-many relationship
+- `incidents`: Status page incidents
+- `account_deletions`: GDPR compliance log
 
 **Auth Pattern:**
 
@@ -168,6 +190,56 @@ export function useSendTransfer(peerManagerRef: RefObject<PeerManager>) {
 ```
 
 ## Key Components
+
+### **New Production Features (March 2026)**
+
+#### **Rate Limiting System**
+
+```typescript
+// apps/web/src/lib/middleware/rate-limit.ts
+const rateLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: 30,
+  redis: redisClient, // Upstash Redis for distributed limiting
+});
+
+// Usage in API routes
+const { limited, headers } = await rateLimiter(request);
+if (limited) {
+  return NextResponse.json({ error: "Too Many Requests" }, { status: 429, headers });
+}
+```
+
+#### **Transfer Performance Monitoring**
+
+```typescript
+// apps/web/src/lib/monitoring/transfer-metrics.ts
+transferMetrics.startTransfer(transferId, fileSize);
+transferMetrics.updateProgress(transferId, bytesTransferred, chunkSize);
+transferMetrics.recordConnectionQuality(transferId, { rtt, bandwidth, connectionType });
+transferMetrics.completeTransfer(transferId, success);
+
+// Automatic analysis and recommendations
+{
+  performanceClass: 'excellent',  // excellent/good/fair/poor
+  speedMbps: '45.67',
+  connectionType: 'direct',       // direct/relay
+  recommendation: 'optimal_performance'
+}
+```
+
+#### **Structured Logging**
+
+```typescript
+// Replaced all console.* with structured logging
+import { logger } from "@repo/utils";
+
+// Before: console.error("Transfer failed:", error);
+// After:
+logger.error({ transferId, error, context }, "Transfer failed");
+logger.info({ transferId, fileSize, speed }, "Transfer completed");
+logger.warn({ peerId, rtt }, "High latency detected");
+```
 
 ### Frontend (`apps/web/src/`)
 

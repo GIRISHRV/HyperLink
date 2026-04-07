@@ -100,15 +100,12 @@ export default function ReceivePage() {
     }
   }, [transferState.status, showPasswordModal]);
 
-  // Expose myPeerId to window for Playwright E2E tests
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      (window as any).myPeerId = myPeerId;
-    }
-  }, [myPeerId]);
-
   return (
-    <div className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col">
+    <div
+      className="bg-transparent min-h-screen text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col"
+      data-testid="receive-page"
+      data-peer-id={myPeerId || ""}
+    >
       <AppHeader
         variant="transfer"
         isPeerReady={!!myPeerId}

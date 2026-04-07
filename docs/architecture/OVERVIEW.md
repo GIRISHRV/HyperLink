@@ -175,17 +175,9 @@ CREATE TABLE transfers (
   completed_at TIMESTAMPTZ,
   error_message TEXT
 );
-
--- Transfer participants (many-to-many)
-CREATE TABLE transfer_participants (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  transfer_id UUID REFERENCES transfers(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  role TEXT NOT NULL, -- 'sender' or 'receiver'
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(transfer_id, user_id, role)
-);
 ```
+
+**Note**: The actual schema uses a simpler design with `sender_id` and `receiver_id` columns directly on the `transfers` table, rather than a separate many-to-many `transfer_participants` table.
 
 **Row Level Security (RLS)**:
 
@@ -193,13 +185,7 @@ CREATE TABLE transfer_participants (
 -- Users can only see their own transfers
 CREATE POLICY "Users can view own transfers"
   ON transfers FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM transfer_participants
-      WHERE transfer_id = transfers.id
-      AND user_id = auth.uid()
-    )
-  );
+  USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 ```
 
 ### 4. Authentication (Supabase Auth)

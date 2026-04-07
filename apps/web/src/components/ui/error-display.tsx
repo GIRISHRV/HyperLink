@@ -8,7 +8,7 @@ interface ErrorDisplayProps {
   onDismiss?: () => void;
 }
 
-export default function ErrorDisplay({ error, onDismiss }: ErrorDisplayProps) {
+export default function ErrorDisplay({ error, onAction, onDismiss }: ErrorDisplayProps) {
   const severityColors = {
     error: {
       bg: "bg-bauhaus-red/10",
@@ -60,7 +60,17 @@ export default function ErrorDisplay({ error, onDismiss }: ErrorDisplayProps) {
 
           <p className="text-gray-300 font-bold text-sm mb-3">{error.message}</p>
 
-          <p className="text-xs text-white/50 font-mono">{error.suggestion}</p>
+          <p className="text-xs text-white/50 font-mono mb-3">{error.suggestion}</p>
+
+          {/* AUDIT FIX: Implement action button if action text and callback are provided */}
+          {error.action && onAction && (
+            <button
+              onClick={onAction}
+              className={`${colors.border} border px-4 py-2 ${colors.text} hover:bg-white/5 transition-colors text-sm font-bold uppercase tracking-wider`}
+            >
+              {error.action}
+            </button>
+          )}
         </div>
       </div>
     </div>

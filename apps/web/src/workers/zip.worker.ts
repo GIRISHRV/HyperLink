@@ -29,8 +29,10 @@ export interface ZipWorkerResponse {
   error?: string;
 }
 
+const ctx = self as any;
+
 // Handle messages from main thread
-self.onmessage = async (event: MessageEvent<ZipWorkerMessage>) => {
+ctx.onmessage = async (event: MessageEvent<ZipWorkerMessage>) => {
   const { id, type, payload } = event.data;
 
   try {
@@ -59,7 +61,7 @@ self.onmessage = async (event: MessageEvent<ZipWorkerMessage>) => {
         type: "progress",
         payload: { progress },
       };
-      self.postMessage(progressResponse);
+      ctx.postMessage(progressResponse);
     }
 
     // Perform ZIP compression
@@ -68,7 +70,7 @@ self.onmessage = async (event: MessageEvent<ZipWorkerMessage>) => {
       type: "progress",
       payload: { progress: 75 },
     };
-    self.postMessage(progressResponse);
+    ctx.postMessage(progressResponse);
 
     const zipped = zipSync(zipData, { level: 0 });
 
@@ -82,14 +84,18 @@ self.onmessage = async (event: MessageEvent<ZipWorkerMessage>) => {
       },
     };
     // Use transferable objects for performance
-    self.postMessage(response, [zipped.buffer]);
+    const transferables: Transferable[] = [];
+    if (zipped.buffer instanceof ArrayBuffer) {
+      transferables.push(zipped.buffer);
+    }
+    ctx.postMessage(response, transferables);
   } catch (error) {
     const response: ZipWorkerResponse = {
       id,
       type: "error",
       error: error instanceof Error ? error.message : String(error),
     };
-    self.postMessage(response);
+    ctx.postMessage(response);
   }
 };
 

@@ -14,23 +14,27 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 - **No Server Storage** - Files never touch our servers, only metadata
 - **Transfer History** - Track your transfers with metadata in Supabase
 - **PWA Ready** - Install as app with offline support
-- **Real-time Monitoring** - Sentry integration for error tracking
+- **Production-Ready Monitoring** - Comprehensive error tracking and performance analytics
+- **Distributed Rate Limiting** - Redis-backed protection against abuse
+- **Real-time Performance Insights** - Automatic speed analysis and optimization recommendations
 
 ## 🏗️ Tech Stack
 
 **Monorepo Structure** (Turborepo):
 
-- `apps/web` - Next.js 14 frontend (Vercel)
+- `apps/web` - Next.js 15 frontend (Vercel)
 - `apps/signaling` - Node.js PeerServer (Render)
 - `packages/*` - Shared configs and utilities
 
 **Technologies:**
 
-- **Frontend:** Next.js 14, TypeScript, React 18, Tailwind CSS
+- **Frontend:** Next.js 15, TypeScript, React 19, Tailwind CSS
 - **P2P:** PeerJS (WebRTC wrapper)
 - **Storage:** IndexedDB (via `idb`)
 - **Auth & DB:** Supabase (PostgreSQL + Auth)
-- **Monitoring:** Sentry
+- **Monitoring:** Sentry (optimized), Transfer Metrics, Structured Logging
+- **Rate Limiting:** Redis (Upstash) with in-memory fallback
+- **Testing:** Vitest (unit), Playwright (E2E), Storybook (components)
 
 ## 🚀 Quick Start
 
@@ -39,6 +43,7 @@ Transfer 10GB+ files directly between browsers without storing them on any serve
 - Node.js 20+ and npm 10+
 - Supabase account (free tier works)
 - Render account (optional, for signaling server)
+- Upstash Redis account (optional, for production rate limiting)
 
 ### Installation
 
@@ -81,7 +86,9 @@ hyperlink/
 │   ├── eslint-config/    # Shared ESLint config
 │   └── typescript-config/# Shared TypeScript config
 ├── supabase/
-│   └── migrations/       # Database schema
+│   ├── schema.sql          # Database schema
+│   ├── reset_database.sql  # Database reset script
+│   └── migrations/         # Future migrations
 ├── docs/                 # Documentation
 └── turbo.json            # Turborepo config
 ```
@@ -138,6 +145,7 @@ Complete documentation is available in the [`docs/`](./docs) directory.
 
 ### Quick Links
 
+- **[Master Guide](./docs/MASTER_GUIDE.md)** - 🎓 **Complete educational guide covering everything**
 - **[Documentation Hub](./docs/README.md)** - Start here for all documentation
 - **[AI Context](./docs/AI_CONTEXT.md)** - Comprehensive reference for AI assistants and developers
 
@@ -158,8 +166,8 @@ Complete documentation is available in the [`docs/`](./docs) directory.
 
 HyperLink is deployed across three services:
 
-- **Frontend**: Vercel (auto-deploy from `main`)
-- **Signaling Server**: Render (auto-deploy from `main`)
+- **Frontend**: Vercel (auto-deploy from `master` branch)
+- **Signaling Server**: Render (auto-deploy from `master` branch)
 - **Database**: Supabase (managed PostgreSQL)
 
 See [Deployment Guide](./docs/guides/DEPLOYMENT.md) for detailed instructions.
@@ -177,7 +185,7 @@ npm run test:e2e
 npm run test:coverage
 ```
 
-Current test coverage: 100% passing (770+ tests)
+Current test coverage: 100% passing (see CI badge above for latest count)
 
 ## 🤝 Contributing
 

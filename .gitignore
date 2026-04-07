@@ -16,6 +16,11 @@ playwright
 coverage
 storybook-static/
 
+# Service Worker (generated at build time)
+public/sw.js
+public/swe-worker.js
+public/workbox-*.js
+
 # Environment variables
 .env
 .env*.local
@@ -67,4 +72,6 @@ E2E_CI_CONFIGURATION.md
 *.png
 test-file-*.bin
 .auth
+.auth/
+**/e2e/.auth/
 *roadmap.md

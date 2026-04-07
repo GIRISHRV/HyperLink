@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { logger } from "@repo/utils";
 import AppHeader from "@/components/app-header";
 
 interface HealthData {
@@ -87,7 +88,7 @@ export default function StatusPage() {
           setIncidents(data.incidents || []);
         }
       } catch (err) {
-        console.error("Failed to fetch incidents:", err);
+        logger.error({ err }, "Failed to fetch incidents");
       }
     };
 

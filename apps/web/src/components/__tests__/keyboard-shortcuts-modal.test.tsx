@@ -69,9 +69,9 @@ describe("KeyboardShortcutsModal", () => {
     render(<KeyboardShortcutsModal isOpen={true} onClose={onClose} />);
 
     // Check for key labels
-    expect(screen.getByText("N")).toBeTruthy();
-    expect(screen.getByText("H")).toBeTruthy();
-    expect(screen.getByText("R")).toBeTruthy();
+    expect(screen.getByText("Shift+F1")).toBeTruthy();
+    expect(screen.getByText("Shift+F2")).toBeTruthy();
+    expect(screen.getByText("Shift+F3")).toBeTruthy();
     expect(screen.getByText("/")).toBeTruthy();
     expect(screen.getByText("Esc")).toBeTruthy();
   });

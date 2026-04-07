@@ -49,7 +49,18 @@ export default function PeerIdCard({ peerId, onCopy, onShowQR }: PeerIdCardProps
             data-testid="my-peer-id"
             className="font-mono text-2xl md:text-3xl text-white font-bold tracking-tight break-all border-l-4 border-primary pl-4 py-2"
           >
-            {peerId ? peerId : "Loading..."}
+            {peerId ? (
+              peerId
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="animate-pulse">Loading...</span>
+                <span className="inline-flex gap-1">
+                  <span className="size-1.5 bg-primary rounded-full animate-[bounce_1s_ease-in-out_0s_infinite]"></span>
+                  <span className="size-1.5 bg-primary rounded-full animate-[bounce_1s_ease-in-out_0.2s_infinite]"></span>
+                  <span className="size-1.5 bg-primary rounded-full animate-[bounce_1s_ease-in-out_0.4s_infinite]"></span>
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

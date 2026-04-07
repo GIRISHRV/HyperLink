@@ -15,7 +15,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "clean": "turbo clean && rm -rf node_modules",
-    "typecheck": "npx tsc --noEmit -p apps/web/tsconfig.json",
+    "typecheck": "tsc --noEmit -p apps/web/tsconfig.json",
     "test": "npm test --workspace=apps/web && npm test --workspace=apps/signaling && npm run test:e2e --workspace=apps/web",
     "test:e2e": "npm run test:e2e --workspace=apps/web",
     "test:e2e:chromium": "npm run test:e2e:chromium --workspace=apps/web",

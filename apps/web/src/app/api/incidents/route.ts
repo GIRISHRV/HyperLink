@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   // SEC-013: Rate limit before hitting the database
-  const { limited, headers, message } = incidentsLimiter(request);
+  const { limited, headers, message } = await incidentsLimiter(request);
   if (limited) {
     return NextResponse.json({ error: message }, { status: 429, headers });
   }

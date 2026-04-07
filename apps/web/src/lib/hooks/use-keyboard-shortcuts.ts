@@ -19,27 +19,27 @@ export function useKeyboardShortcuts(onShowHelp?: () => void) {
         return;
       }
 
-      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const isMac = navigator.userAgent.toUpperCase().indexOf("MAC") >= 0;
       const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
 
-      // Ctrl/Cmd + N - New transfer
-      if (ctrlOrCmd && e.key === "n") {
+      // Ctrl/Cmd + Shift + F1 - New transfer (F-keys avoid all browser conflicts)
+      if (ctrlOrCmd && e.shiftKey && e.key === "F1") {
         e.preventDefault();
         router.push("/send");
         return;
       }
 
-      // Ctrl/Cmd + H - History
-      if (ctrlOrCmd && e.key === "h") {
+      // Ctrl/Cmd + Shift + F2 - Receive files
+      if (ctrlOrCmd && e.shiftKey && e.key === "F2") {
         e.preventDefault();
-        router.push("/history");
+        router.push("/receive");
         return;
       }
 
-      // Ctrl/Cmd + R - Receive
-      if (ctrlOrCmd && e.key === "r") {
+      // Ctrl/Cmd + Shift + F3 - History
+      if (ctrlOrCmd && e.shiftKey && e.key === "F3") {
         e.preventDefault();
-        router.push("/receive");
+        router.push("/history");
         return;
       }
 
@@ -58,22 +58,22 @@ export function useKeyboardShortcuts(onShowHelp?: () => void) {
 
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
-    key: "N",
+    key: "Shift+F1",
     ctrlOrCmd: true,
     action: () => {},
     description: "New Transfer",
   },
   {
-    key: "H",
-    ctrlOrCmd: true,
-    action: () => {},
-    description: "View History",
-  },
-  {
-    key: "R",
+    key: "Shift+F2",
     ctrlOrCmd: true,
     action: () => {},
     description: "Receive Files",
+  },
+  {
+    key: "Shift+F3",
+    ctrlOrCmd: true,
+    action: () => {},
+    description: "View History",
   },
   {
     key: "/",

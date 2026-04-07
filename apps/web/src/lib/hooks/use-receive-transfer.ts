@@ -448,25 +448,27 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
         blob,
       });
 
-      // Pre-prepare share data
-      try {
-        const type = getMimeType(pendingOffer.filename);
-        const nameParts = pendingOffer.filename.split(".");
-        const extension = nameParts.length > 1 ? nameParts.pop() : "";
-        const baseName = nameParts.join(".").replace(/[^a-z0-9]/gi, "_");
-        const cleanName = extension ? `${baseName}.${extension}` : baseName;
+      // Pre-prepare share data (only for non-streaming transfers where blob is available)
+      if (blob) {
+        try {
+          const type = getMimeType(pendingOffer.filename);
+          const nameParts = pendingOffer.filename.split(".");
+          const extension = nameParts.length > 1 ? nameParts.pop() : "";
+          const baseName = nameParts.join(".").replace(/[^a-z0-9]/gi, "_");
+          const cleanName = extension ? `${baseName}.${extension}` : baseName;
 
-        const fileToShow = new File([blob], cleanName, {
-          type,
-          lastModified: Date.now(),
-        });
+          const fileToShow = new File([blob], cleanName, {
+            type,
+            lastModified: Date.now(),
+          });
 
-        setPreparedShareData({
-          files: [fileToShow],
-          title: cleanName,
-        });
-      } catch (e) {
-        logger.error({ e }, "Failed to pre-prepare share data:");
+          setPreparedShareData({
+            files: [fileToShow],
+            title: cleanName,
+          });
+        } catch (e) {
+          logger.error({ e }, "Failed to pre-prepare share data:");
+        }
       }
 
       dispatchTransfer({ type: "COMPLETE" });

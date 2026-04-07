@@ -14,6 +14,77 @@ import Link from "next/link";
 import AppHeader from "@/components/app-header";
 import { toast } from "sonner";
 import { logger } from "@repo/utils";
+import { supabase } from "@/lib/supabase/client";
+
+// Admin Section Component
+function AdminSection({ userId }: { userId: string }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const { data } = await supabase
+          .from("user_profiles")
+          .select("is_admin")
+          .eq("user_id", userId)
+          .single();
+        setIsAdmin(data?.is_admin || false);
+      } catch (error) {
+        logger.error({ error }, "Failed to check admin status");
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-purple-500 border-y border-r border-white/5 p-6 animate-pulse">
+        <div className="h-6 bg-white/10 rounded w-32 mb-4"></div>
+        <div className="h-16 bg-white/5 rounded"></div>
+      </section>
+    );
+  }
+
+  if (!isAdmin) {
+    return null; // Don't show admin section for non-admin users
+  }
+
+  return (
+    <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-purple-500 border-y border-r border-white/5 p-6">
+      <h2 className="text-xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
+        <span className="material-symbols-outlined text-purple-400 text-xl">security</span>
+        Administration
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Link
+          href="/admin"
+          className="bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 hover:border-purple-400 text-purple-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-sm">dashboard</span>
+          Admin Dashboard
+        </Link>
+        <Link
+          href="/admin/incidents"
+          className="bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/30 hover:border-orange-400 text-orange-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-sm">report_problem</span>
+          Manage Incidents
+        </Link>
+      </div>
+      <div className="mt-3 p-2 bg-purple-900/10 border border-purple-500/20 rounded-none">
+        <p className="text-xs text-purple-300 flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+          You have administrator privileges
+        </p>
+      </div>
+    </section>
+  );
+}
 
 const AVATAR_ICONS = [
   "person",
@@ -137,7 +208,11 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      logger.error({ error }, "Sign out failed");
+    }
     router.push("/auth");
   }
 
@@ -198,139 +273,119 @@ export default function SettingsPage() {
           <AppHeader variant="app" />
 
           {/* Main Content */}
-          <main className="relative z-10 flex-1 w-full max-w-7xl mx-auto p-6 md:p-8 lg:p-12">
-            {/* Page Header */}
-            <div className="mb-12">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-1 w-12 bg-bauhaus-red"></div>
+          <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto p-6 md:p-8">
+            {/* Compact Page Header */}
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-1 w-8 bg-bauhaus-red"></div>
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
                   Configuration
                 </span>
               </div>
-              <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter uppercase mb-4 text-white">
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-2 text-white">
                 Settings<span className="text-bauhaus-blue">.</span>
               </h1>
-              <p className="text-lg md:text-xl font-medium text-gray-400 max-w-2xl leading-relaxed">
+              <p className="text-gray-400 max-w-xl">
                 Customize your profile and manage your HyperLink account.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left Column: Preview */}
-              <div className="lg:col-span-4">
-                <div className="bg-surface/60 backdrop-blur-xl p-8 border-l-4 border-primary border-y border-r border-white/5 sticky top-24 shadow-2xl">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">
-                    Live Preview
-                  </h3>
-                  <div className="flex flex-col items-center gap-6">
-                    <div
-                      className={`size-32 ${selectedColor.value} rounded-full flex items-center justify-center border-4 border-white/10 shadow-lg`}
-                    >
-                      <span className={`material-symbols-outlined text-6xl ${selectedColor.text}`}>
-                        {selectedIcon}
+            {/* Single Column Layout - All Cards Stacked */}
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Preview Card */}
+              <div className="bg-surface/60 backdrop-blur-xl p-6 border-l-4 border-primary border-y border-r border-white/5">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">
+                  Live Preview
+                </h3>
+                <div className="flex items-center gap-8">
+                  <div
+                    className={`size-32 ${selectedColor.value} rounded-full flex items-center justify-center border-2 border-white/10 shrink-0`}
+                  >
+                    <span className={`material-symbols-outlined text-5xl ${selectedColor.text}`}>
+                      {selectedIcon}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-xl text-white">
+                      {displayName || user?.email?.split("@")[0] || "User"}
+                    </p>
+                    <p className="text-sm text-gray-400 font-mono mt-1">{user?.email}</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="bg-bauhaus-blue/20 p-3 text-center border border-bauhaus-blue/30">
+                      <span className="material-symbols-outlined text-bauhaus-blue text-xl">
+                        upload
                       </span>
                     </div>
-                    <div className="text-center">
-                      <p className="font-black text-2xl uppercase tracking-tight text-white">
-                        {displayName || user?.email?.split("@")[0] || "User"}
-                      </p>
-                      <p className="text-sm text-gray-400 mt-2 font-mono">{user?.email}</p>
+                    <div className="bg-bauhaus-red/20 p-3 text-center border border-bauhaus-red/30">
+                      <span className="material-symbols-outlined text-bauhaus-red text-xl">
+                        download
+                      </span>
                     </div>
-                    <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                    <div className="grid grid-cols-3 gap-3 w-full">
-                      <div className="bg-bauhaus-blue/20 p-3 text-center border border-bauhaus-blue/30">
-                        <span className="material-symbols-outlined text-bauhaus-blue text-2xl">
-                          upload
-                        </span>
-                      </div>
-                      <div className="bg-bauhaus-red/20 p-3 text-center border border-bauhaus-red/30">
-                        <span className="material-symbols-outlined text-bauhaus-red text-2xl">
-                          download
-                        </span>
-                      </div>
-                      <div className="bg-primary/20 p-3 text-center border border-primary/30">
-                        <span className="material-symbols-outlined text-primary text-2xl">
-                          link
-                        </span>
-                      </div>
+                    <div className="bg-primary/20 p-3 text-center border border-primary/30">
+                      <span className="material-symbols-outlined text-primary text-xl">link</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Settings Forms */}
-              <div className="lg:col-span-8 space-y-6">
-                {/* Profile Section */}
-                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-6 shadow-xl">
-                  <h2 className="text-2xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
-                    <span className="material-symbols-outlined text-bauhaus-blue text-2xl">
-                      person
-                    </span>
-                    Profile
-                  </h2>
+              {/* Profile & Appearance Card */}
+              <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-6">
+                <h2 className="text-xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
+                  <span className="material-symbols-outlined text-bauhaus-blue text-xl">
+                    person
+                  </span>
+                  Profile & Appearance
+                </h2>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Display Name */}
-                    <div>
-                      <label
-                        htmlFor="settings-display-name"
-                        className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold"
-                      >
-                        Display Name
-                      </label>
-                      <input
-                        id="settings-display-name"
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder={user?.email?.split("@")[0] || "Enter your name"}
-                        className="w-full bg-white/10 border border-white/20 focus:border-primary text-white px-4 py-2.5 focus:outline-none transition-colors text-sm"
-                      />
-                    </div>
-
-                    {/* Email (read-only) */}
-                    <div>
-                      <label
-                        htmlFor="settings-email"
-                        className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold"
-                      >
-                        Email Address
-                      </label>
-                      <input
-                        id="settings-email"
-                        type="email"
-                        value={user?.email || ""}
-                        disabled
-                        className="w-full bg-white/5 border border-white/10 text-gray-500 px-4 py-2.5 cursor-not-allowed text-sm"
-                      />
-                    </div>
+                {/* Profile Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                      Display Name
+                    </label>
+                    <input
+                      id="settings-display-name"
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder={user?.email?.split("@")[0] || "Enter your name"}
+                      className="w-full bg-white/10 border border-white/20 focus:border-primary text-white px-3 py-2 focus:outline-none transition-colors text-sm"
+                    />
                   </div>
-                </section>
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">
+                      Email Address
+                    </label>
+                    <input
+                      id="settings-email"
+                      type="email"
+                      value={user?.email || ""}
+                      disabled
+                      className="w-full bg-white/5 border border-white/10 text-gray-500 px-3 py-2 cursor-not-allowed text-sm"
+                    />
+                  </div>
+                </div>
 
-                {/* Appearance Section - Combined Avatar Icon & Color */}
-                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-primary border-y border-r border-white/5 p-6 shadow-xl">
-                  <h2 className="text-2xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
-                    <span className="material-symbols-outlined text-primary text-2xl">palette</span>
-                    Appearance
-                  </h2>
-
+                {/* Avatar Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Avatar Icon */}
-                  <div className="mb-6">
+                  <div>
                     <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-3 font-bold">
                       Avatar Icon
                     </h3>
-                    <div className="grid grid-cols-8 md:grid-cols-10 gap-2">
-                      {AVATAR_ICONS.map((icon) => (
+                    <div className="grid grid-cols-6 gap-2">
+                      {AVATAR_ICONS.slice(0, 12).map((icon) => (
                         <button
                           key={icon}
                           onClick={() => setSelectedIcon(icon)}
-                          className={`size-12 flex items-center justify-center border transition-all hover:scale-110 active:scale-95 text-white relative overflow-hidden ${
+                          className={`size-10 flex items-center justify-center border transition-all hover:scale-110 active:scale-95 text-white relative overflow-hidden ${
                             selectedIcon === icon
                               ? "border-primary bg-primary/20"
                               : "border-white/10 hover:border-white/30 bg-white/5"
                           }`}
                         >
-                          <span className="material-symbols-outlined text-2xl relative z-10">
+                          <span className="material-symbols-outlined text-lg relative z-10">
                             {icon}
                           </span>
                           <Ripple
@@ -350,19 +405,19 @@ export default function SettingsPage() {
                     <h3 className="text-xs uppercase tracking-widest text-gray-400 mb-3 font-bold">
                       Avatar Color
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 gap-2">
                       {AVATAR_COLORS.map((color) => (
                         <button
                           key={color.value}
                           onClick={() => setSelectedColor(color)}
-                          className={`flex items-center gap-2 p-3 border transition-all hover:scale-105 active:scale-[0.98] relative overflow-hidden ${
+                          className={`flex items-center gap-2 p-2 border transition-all hover:scale-105 active:scale-[0.98] relative overflow-hidden ${
                             selectedColor.value === color.value
                               ? "border-white bg-white/5"
                               : "border-white/10 hover:border-white/30"
                           }`}
                         >
                           <div
-                            className={`size-8 ${color.value} rounded-full border-2 border-white/20 shadow-lg relative z-10`}
+                            className={`size-6 ${color.value} rounded-full border border-white/20 relative z-10`}
                           ></div>
                           <span className="text-xs font-bold uppercase tracking-wide text-white relative z-10">
                             {color.name}
@@ -372,167 +427,154 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   </div>
-                </section>
+                </div>
+              </section>
 
-                {/* Preferences Section - Combined Notifications & Connectivity */}
-                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-blue border-y border-r border-white/5 p-6 shadow-xl">
-                  <h2 className="text-2xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
-                    <span className="material-symbols-outlined text-bauhaus-blue text-2xl">
-                      tune
-                    </span>
-                    Preferences
-                  </h2>
+              {/* Preferences Card */}
+              <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-primary border-y border-r border-white/5 p-6">
+                <h2 className="text-xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
+                  <span className="material-symbols-outlined text-primary text-xl">tune</span>
+                  Preferences
+                </h2>
 
-                  <div className="space-y-3">
-                    {/* Sound Effects */}
-                    <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-primary text-xl">
-                          volume_up
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-bold text-white uppercase tracking-tight">
-                            Sound Effects
-                          </h3>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Audio chimes on transfer events
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setSoundEnabled(!soundEnabled)}
-                        className={`relative inline-flex h-7 w-12 items-center transition-all focus:outline-none ${soundEnabled ? "bg-primary" : "bg-white/10"}`}
-                      >
-                        <span
-                          className={`inline-block size-5 transform bg-white transition-transform ${soundEnabled ? "translate-x-6" : "translate-x-1"}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Browser Notifications */}
-                    <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-bauhaus-blue text-xl">
-                          notifications
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-bold text-white uppercase tracking-tight">
-                            Browser Notifications
-                          </h3>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Desktop notifications for transfers
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setBrowserNotificationsEnabled(!browserNotificationsEnabled)}
-                        className={`relative inline-flex h-7 w-12 items-center transition-all focus:outline-none ${browserNotificationsEnabled ? "bg-primary" : "bg-white/10"}`}
-                      >
-                        <span
-                          className={`inline-block size-5 transform bg-white transition-transform ${browserNotificationsEnabled ? "translate-x-6" : "translate-x-1"}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Compatibility Mode */}
-                    <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10">
-                      <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-yellow-500 text-xl">
-                          router
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-bold text-white uppercase tracking-tight">
-                            Compatibility Mode
-                          </h3>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Force relay for strict firewalls
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setCompatibilityMode(!compatibilityMode)}
-                        className={`relative inline-flex h-7 w-12 items-center transition-all focus:outline-none ${compatibilityMode ? "bg-primary" : "bg-white/10"}`}
-                      >
-                        <span
-                          className={`inline-block size-5 transform bg-white transition-transform ${compatibilityMode ? "translate-x-6" : "translate-x-1"}`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Account Actions */}
-                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-red border-y border-r border-white/5 p-6 shadow-xl">
-                  <h2 className="text-2xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
-                    <span className="material-symbols-outlined text-bauhaus-red text-2xl">
-                      admin_panel_settings
-                    </span>
-                    Account
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Link
-                      href="/status"
-                      className="bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary text-white font-bold py-3 px-4 transition-all active:scale-[0.98] flex items-center justify-center gap-2 uppercase tracking-wider text-xs"
-                    >
-                      <span className="material-symbols-outlined text-lg">radar</span>
-                      Network Status
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="bg-red-900/30 hover:bg-red-900/50 border border-red-900/50 hover:border-red-500 text-red-400 font-bold py-3 px-4 transition-all active:scale-[0.98] flex items-center justify-center gap-2 uppercase tracking-wider text-xs relative overflow-hidden"
-                    >
-                      <span className="material-symbols-outlined text-lg relative z-10">
-                        logout
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sound Effects */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-lg">
+                        volume_up
                       </span>
-                      <span className="relative z-10">Sign Out</span>
-                      <Ripple color="rgba(239, 68, 68, 0.3)" />
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Sound Effects</h3>
+                        <p className="text-xs text-gray-400">Audio chimes</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center transition-all focus:outline-none ${soundEnabled ? "bg-primary" : "bg-white/10"}`}
+                    >
+                      <span
+                        className={`inline-block size-4 transform bg-white transition-transform ${soundEnabled ? "translate-x-6" : "translate-x-1"}`}
+                      />
                     </button>
                   </div>
-                </section>
 
-                {/* GDPR: Account Deletion */}
-                <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-red-700 border-y border-r border-white/5 p-6 shadow-xl">
-                  <h2 className="text-2xl font-black uppercase mb-1 tracking-tight flex items-center gap-2 text-white">
-                    <span className="material-symbols-outlined text-red-500 text-2xl">
-                      delete_forever
-                    </span>
-                    Danger Zone
-                  </h2>
-                  <p className="text-sm text-gray-400 mb-4">
-                    Permanently delete your account and all data. This action{" "}
-                    <strong className="text-white">cannot be undone</strong>.{" "}
-                    <Link
-                      href="/privacy"
-                      className="text-primary underline hover:text-yellow-300 transition-colors"
+                  {/* Browser Notifications */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-bauhaus-blue text-lg">
+                        notifications
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Notifications</h3>
+                        <p className="text-xs text-gray-400">Desktop alerts</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setBrowserNotificationsEnabled(!browserNotificationsEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center transition-all focus:outline-none ${browserNotificationsEnabled ? "bg-primary" : "bg-white/10"}`}
                     >
-                      Privacy Policy
-                    </Link>
-                  </p>
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="bg-red-950/50 hover:bg-red-900/60 border border-red-800 hover:border-red-500 text-red-400 font-bold py-3 px-6 transition-all active:scale-[0.98] flex items-center gap-2 uppercase tracking-wider text-xs relative overflow-hidden"
-                  >
-                    <span className="material-symbols-outlined text-lg relative z-10">
-                      delete_forever
-                    </span>
-                    <span className="relative z-10">Delete My Account</span>
-                  </button>
-                </section>
+                      <span
+                        className={`inline-block size-4 transform bg-white transition-transform ${browserNotificationsEnabled ? "translate-x-6" : "translate-x-1"}`}
+                      />
+                    </button>
+                  </div>
 
-                {/* Save Button */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="bg-primary hover:bg-yellow-400 text-black font-bold py-3 px-10 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-sm shadow-lg relative overflow-hidden"
+                  {/* Compatibility Mode */}
+                  <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 md:col-span-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-yellow-500 text-lg">
+                        router
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Compatibility Mode</h3>
+                        <p className="text-xs text-gray-400">Force relay for strict firewalls</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setCompatibilityMode(!compatibilityMode)}
+                      className={`relative inline-flex h-6 w-11 items-center transition-all focus:outline-none ${compatibilityMode ? "bg-primary" : "bg-white/10"}`}
+                    >
+                      <span
+                        className={`inline-block size-4 transform bg-white transition-transform ${compatibilityMode ? "translate-x-6" : "translate-x-1"}`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Account Actions Card */}
+              <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-bauhaus-red border-y border-r border-white/5 p-6">
+                <h2 className="text-xl font-black uppercase mb-4 tracking-tight flex items-center gap-2 text-white">
+                  <span className="material-symbols-outlined text-bauhaus-red text-xl">
+                    admin_panel_settings
+                  </span>
+                  Account
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Link
+                    href="/status"
+                    className="bg-white/5 hover:bg-white/10 border border-white/20 hover:border-primary text-white font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider text-center flex items-center justify-center gap-2"
                   >
-                    <span className="material-symbols-outlined text-lg relative z-10">save</span>
-                    <span className="relative z-10">
-                      {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
-                    </span>
-                    <Ripple color="rgba(0,0,0,0.2)" />
+                    <span className="material-symbols-outlined text-sm">radar</span>
+                    Network Status
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="bg-red-900/30 hover:bg-red-900/50 border border-red-900/50 hover:border-red-500 text-red-400 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2 relative overflow-hidden"
+                  >
+                    <span className="material-symbols-outlined text-sm relative z-10">logout</span>
+                    <span className="relative z-10">Sign Out</span>
+                    <Ripple color="rgba(239, 68, 68, 0.3)" />
                   </button>
                 </div>
+              </section>
+
+              {/* Admin Section - Only show for admin users */}
+              {user && <AdminSection userId={user.id} />}
+
+              {/* Danger Zone Card */}
+              <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-red-700 border-y border-r border-white/5 p-6">
+                <h2 className="text-xl font-black uppercase mb-2 tracking-tight flex items-center gap-2 text-white">
+                  <span className="material-symbols-outlined text-red-500 text-xl">
+                    delete_forever
+                  </span>
+                  Danger Zone
+                </h2>
+                <p className="text-sm text-gray-400 mb-4">
+                  Permanently delete your account and all data. This action{" "}
+                  <strong className="text-white">cannot be undone</strong>.{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-primary underline hover:text-yellow-300 transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                </p>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-950/50 hover:bg-red-900/60 border border-red-800 hover:border-red-500 text-red-400 font-bold py-2 px-4 transition-all text-xs uppercase tracking-wider flex items-center gap-2 relative overflow-hidden"
+                >
+                  <span className="material-symbols-outlined text-sm relative z-10">
+                    delete_forever
+                  </span>
+                  <span className="relative z-10">Delete My Account</span>
+                </button>
+              </section>
+
+              {/* Save Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-primary hover:bg-yellow-400 text-black font-bold py-3 px-8 uppercase tracking-wider transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 text-sm relative overflow-hidden"
+                >
+                  <span className="material-symbols-outlined text-lg relative z-10">save</span>
+                  <span className="relative z-10">
+                    {saving ? "Saving..." : saved ? "Saved!" : "Save Changes"}
+                  </span>
+                  <Ripple color="rgba(0,0,0,0.2)" />
+                </button>
               </div>
             </div>
           </main>

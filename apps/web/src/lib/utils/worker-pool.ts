@@ -5,6 +5,8 @@
  * Provides a promise-based API for worker communication.
  */
 
+import { logger } from "@repo/utils";
+
 type WorkerMessage = {
   id: string;
   type: string;
@@ -51,7 +53,7 @@ export class WorkerPool {
     const pending = this.pendingRequests.get(id);
 
     if (!pending) {
-      console.warn(`[WorkerPool] Received message for unknown request: ${id}`);
+      logger.warn({ id }, "[WorkerPool] Received message for unknown request");
       return;
     }
 
@@ -73,7 +75,7 @@ export class WorkerPool {
         break;
 
       default:
-        console.warn(`[WorkerPool] Unknown response type: ${type}`);
+        logger.warn({ type }, "[WorkerPool] Unknown response type");
     }
   }
 
@@ -81,7 +83,7 @@ export class WorkerPool {
    * Handle worker errors
    */
   private handleError(error: ErrorEvent) {
-    console.error("[WorkerPool] Worker error:", error);
+    logger.error({ error }, "[WorkerPool] Worker error");
 
     // Reject all pending requests
     for (const [id, pending] of this.pendingRequests.entries()) {

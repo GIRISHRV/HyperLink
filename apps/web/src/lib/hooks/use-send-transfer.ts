@@ -4,10 +4,7 @@ import { FileSender } from "@/lib/transfer/sender";
 import type { DataConnection } from "peerjs";
 import { getIceServers, getPeerConfigAsync } from "@/lib/config/webrtc";
 import { validatePeerMessage } from "@/lib/utils/peer-message-validator";
-import {
-  createTransfer,
-  updateTransferStatus,
-} from "@/lib/services/transfer-service";
+import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
@@ -75,11 +72,17 @@ export function useSendTransfer({
     onResetRef.current = onReset;
   }, [onReset]);
 
-  const { request: requestWakeLock, release: releaseWakeLock, isLocked: isWakeLockActive } = useWakeLock();
+  const {
+    request: requestWakeLock,
+    release: releaseWakeLock,
+    isLocked: isWakeLockActive,
+  } = useWakeLock();
   const { vibrate } = useHaptics();
 
-  const { showBackModal, confirmBackNavigation, cancelBackNavigation } =
-    useTransferGuard(transferId, isTransferActive);
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(
+    transferId,
+    isTransferActive
+  );
 
   const addLog = useCallback((message: string) => {
     onLogRef.current?.(message);
@@ -89,20 +92,14 @@ export function useSendTransfer({
   useEffect(() => {
     requestNotificationPermission();
     if (!isSecureContext() && window.location.hostname !== "localhost") {
-      setError(
-        "Insecure Context: WebRTC is likely blocked. Please use HTTPS."
-      );
+      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
     }
   }, []);
 
   // Title updates, notifications, wake lock
   useEffect(() => {
-    if (
-      transferState.status === "transferring" &&
-      transferState.totalBytes > 0
-    ) {
-      const percentage =
-        (transferState.bytesTransferred / transferState.totalBytes) * 100;
+    if (transferState.status === "transferring" && transferState.totalBytes > 0) {
+      const percentage = (transferState.bytesTransferred / transferState.totalBytes) * 100;
       document.title = `${percentage.toFixed(0)}% - Sending...`;
     } else if (transferState.status === "complete") {
       document.title = "File Sent - HyperLink";
@@ -154,13 +151,16 @@ export function useSendTransfer({
       // Task #4: Listen for firewall blocked events
       peerManagerRef.current.on("firewall-blocked", () => {
         toast.error("Firewall Blocked", {
-          description: "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
+          description:
+            "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
           duration: 10000,
         });
       });
 
       // Task #3: Fetch Supabase JWT for signaling authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const token = session?.access_token;
 
       // Task #9: Generate a stable, user-linked Peer ID
@@ -282,7 +282,10 @@ export function useSendTransfer({
           }
 
           addLog("Sending file offer...");
-          logger.debug({ filename: file.name, fileSize: file.size }, "[useSendTransfer] Sending file offer");
+          logger.debug(
+            { filename: file.name, fileSize: file.size },
+            "[useSendTransfer] Sending file offer"
+          );
           await sender.sendOffer();
           dispatchTransfer({ type: "AWAIT_ACCEPTANCE" });
 
@@ -346,7 +349,7 @@ export function useSendTransfer({
 
       conn.on("data", (data: unknown) => {
         try {
-          // Task: Fix Chat Reception - This listener handles chat messages 
+          // Task: Fix Chat Reception - This listener handles chat messages
           // and other non-transfer control messages.
           onDataRef.current?.(data);
 
@@ -368,7 +371,9 @@ export function useSendTransfer({
       });
 
       conn.on("close", () => {
-        if (transferState.status !== "complete") {
+        // Use ref to avoid stale closure - check current status from FileSender
+        const currentStatus = fileSenderRef.current?.getStatus();
+        if (currentStatus !== "complete") {
           setError("Connection closed");
           addLog("✗ Connection closed");
           resetSend();
@@ -391,7 +396,7 @@ export function useSendTransfer({
     dispatchTransfer,
     resetSend,
     vibrate,
-    transferState.status,
+    // transferState.status removed - we now use fileSenderRef.current?.getStatus() to avoid stale closure
   ]);
 
   return {

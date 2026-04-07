@@ -68,23 +68,15 @@ export default function TransferProgressPanel({
           </div>
           <div>
             <p className="text-muted text-xs font-bold uppercase tracking-widest">
-              {isUplink
-                ? "Secure Uplink Established"
-                : "Incoming Data Stream"}
+              {isUplink ? "Secure Uplink Established" : "Incoming Data Stream"}
             </p>
             <p className="text-white font-bold font-mono text-sm tracking-tight">
               ID: {peerId.slice(0, 8)}...{peerId.slice(-4)}
             </p>
           </div>
         </div>
-        <span
-          className={`material-symbols-outlined text-primary ${!isPaused && "animate-pulse"}`}
-        >
-          {isPaused
-            ? "pause_circle"
-            : isUplink
-              ? "lock"
-              : "downloading"}
+        <span className={`material-symbols-outlined text-primary ${!isPaused && "animate-pulse"}`}>
+          {isPaused ? "pause_circle" : isUplink ? "lock" : "downloading"}
         </span>
       </div>
 
@@ -94,8 +86,12 @@ export default function TransferProgressPanel({
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-amber-500 animate-pulse">coffee</span>
             <div>
-              <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest">System Stay-Awake Active</p>
-              <p className="text-white/60 text-[10px] font-mono">Screen will remain on until transfer completes</p>
+              <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest">
+                System Stay-Awake Active
+              </p>
+              <p className="text-white/60 text-[10px] font-mono">
+                Screen will remain on until transfer completes
+              </p>
             </div>
           </div>
           <div className="px-2 py-0.5 bg-amber-500 text-black text-[10px] font-black uppercase tracking-tighter rounded-sm">
@@ -116,7 +112,12 @@ export default function TransferProgressPanel({
             <p className="text-muted text-xs font-mono mt-1 truncate max-w-xs">{fileName}</p>
           </div>
           <div className="text-right">
-            <span data-testid="progress" className="text-primary font-mono text-2xl font-bold block">
+            <span
+              data-testid="progress"
+              className="text-primary font-mono text-2xl font-bold block"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               {percentage.toFixed(0)}%
             </span>
             <span className="text-white/30 text-xs uppercase tracking-wider">
@@ -128,10 +129,16 @@ export default function TransferProgressPanel({
         {/* Dynamic Chunking Indicator (Task #8) */}
         {turbo && (
           <div className="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 w-fit rounded-full -mt-2 animate-in fade-in slide-in-from-top-1">
-            <span className={`material-symbols-outlined text-sm ${turbo.color} animate-pulse`}>rocket_launch</span>
-            <span className={`text-[10px] font-black uppercase tracking-tighter ${turbo.color}`}>{turbo.label}</span>
+            <span className={`material-symbols-outlined text-sm ${turbo.color} animate-pulse`}>
+              rocket_launch
+            </span>
+            <span className={`text-[10px] font-black uppercase tracking-tighter ${turbo.color}`}>
+              {turbo.label}
+            </span>
             <div className="w-[1px] h-3 bg-white/10 mx-1" />
-            <span className="text-[10px] text-white/40 font-mono">{formatFileSize(chunkSize || 0)}/chunk</span>
+            <span className="text-[10px] text-white/40 font-mono">
+              {formatFileSize(chunkSize || 0)}/chunk
+            </span>
           </div>
         )}
 
@@ -148,17 +155,16 @@ export default function TransferProgressPanel({
           <button
             onClick={onPauseResume}
             disabled={isPaused && pausedBy === "remote"}
-            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${isPaused && pausedBy === "remote"
-              ? "bg-surface text-muted border-subtle-bauhaus cursor-not-allowed"
-              : isPaused
-                ? "bg-primary text-black border-primary hover:bg-white"
-                : "bg-transparent text-white border-white/20 hover:border-white hover:bg-white/5"
-              }`}
+            className={`h-12 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] border ${
+              isPaused && pausedBy === "remote"
+                ? "bg-surface text-muted border-subtle-bauhaus cursor-not-allowed"
+                : isPaused
+                  ? "bg-primary text-black border-primary hover:bg-white"
+                  : "bg-transparent text-white border-white/20 hover:border-white hover:bg-white/5"
+            }`}
           >
             {isPaused && pausedBy === "remote" ? (
-              <span className="material-symbols-outlined !text-[18px]">
-                pause_circle
-              </span>
+              <span className="material-symbols-outlined !text-[18px]">pause_circle</span>
             ) : (
               <span className="material-symbols-outlined !text-[18px]">
                 {isPaused ? "play_arrow" : "pause"}
@@ -178,9 +184,7 @@ export default function TransferProgressPanel({
             onClick={onCancel}
             className="h-12 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
-            <span className="material-symbols-outlined !text-[18px]">
-              block
-            </span>
+            <span className="material-symbols-outlined !text-[18px]">block</span>
             Abort
           </button>
         </div>
@@ -200,19 +204,27 @@ export default function TransferProgressPanel({
           {showDetails && (
             <div className="mt-3 grid grid-cols-2 gap-4 p-4 bg-black/40 border border-white/5 rounded-sm animate-in fade-in slide-in-from-top-2">
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Pipe Capacity</p>
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                  Pipe Capacity
+                </p>
                 <p className="text-xs font-mono text-primary">{formatFileSize(chunkSize || 0)}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Congestion Window</p>
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                  Congestion Window
+                </p>
                 <p className="text-xs font-mono text-blue-400">{windowSize || 0} chunks</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Protocol</p>
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                  Protocol
+                </p>
                 <p className="text-xs font-mono text-white/60">WebRTC/SCTP</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Encapsulation</p>
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                  Encapsulation
+                </p>
                 <p className="text-xs font-mono text-white/60">AES-GCM-256</p>
               </div>
             </div>

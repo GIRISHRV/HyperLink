@@ -11,12 +11,78 @@ import type { StatusConfigKey } from "@repo/utils";
 import AppHeader from "@/components/app-header";
 import Link from "next/link";
 
+// Admin Quick Access Component
+function AdminQuickAccess({ userId }: { userId: string }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const { supabase } = await import("@/lib/supabase/client");
+        const { data } = await supabase
+          .from("user_profiles")
+          .select("is_admin")
+          .eq("user_id", userId)
+          .single();
+        setIsAdmin(data?.is_admin || false);
+      } catch {
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-purple-500 relative overflow-hidden animate-pulse">
+        <div className="h-20 bg-white/5 rounded"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null; // Don't show for non-admin users
+  }
+
+  return (
+    <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-purple-500 relative overflow-hidden">
+      <div className="relative z-10">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Administration
+          </h3>
+          <span className="material-symbols-outlined text-purple-400">security</span>
+        </div>
+        <div className="space-y-3">
+          <Link
+            href="/admin"
+            className="block w-full bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 hover:border-purple-400 text-purple-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider text-center"
+          >
+            Admin Dashboard
+          </Link>
+          <Link
+            href="/admin/incidents"
+            className="block w-full bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/30 hover:border-orange-400 text-orange-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider text-center"
+          >
+            Manage Incidents
+          </Link>
+        </div>
+      </div>
+      <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-purple-500/5 rounded-full blur-xl"></div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { transfers, loading: transfersLoading, removeTransfer } = useUserTransfersRealtime();
 
-  const { loading } = useRequireAuth();
+  const { user, loading } = useRequireAuth();
 
   // Timer that pauses when tab is hidden to save CPU
   useEffect(() => {
@@ -251,6 +317,9 @@ export default function DashboardPage() {
               </div>
               <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-bauhaus-blue/5 rounded-full blur-xl"></div>
             </div>
+
+            {/* Admin Panel - Only show for admin users */}
+            {user && <AdminQuickAccess userId={user.id} />}
           </div>
 
           {/* BOTTOM SECTION (Recent Activity) - Spans 12 cols */}

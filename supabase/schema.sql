@@ -134,11 +134,22 @@ DO $$ BEGIN
     CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE
       USING (auth.uid() = user_id);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_profiles' AND policyname='Users can view active_peer_id of others') THEN
-    CREATE POLICY "Users can view active_peer_id of others" ON public.user_profiles FOR SELECT
-      USING (auth.role() = 'authenticated');
-  END IF;
+  -- AUDIT FIX: Removed over-permissive "Users can view active_peer_id of others" policy
+  -- that granted SELECT on ALL columns (including is_admin, display_name, etc.) to ALL authenticated users.
+  -- Replaced with a restricted view below that only exposes user_id and active_peer_id.
 END $$;
+
+-- Create a restricted view for peer discovery that only exposes necessary fields
+-- This prevents authenticated users from seeing sensitive profile data like is_admin, display_name, etc.
+CREATE OR REPLACE VIEW public.peer_discovery AS
+SELECT 
+  user_id,
+  active_peer_id
+FROM public.user_profiles
+WHERE active_peer_id IS NOT NULL;
+
+-- Grant SELECT on the view to authenticated users
+GRANT SELECT ON public.peer_discovery TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.update_user_profile_updated_at()
 RETURNS TRIGGER AS $$
@@ -156,8 +167,10 @@ CREATE TRIGGER update_user_profile_updated_at
 CREATE OR REPLACE FUNCTION public.create_default_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
+  -- AUDIT FIX: Use generic default instead of email prefix to avoid PII leakage
+  -- Combined with the removed over-permissive SELECT policy, this prevents email enumeration
   INSERT INTO public.user_profiles (user_id, display_name, avatar_icon, avatar_color)
-  VALUES (NEW.id, split_part(NEW.email, '@', 1), 'person', 'bg-primary');
+  VALUES (NEW.id, 'User', 'person', 'bg-primary');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -344,6 +357,12 @@ CREATE POLICY "Only admins can view deletion log"
       AND is_admin = TRUE
     )
   );
+
+-- AUDIT FIX: Restrict INSERT to only allow users to log their own account deletion
+DROP POLICY IF EXISTS "Users can log own account deletion" ON public.account_deletions;
+CREATE POLICY "Users can log own account deletion"
+  ON public.account_deletions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
 
 REVOKE ALL ON public.account_deletions FROM PUBLIC;
 GRANT INSERT ON public.account_deletions TO authenticated;

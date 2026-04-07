@@ -17,7 +17,7 @@ export const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(",").map((s) =
   "https://hyperlink.vercel.app",
 ];
 
-export const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || "";
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || "";
 
 // SEC-011: fail-closed in production if JWT secret is missing.
 if (!SUPABASE_JWT_SECRET && process.env.NODE_ENV === "production") {
@@ -66,7 +66,14 @@ export function createApp(connectedPeers: () => number) {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true); // mobile / Postman
+        // Reject null origin in production (file:// and sandboxed iframes)
+        // Allow in development for tools like Postman
+        if (!origin) {
+          if (process.env.NODE_ENV === "production") {
+            return callback(new Error("Null origin not allowed"));
+          }
+          return callback(null, true);
+        }
         if (ALLOWED_ORIGINS.includes(origin)) {
           callback(null, true);
         } else {
@@ -82,13 +89,17 @@ export function createApp(connectedPeers: () => number) {
   // ── Routes ──────────────────────────────────────────────────────────────────
 
   app.get("/health", healthLimiter, (_req, res) => {
-    res.json({
+    const healthData = {
       status: "healthy",
       service: "HyperLink Signaling Server",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
       peers: connectedPeers(),
-    });
+    };
+
+    logger.debug(healthData, "health_check");
+
+    res.json(healthData);
   });
 
   app.get("/", (_req, res) => {

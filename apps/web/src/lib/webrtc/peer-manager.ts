@@ -140,6 +140,8 @@ export class PeerManager {
           this.connectionState = "failed";
           this.emit("state-change", "failed");
           this.emit("error", error);
+          // AUDIT FIX: Reset initializationPromise on error so re-initialization is possible
+          this.initializationPromise = null;
           reject(error);
         });
 
@@ -162,6 +164,8 @@ export class PeerManager {
           this.emit("state-change", "closed");
         });
       } catch (error) {
+        // AUDIT FIX: Reset initializationPromise on error so re-initialization is possible
+        this.initializationPromise = null;
         reject(error);
       }
     });

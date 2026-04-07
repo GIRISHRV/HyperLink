@@ -6,7 +6,7 @@ import { updateTransferStatus } from "@/lib/services/transfer-service";
 
 /**
  * Guard against accidental navigation/reload during an active transfer.
- * 
+ *
  * - Shows browser-native "beforeunload" confirmation dialog on tab close / reload
  * - Shows a custom modal for browser back/forward via `showBackModal` state
  * - Marks the transfer as "failed" in the DB on unmount (navigation / tab close)
@@ -40,7 +40,7 @@ export function useTransferGuard(
     if (!isActiveRef.current || !transferIdRef.current) return;
     cleanedUpRef.current = true;
     // Fire-and-forget: page may unload before completion
-    updateTransferStatus(transferIdRef.current, "failed").catch(() => { });
+    updateTransferStatus(transferIdRef.current, "failed").catch(() => {});
   }, []);
 
   // Browser beforeunload — warns on tab close / reload (browser-native, can't customize)

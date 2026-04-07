@@ -1,25 +1,24 @@
 /**
- * SEC-013: Simple edge-compatible in-memory rate limiter for Next.js API routes.
- *
- * Uses a sliding-window counter keyed by IP address. Designed for low-traffic
- * endpoints; for high-scale use Upstash Redis or Vercel Edge rate limiting.
- *
- * ⚠️  D1 KNOWN LIMITATION: On Vercel serverless (and other FaaS platforms),
- * each Lambda invocation gets its own fresh Map, so this limiter resets on
- * every cold start. It provides burst protection within a single function
- * instance but offers no protection against distributed attacks across
- * multiple instances.
- *
- * TODO (D1): Upgrade to a Redis-backed solution for production-scale
- * protection. Recommended options:
- *   - Upstash Redis (@upstash/ratelimit) — edge-compatible, pay-per-use
- *   - Vercel Edge Middleware rate limiting — built-in, no extra infra
- *
- * Usage:
- *   const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
- *   const { limited, headers } = limiter(request);
- *   if (limited) return NextResponse.json({ error: "Too Many Requests" }, { status: 429, headers });
+ * Production-ready rate limiter with Redis backend for distributed protection.
+ * Falls back to in-memory for development/edge cases.
  */
+
+import { logger } from "@repo/utils";
+
+// Optional Redis import - only available if installed
+let Redis: any = null;
+let redisImportPromise: Promise<void> | null = null;
+
+// Lazy load Redis using dynamic import for ESM consistency
+if (typeof window === "undefined") {
+  redisImportPromise = import("@upstash/redis")
+    .then((module) => {
+      Redis = module.Redis;
+    })
+    .catch(() => {
+      // Redis not available, will use in-memory fallback
+    });
+}
 
 interface RateLimiterOptions {
   /** Time window in milliseconds */
@@ -42,37 +41,79 @@ interface WindowEntry {
   resetAt: number;
 }
 
+// Initialize Redis client if credentials are available
+let redis: any = null;
+let redisInitPromise: Promise<void> | null = null;
+
+// Lazy initialize Redis after import completes
+if (
+  redisImportPromise &&
+  process.env.UPSTASH_REDIS_REST_URL &&
+  process.env.UPSTASH_REDIS_REST_TOKEN
+) {
+  redisInitPromise = redisImportPromise.then(() => {
+    if (Redis) {
+      redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+    }
+  });
+}
+
 /**
- * Create a rate limiter function.
- * Each limiter has its own isolated counter store — endpoints don't share state.
+ * Create a rate limiter function with Redis backend for production.
+ * Falls back to in-memory for development.
  */
-export function createRateLimiter(options: RateLimiterOptions) {
+function createRateLimiter(options: RateLimiterOptions) {
   const { windowMs, max, message = "Too many requests, please slow down." } = options;
 
-  // In-memory store: Map<ip → WindowEntry>
-  // On serverless/Edge, each cold start gets a fresh map — acceptable for burst protection.
-  const store = new Map<string, WindowEntry>();
+  // Fallback in-memory store for development
+  const memoryStore = new Map<string, WindowEntry>();
 
-  return function rateLimit(request: Request): RateLimitResult & { message: string } {
-    // Extract client IP — Next.js passes it via x-forwarded-for on Vercel
+  return async function rateLimit(
+    request: Request
+  ): Promise<RateLimitResult & { message: string }> {
+    // Ensure Redis is initialized if it's going to be used
+    if (redisInitPromise) {
+      await redisInitPromise;
+    }
+
+    // Extract client IP
     const forwarded = (request as { headers: Headers }).headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
 
     const now = Date.now();
-    const entry = store.get(ip);
+    const windowStart = Math.floor(now / windowMs) * windowMs;
+    const key = `ratelimit:${ip}:${windowStart}`;
 
     let count: number;
-    let resetAt: number;
+    let resetAt = windowStart + windowMs;
 
-    if (!entry || now >= entry.resetAt) {
-      // New window
+    try {
+      if (redis) {
+        // Redis-backed rate limiting for production
+        const pipeline = redis.pipeline();
+        pipeline.incr(key);
+        pipeline.expire(key, Math.ceil(windowMs / 1000));
+        const results = await pipeline.exec();
+        count = results[0] as number;
+      } else {
+        // Fallback to in-memory for development
+        const entry = memoryStore.get(key);
+
+        if (!entry || now >= entry.resetAt) {
+          count = 1;
+          memoryStore.set(key, { count, resetAt });
+        } else {
+          count = entry.count + 1;
+          memoryStore.set(key, { count, resetAt });
+        }
+      }
+    } catch (error) {
+      // If Redis fails, allow the request (fail open for availability)
+      logger.warn({ error, ip }, "Rate limiter Redis error, allowing request");
       count = 1;
-      resetAt = now + windowMs;
-      store.set(ip, { count, resetAt });
-    } else {
-      count = entry.count + 1;
-      resetAt = entry.resetAt;
-      store.set(ip, { count, resetAt });
     }
 
     const remaining = Math.max(0, max - count);
