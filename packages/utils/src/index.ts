@@ -12,10 +12,23 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * Generate unique transfer ID
+ * Generate a cryptographically-secure UUID v4 transfer ID.
+ * Always returns a string matching the UUID v4 regex expected by peer-message-validator.
  */
 export function generateTransferId(): string {
-  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Polyfill for environments without crypto.randomUUID (e.g. older browsers).
+  // Uses crypto.getRandomValues — never Math.random() which is not cryptographically secure.
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 1 (RFC 4122)
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /**
@@ -107,5 +120,5 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
   };
 }
 
-export * from './logger';
-export * from './constants';
+export * from "./logger";
+export * from "./constants";

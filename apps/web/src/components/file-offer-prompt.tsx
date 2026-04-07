@@ -26,7 +26,14 @@ export default function FileOfferPrompt({
   const extension = filename.split(".").pop()?.toUpperCase() || "FILE";
 
   return (
-    <div ref={modalRef} onKeyDown={handleKeyDown} role="dialog" aria-modal="true" aria-label="Incoming File" className="fixed inset-0 z-[100] flex items-center justify-center">
+    <div
+      ref={modalRef}
+      onKeyDown={handleKeyDown}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Incoming File"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
@@ -40,25 +47,17 @@ export default function FileOfferPrompt({
           {/* File icon */}
           <div className="relative">
             <div className="w-20 h-20 bg-primary/20 rounded-2xl flex items-center justify-center border border-primary/30">
-              <span className="material-symbols-outlined text-4xl text-primary">
-                description
-              </span>
+              <span className="material-symbols-outlined text-4xl text-primary">description</span>
             </div>
             {/* Incoming badge */}
             <div className="absolute -top-2 -right-2 w-7 h-7 bg-bauhaus-blue rounded-full flex items-center justify-center border-2 border-surface">
-              <span className="material-symbols-outlined text-white text-sm">
-                arrow_downward
-              </span>
+              <span className="material-symbols-outlined text-white text-sm">arrow_downward</span>
             </div>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-xl font-bold text-white">
-              Incoming File
-            </h3>
-            <p className="text-gray-400 text-sm">
-              Someone wants to send you a file
-            </p>
+            <h3 className="text-xl font-bold text-white">Incoming File</h3>
+            <p className="text-gray-400 text-sm">Someone wants to send you a file</p>
           </div>
 
           {/* File details */}
@@ -75,7 +74,9 @@ export default function FileOfferPrompt({
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-white/5">
               <span className="text-xs text-gray-500 uppercase tracking-wider">Size</span>
-              <span className="text-sm font-mono text-primary font-bold">{formatFileSize(fileSize)}</span>
+              <span className="text-sm font-mono text-primary font-bold">
+                {formatFileSize(fileSize)}
+              </span>
             </div>
           </div>
 

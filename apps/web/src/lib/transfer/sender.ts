@@ -1,13 +1,21 @@
 import type { DataConnection } from "peerjs";
 import type { PeerMessage, FileOfferPayload, ChunkPayload, TransferProgress } from "@repo/types";
-import { generateTransferId, calculateChunkCount, logger } from "@repo/utils";
-import { generateSalt, deriveKey, encryptChunk, arrayBufferToBase64 } from "@/lib/utils/crypto";
+import { generateTransferId, logger } from "@repo/utils";
+import { generateSalt, arrayBufferToBase64 } from "@/lib/utils/crypto";
+import { encryptionWorkerClient } from "@/lib/utils/encryption-worker-client";
 import { validatePeerMessage } from "@/lib/utils/peer-message-validator";
+import { transferMetrics } from "@/lib/monitoring/transfer-metrics";
 import type { TransferStatus } from "@/lib/hooks/use-transfer-state";
 
-const CHUNK_SIZE = 64 * 1024; // 64KB chunks for higher throughput
-const WINDOW_SIZE = 16; // reduced window size to prevent buffer overflow with larger chunks
-const MAX_BUFFERED_AMOUNT = 1 * 1024 * 1024; // 1MB backpressure limit
+const MIN_CHUNK_SIZE = 64 * 1024; // 64KB minimum
+const MAX_CHUNK_SIZE = 1024 * 1024; // 1MB maximum (higher can cause WebRTC buffer issues)
+const INITIAL_WINDOW_SIZE = 16;
+const MAX_BUFFERED_AMOUNT = 1 * 1024 * 1024; // 1MB total backpressure limit
+const BUFFER_LOW_WATERMARK = 256 * 1024; // 256KB for scaling up
+const BUFFER_HIGH_WATERMARK = 768 * 1024; // 768KB for scaling down
+const RTT_THRESHOLD_FAST = 80; // Scale up if RTT < 80ms
+const RTT_THRESHOLD_SLOW = 250; // Scale down if RTT > 250ms
+const CONSECUTIVE_FAST_ACKS = 8; // Threshold to scale up chunk size
 
 export class FileSender {
   private file: File;
@@ -16,27 +24,51 @@ export class FileSender {
   private totalChunks: number;
   private currentChunk: number = 0;
   private activeChunks: number = 0; // Number of un-acked chunks in flight
+  private chunkSize: number = MIN_CHUNK_SIZE;
+  private windowSize: number = INITIAL_WINDOW_SIZE;
   private status: TransferStatus = "idle";
   private bytesSent: number = 0;
+  private bytesProcessed: number = 0; // Cumulative file bytes read/sent
   private startTime: number = 0;
+  private chunkRanges: Map<number, { start: number; end: number; startTime: number }> = new Map();
+  private fastAckCount: number = 0;
   private dbTransferId?: string;
   private progressCallback?: (progress: TransferProgress) => void;
   private rejectTransfer?: (error: Error) => void;
   private cancelCallback?: () => void;
   private pauseCallback?: (paused: boolean) => void;
   private rejectCallback?: () => void;
+  private acceptedCallback?: () => void;
+  private lastAckTimestamp: number = 0;
+  private probeTimer: NodeJS.Timeout | null = null;
+  private probeCount: number = 0;
+  private readonly PROBE_INTERVAL = 3000;
+  private readonly MAX_PROBES = 5;
 
   // Encryption state
   private salt?: Uint8Array;
   private cryptoKey?: CryptoKey;
+  private onLog?: (msg: string) => void;
 
   constructor(file: File, connection: DataConnection, dbTransferId?: string) {
     this.file = file;
     this.connection = connection;
     this.transferId = generateTransferId();
-    this.totalChunks = calculateChunkCount(file.size, CHUNK_SIZE);
+    // totalChunks is now an estimate since size is dynamic
+    this.totalChunks = Math.ceil(file.size / MIN_CHUNK_SIZE);
     this.dbTransferId = dbTransferId;
-    logger.info({ transferId: this.transferId, dbTransferId }, "[SENDER] Initialized FileSender");
+    logger.debug(
+      { transferId: this.transferId, dbTransferId, fileSize: file.size },
+      "[SENDER] Initialized FileSender with Dynamic Chunking"
+    );
+  }
+
+  /**
+   * Set log subscriber
+   */
+  setOnLog(callback: (msg: string) => void): void {
+    this.onLog = callback;
+    this.onLog(`[FS] Reading file metadata: ${this.file.name} (${this.file.size} bytes)`);
   }
 
   /**
@@ -45,13 +77,22 @@ export class FileSender {
   async setPassword(password: string): Promise<void> {
     if (!password) return;
     try {
+      this.onLog?.("[SEC] Encryption enabled: Generating cryptographic salt...");
       this.salt = generateSalt();
-      this.cryptoKey = await deriveKey(password, this.salt);
+      logger.debug({ saltLength: this.salt.length }, "[SENDER] Generated salt");
+      this.onLog?.("[SEC] Deriving AES-GCM 256-bit key from passphrase...");
+      const result = await encryptionWorkerClient.deriveKey(password, this.salt);
+      this.cryptoKey = result.key;
+      // Update salt from worker result to ensure consistency
+      this.salt = result.salt;
+      logger.debug({ resultSaltLength: this.salt.length }, "[SENDER] Received salt from worker");
       // FINDING-018: Do NOT store `password` on `this` — the non-extractable
       // CryptoKey is sufficient. Plaintext password goes out of scope here.
-      logger.info("[SENDER] 🔐 Encryption enabled and key derived");
+      logger.debug("[SENDER] 🔐 Encryption enabled and key derived");
+      this.onLog?.("[SEC] 🔐 Key derived successfully.");
     } catch (e) {
       logger.error({ e }, "[SENDER] Failed to setup encryption");
+      this.onLog?.("[ERR] [SEC] Encryption setup failed");
       throw new Error("Encryption setup failed");
     }
   }
@@ -60,6 +101,19 @@ export class FileSender {
    * Send file offer to receiver with defensive check
    */
   async sendOffer(): Promise<string> {
+    const saltBase64 = this.salt ? arrayBufferToBase64(this.salt) : undefined;
+    logger.debug(
+      {
+        isEncrypted: !!this.cryptoKey,
+        hasSalt: !!this.salt,
+        saltLength: this.salt?.length,
+        saltBase64Length: saltBase64?.length,
+        saltFirst4Bytes: this.salt ? Array.from(this.salt.slice(0, 4)) : undefined,
+        saltBase64: saltBase64,
+      },
+      "[SENDER] Preparing file offer"
+    );
+
     const offerMessage: PeerMessage<FileOfferPayload> = {
       type: "file-offer",
       transferId: this.transferId,
@@ -70,14 +124,17 @@ export class FileSender {
         totalChunks: this.totalChunks,
         dbTransferId: this.dbTransferId,
         isEncrypted: !!this.cryptoKey,
-        salt: this.salt ? arrayBufferToBase64(this.salt) : undefined,
+        salt: saltBase64,
       },
       timestamp: Date.now(),
     };
 
-    logger.info({ offerMessage }, "[SENDER] 📤 Sending FILE-OFFER to receiver");
+    logger.debug({ offerMessage }, "[SENDER] 📤 Sending FILE-OFFER to receiver");
+    this.onLog?.(
+      `[SDP] 📤 Sending FILE-OFFER to receiver (Encrypted: ${this.cryptoKey ? "Yes" : "No"})`
+    );
     await this.safeSend(offerMessage);
-    logger.info("[SENDER] ✅ FILE-OFFER sent successfully");
+    logger.debug("[SENDER] ✅ FILE-OFFER sent successfully");
     return this.transferId;
   }
 
@@ -94,10 +151,14 @@ export class FileSender {
     this.progressCallback = onProgress;
     this.startTime = Date.now();
 
+    // Start metrics collection
+    transferMetrics.startTransfer(this.transferId, this.file.size);
+
     return new Promise((resolve, reject) => {
       this.rejectTransfer = reject;
 
-      logger.info("[SENDER] Setting up Turbo Mode (Sliding Window)...");
+      logger.debug("[SENDER] Setting up Turbo Mode (Sliding Window)...");
+      this.onLog?.("[SYS] Setting up Turbo Mode (Sliding Window)...");
 
       // Listen for connection events to detect failure during transfer
       const onClose = () => {
@@ -113,10 +174,13 @@ export class FileSender {
       };
 
       const cleanup = () => {
+        this.stopHeartbeat();
         this.connection.off("close", onClose);
         this.connection.off("error", onError);
         if (this.status === "transferring" || this.status === "paused") {
           this.status = "failed";
+          // AUDIT FIX: Clear chunkRanges Map on failure to prevent memory leak
+          this.chunkRanges.clear();
         }
       };
 
@@ -128,7 +192,7 @@ export class FileSender {
       // Sanity check
       if (this.totalChunks <= 0) {
         cleanup();
-        this.sendComplete().catch(err => logger.error({ err }, "[SENDER] sendComplete failed"));
+        this.sendComplete().catch((err) => logger.error({ err }, "[SENDER] sendComplete failed"));
         resolve();
         return;
       }
@@ -145,8 +209,13 @@ export class FileSender {
 
         // Wait for file-accept before sending first chunk
         if (message.type === "file-accept" && !transferStarted) {
-          logger.info("[SENDER] Received file-accept, pumping chunks...");
+          logger.debug("[SENDER] Received file-accept, pumping chunks...");
+          this.onLog?.("[SYS] Received file-accept, pumping chunks...");
+          this.onLog?.(`[NET] Starting transfer pump (Total chunks: ~${this.totalChunks})`);
           transferStarted = true;
+          this.acceptedCallback?.();
+          this.lastAckTimestamp = Date.now();
+          this.startHeartbeat();
           this.pump();
           return;
         }
@@ -155,7 +224,10 @@ export class FileSender {
         if (message.type === "resume-from" && transferStarted) {
           const startChunk = (message.payload as { startChunk: number })?.startChunk;
           if (typeof startChunk === "number" && startChunk > 0 && startChunk < this.totalChunks) {
-            logger.info({ startChunk, previousChunk: this.currentChunk }, "[SENDER] Resuming from chunk (receiver has prior data)");
+            logger.debug(
+              { startChunk, previousChunk: this.currentChunk },
+              "[SENDER] Resuming from chunk (receiver has prior data)"
+            );
             this.currentChunk = startChunk;
             this.pump();
           }
@@ -164,54 +236,77 @@ export class FileSender {
 
         if (message.type === "chunk-ack") {
           // Receiver confirmed chunk, slide window
+          const { chunkIndex } = message.payload as { chunkIndex: number };
+
+          // Performance measurement & scaling
+          const range = this.chunkRanges.get(chunkIndex);
+          if (!range) {
+            // Duplicate or already-processed ACK, ignore to prevent activeChunks underflow
+            return;
+          }
+
           this.activeChunks = Math.max(0, this.activeChunks - 1);
+          this.lastAckTimestamp = Date.now();
+          this.probeCount = 0;
+
+          const startTime = range.startTime;
+          if (startTime) {
+            const rtt = Date.now() - startTime;
+            this.handleAdaptiveScaling(rtt);
+          }
+          this.chunkRanges.delete(chunkIndex);
 
           if (this.status === "cancelled") return;
           if (this.status === "paused") return;
 
-          // If we finished sending everything and all ACKs are back
-          if (this.currentChunk >= this.totalChunks && this.activeChunks <= 0) {
+          // Completion check: All file bytes processed AND all active chunks acked
+          if (this.bytesProcessed >= this.file.size && this.activeChunks <= 0) {
             cleanup();
-            this.sendComplete().catch(err => {
-              logger.error({ err }, "[SENDER] Final complete failed");
-            }).finally(() => {
-              resolve();
-            });
+            transferMetrics.completeTransfer(this.transferId, true);
+            this.sendComplete()
+              .catch((err) => {
+                logger.error({ err }, "[SENDER] Final complete failed");
+              })
+              .finally(() => {
+                resolve();
+              });
             return;
           }
 
           // Pump more chunks if window allows
           this.pump();
-
         } else if (message.type === "file-reject") {
           if (this.status === "cancelled" || this.status === "complete") return;
-          logger.info("[SENDER] Receiver rejected the file offer");
+          logger.debug("[SENDER] Receiver rejected the file offer");
           this.status = "cancelled";
           this.rejectCallback?.();
           cleanup();
           reject(new Error("File offer rejected by receiver"));
         } else if (message.type === "transfer-cancel") {
           if (this.status === "cancelled" || this.status === "complete") return;
-          logger.info("[SENDER] Receiver cancelled transfer");
+          logger.debug("[SENDER] Receiver cancelled transfer");
+          this.onLog?.("[SYS] Receiver cancelled transfer.");
           this.status = "cancelled";
           this.cancelCallback?.();
           cleanup();
           reject(new Error("Transfer cancelled by receiver"));
         } else if (message.type === "transfer-pause") {
           if (this.status === "cancelled" || this.status === "complete") return;
-          logger.info("[SENDER] Receiver requested pause");
+          logger.debug("[SENDER] Receiver requested pause");
+          this.onLog?.("[SYS] Receiver requested pause.");
           this.status = "paused";
           this.pauseCallback?.(true);
         } else if (message.type === "transfer-resume") {
           if (this.status === "cancelled" || this.status === "complete") return;
-          logger.info("[SENDER] Receiver requested resume");
+          logger.debug("[SENDER] Receiver requested resume");
+          this.onLog?.("[SYS] Receiver requested resume. Pumping...");
           this.status = "transferring";
           this.pauseCallback?.(false);
           this.pump();
         }
       });
 
-      logger.info("[SENDER] Waiting for receiver to accept...");
+      logger.debug("[SENDER] Waiting for receiver to accept...");
     });
   }
 
@@ -222,16 +317,28 @@ export class FileSender {
     if (this.status === "cancelled" || this.status === "paused") return;
 
     // While we have chunks left AND window has space
-    while (this.currentChunk < this.totalChunks && this.activeChunks < WINDOW_SIZE) {
+    while (this.bytesProcessed < this.file.size && this.activeChunks < this.windowSize) {
       // Check backpressure — stop pushing if the WebRTC DataChannel buffer is saturated.
       // PeerJS exposes dataChannel on DataConnection at runtime; we cast to access it.
       const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
       const bufferedAmount = peerConn.dataChannel?.bufferedAmount ?? 0;
 
       if (bufferedAmount > MAX_BUFFERED_AMOUNT) {
-        // Wait for buffer to drain (simple retry via timeout or just wait for next ACK)
-        // Since we get ACKs, the pump will be called again soon.
-        // We can break here and let the next ACK trigger another pump.
+        // Apply immediate backpressure and scale down window
+        this.onLog?.(
+          `[WARN] [NET] Buffer saturated (${(bufferedAmount / 1024).toFixed(0)}KB). Applying backpressure...`
+        );
+        if (this.windowSize > 4) {
+          this.windowSize = Math.max(4, Math.floor(this.windowSize / 2));
+        }
+        break;
+      }
+
+      // Proactive throttling: slow down if nearing high watermark
+      if (bufferedAmount > BUFFER_HIGH_WATERMARK) {
+        if (this.windowSize > 4) {
+          this.windowSize = Math.max(4, this.windowSize - 1);
+        }
         break;
       }
 
@@ -247,11 +354,13 @@ export class FileSender {
 
     // Capture current index before incrementing
     const chunkIndex = this.currentChunk;
+    const start = this.bytesProcessed;
+    const end = Math.min(start + this.chunkSize, this.file.size);
+
     this.currentChunk++;
     this.activeChunks++;
-
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, this.file.size);
+    this.bytesProcessed = end;
+    this.chunkRanges.set(chunkIndex, { start, end, startTime: Date.now() });
 
     let arrayBuffer: ArrayBuffer;
     try {
@@ -260,43 +369,68 @@ export class FileSender {
       arrayBuffer = await this.file.slice(start, end).arrayBuffer();
     } catch (e) {
       logger.error({ e, chunkIndex }, "[SENDER] File read error");
-      this.sendError("File read error").catch(err => logger.error({ err }, "[SENDER] sendError failed"));
+      this.onLog?.(`[ERR] [FS] File read error at chunk ${chunkIndex}.`);
+      this.sendError("File read error").catch((err) =>
+        logger.error({ err }, "[SENDER] sendError failed")
+      );
       this.rejectTransfer?.(new Error("File read error"));
       return;
     }
 
-    if (this.status as string === "cancelled") return;
+    if ((this.status as string) === "cancelled") return;
+
+    // AUDIT FIX: Check data channel state after async read to avoid TOCTOU gap
+    const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
+    if (peerConn.dataChannel?.readyState !== "open") {
+      logger.warn(
+        { chunkIndex, readyState: peerConn.dataChannel?.readyState },
+        "[SENDER] Data channel closed during chunk read"
+      );
+      this.onLog?.(`[WARN] [NET] Data channel closed during chunk ${chunkIndex} read`);
+      this.sendError("Connection closed").catch((err) =>
+        logger.error({ err }, "[SENDER] sendError failed")
+      );
+      this.rejectTransfer?.(new Error("Connection closed during transfer"));
+      return;
+    }
 
     // Encrypt if key is present
     if (this.cryptoKey) {
       try {
-        arrayBuffer = await encryptChunk(arrayBuffer, this.cryptoKey);
+        arrayBuffer = await encryptionWorkerClient.encrypt(arrayBuffer, this.cryptoKey);
       } catch (e) {
         logger.error({ e }, "[SENDER] Encryption failed for chunk " + chunkIndex);
+        this.onLog?.(`[ERR] [SEC] Encryption failed for chunk ${chunkIndex}.`);
         this.sendError("Encryption failed");
         this.rejectTransfer?.(new Error("Encryption failed"));
         return;
       }
     }
 
-    this.sendChunk(arrayBuffer, chunkIndex);
+    this.sendChunk(arrayBuffer, chunkIndex, start);
+
+    // Update metrics
+    transferMetrics.updateProgress(this.transferId, this.bytesSent, arrayBuffer.byteLength);
   }
 
   /**
    * Send binary chunk over DataChannel
    */
-  private sendChunk(data: ArrayBuffer, chunkIndex: number): void {
+  private sendChunk(data: ArrayBuffer, chunkIndex: number, offset: number): void {
     const chunkMessage: PeerMessage<ChunkPayload> = {
       type: "chunk",
       transferId: this.transferId,
       payload: {
         chunkIndex: chunkIndex,
         data,
+        offset,
+        chunkSize: this.chunkSize,
+        windowSize: this.windowSize,
       },
       timestamp: Date.now(),
     };
 
-    this.safeSend(chunkMessage).catch(err => {
+    this.safeSend(chunkMessage).catch((err) => {
       logger.error({ err }, "[SENDER] Failed to send chunk");
       this.sendError("Chunk transmission failed");
       this.rejectTransfer?.(new Error("Chunk transmission failed"));
@@ -325,6 +459,8 @@ export class FileSender {
         percentage,
         speed,
         timeRemaining,
+        chunkSize: this.chunkSize,
+        windowSize: this.windowSize,
       });
     }
   }
@@ -342,7 +478,7 @@ export class FileSender {
 
     await this.safeSend(completeMessage);
     this.status = "complete";
-    logger.info("[SENDER] Transfer complete!");
+    logger.debug("[SENDER] Transfer complete!");
   }
 
   /**
@@ -369,7 +505,10 @@ export class FileSender {
     if (!this.connection.open) {
       logger.warn("[SENDER] Connection not open. Waiting for ready state...");
       await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Timeout waiting for connection to open")), 5000);
+        const timeout = setTimeout(
+          () => reject(new Error("Timeout waiting for connection to open")),
+          5000
+        );
 
         const onOpen = () => {
           clearTimeout(timeout);
@@ -398,11 +537,14 @@ export class FileSender {
       // If it's a "not open" error despite the check, wait a tick and retry once
       const errMsg = err instanceof Error ? err.message : String(err);
       if (errMsg.includes("not open")) {
-        logger.info("[SENDER] Retrying send after tick...");
-        await new Promise(r => setTimeout(r, 100));
+        logger.debug("[SENDER] Retrying send after tick...");
+        await new Promise((r) => setTimeout(r, 100));
 
-        if (this.status as string === "cancelled") return;
-        const retryConn = this.connection as unknown as { _disconnected: boolean; _closed: boolean };
+        if ((this.status as string) === "cancelled") return;
+        const retryConn = this.connection as unknown as {
+          _disconnected: boolean;
+          _closed: boolean;
+        };
         if (retryConn._disconnected || retryConn._closed) {
           logger.warn("[SENDER] Connection permanently closed, abandoning retry.");
           return;
@@ -427,6 +569,10 @@ export class FileSender {
     if (this.status === "cancelled" || this.status === "complete") return;
     // Stop the pump loop immediately so no more chunks are sent
     this.status = "paused";
+
+    // Record cancellation in metrics
+    transferMetrics.completeTransfer(this.transferId, false);
+
     // Send the cancel message BEFORE setting status to cancelled,
     // because safeSend() short-circuits if status is already "cancelled".
     const cancelMessage: PeerMessage = {
@@ -440,6 +586,10 @@ export class FileSender {
     } catch (e) {
       logger.warn({ e }, "[SENDER] Failed to send cancel message");
     }
+
+    // AUDIT FIX: Clear chunkRanges Map to prevent memory leak
+    this.chunkRanges.clear();
+
     this.status = "cancelled";
     this.cancelCallback?.();
     this.rejectTransfer?.(new Error("Transfer cancelled by sender"));
@@ -451,6 +601,7 @@ export class FileSender {
   async pause(): Promise<void> {
     if (this.status === "paused" || this.status === "cancelled") return;
     this.status = "paused";
+    transferMetrics.recordPause(this.transferId);
     const pauseMessage: PeerMessage = {
       type: "transfer-pause",
       transferId: this.transferId,
@@ -458,7 +609,7 @@ export class FileSender {
       timestamp: Date.now(),
     };
     await this.safeSend(pauseMessage);
-    logger.info("[SENDER] Transfer paused");
+    logger.debug("[SENDER] Transfer paused");
   }
 
   /**
@@ -467,6 +618,7 @@ export class FileSender {
   async resume(): Promise<void> {
     if (this.status !== "paused") return;
     this.status = "transferring";
+    transferMetrics.recordResume(this.transferId);
     const resumeMessage: PeerMessage = {
       type: "transfer-resume",
       transferId: this.transferId,
@@ -474,7 +626,7 @@ export class FileSender {
       timestamp: Date.now(),
     };
     await this.safeSend(resumeMessage);
-    logger.info("[SENDER] Transfer resumed, pumping...");
+    logger.debug("[SENDER] Transfer resumed, pumping...");
     this.pump();
   }
 
@@ -507,6 +659,13 @@ export class FileSender {
   }
 
   /**
+   * Register acceptance callback (receiver accepted the offer)
+   */
+  onAccepted(callback: () => void): void {
+    this.acceptedCallback = callback;
+  }
+
+  /**
    * Get current chunk index (for resumption info)
    */
   getCurrentChunk(): number {
@@ -525,5 +684,153 @@ export class FileSender {
    */
   getTransferId(): string {
     return this.transferId;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.probeTimer = setInterval(() => {
+      if (this.status !== "transferring" || this.activeChunks === 0) return;
+
+      const now = Date.now();
+      if (now - this.lastAckTimestamp > this.PROBE_INTERVAL) {
+        this.sendProbe();
+      }
+    }, 1000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.probeTimer) {
+      clearInterval(this.probeTimer);
+      this.probeTimer = null;
+    }
+  }
+
+  private async sendProbe(): Promise<void> {
+    if (this.probeCount >= this.MAX_PROBES) {
+      logger.error(
+        { transferId: this.transferId, probes: this.probeCount },
+        "[SENDER] Transfer stalled. Max probes reached."
+      );
+      this.onLog?.("[ERR] [NET] Transfer stalled. Max probes (5) reached.");
+      this.sendError("Transfer stalled (connection lost)").catch(() => {});
+      this.rejectTransfer?.(new Error("Transfer stalled"));
+      this.cancel();
+      return;
+    }
+
+    this.probeCount++;
+    // Re-send the oldest un-acked chunk as a probe
+    // Since chunkRanges tracks in-flight chunks, the first key is the oldest
+    const probeIndex = this.chunkRanges.keys().next().value;
+    if (probeIndex === undefined) return;
+
+    // Scaling down on probe (potential lost packet/congestion)
+    if (this.chunkSize > MIN_CHUNK_SIZE) {
+      this.chunkSize = Math.max(MIN_CHUNK_SIZE, this.chunkSize / 2);
+      this.windowSize = INITIAL_WINDOW_SIZE; // Reset window to be safe
+      logger.warn(
+        { newChunkSize: this.chunkSize },
+        "[SENDER] Scaling down chunk size due to probe (latency/congestion)"
+      );
+      this.onLog?.("[WARN] [NET] Scaling down chunk size due to probe (latency/congestion).");
+    }
+
+    // Probes now use the EXACT byte ranges stored when the chunk was first sent.
+    // This handles variable chunk sizes perfectly.
+    const range = this.chunkRanges.get(probeIndex);
+    if (!range) {
+      logger.warn({ probeIndex }, "[SENDER] Probe range not found, skipping");
+      return;
+    }
+
+    const { start, end } = range;
+
+    try {
+      let arrayBuffer = await this.file.slice(start, end).arrayBuffer();
+      if (this.cryptoKey) {
+        arrayBuffer = await encryptionWorkerClient.encrypt(arrayBuffer, this.cryptoKey);
+      }
+
+      const probeMessage: PeerMessage<ChunkPayload> = {
+        type: "chunk-probe",
+        transferId: this.transferId,
+        payload: {
+          chunkIndex: probeIndex,
+          data: arrayBuffer,
+          offset: start,
+          chunkSize: this.chunkSize,
+          windowSize: this.windowSize,
+        },
+        timestamp: Date.now(),
+      };
+
+      logger.warn(
+        {
+          transferId: this.transferId,
+          probeIndex,
+          start,
+          end,
+          probeCount: this.probeCount,
+          activeChunks: this.activeChunks,
+        },
+        "[SENDER] Sending chunk-probe (ACK delayed)"
+      );
+      this.onLog?.(
+        `[WARN] [NET] ACK delayed. Sending chunk-probe for index ${probeIndex} (Bytes: ${start}-${end})...`
+      );
+
+      await this.safeSend(probeMessage);
+    } catch (err) {
+      logger.error({ err, probeIndex }, "[SENDER] Probe failed");
+    }
+  }
+
+  /**
+   * Adaptive Scaling Logic
+   */
+  private handleAdaptiveScaling(rtt: number): void {
+    if (rtt < RTT_THRESHOLD_FAST) {
+      this.fastAckCount++;
+      // Proactive check: only scale up if buffer is healthy (low watermark)
+      const peerConn = this.connection as unknown as { dataChannel?: RTCDataChannel };
+      const bufferedAmount = peerConn.dataChannel?.bufferedAmount ?? 0;
+
+      if (
+        this.fastAckCount >= CONSECUTIVE_FAST_ACKS &&
+        this.chunkSize < MAX_CHUNK_SIZE &&
+        bufferedAmount < BUFFER_LOW_WATERMARK
+      ) {
+        this.chunkSize = Math.min(MAX_CHUNK_SIZE, this.chunkSize * 2);
+        // Larger chunks benefit from smaller windows to reduce SCTP head-of-line blocking
+        this.windowSize = Math.max(
+          4,
+          Math.floor(INITIAL_WINDOW_SIZE / (this.chunkSize / MIN_CHUNK_SIZE))
+        );
+        this.fastAckCount = 0;
+        logger.debug(
+          { rtt, bufferedAmount, newChunkSize: this.chunkSize, newWindowSize: this.windowSize },
+          "[SENDER] 🚀 Scaling up chunk size (High Bandwidth detected)"
+        );
+        this.onLog?.(
+          `[NET] 🚀 High Bandwidth detected (RTT: ${rtt}ms). Scaling up: ${this.chunkSize / 1024}KB, Window: ${this.windowSize}`
+        );
+      }
+    } else if (rtt > RTT_THRESHOLD_SLOW) {
+      this.fastAckCount = 0;
+      if (this.chunkSize > MIN_CHUNK_SIZE) {
+        this.chunkSize = Math.max(MIN_CHUNK_SIZE, this.chunkSize / 2);
+        this.windowSize = INITIAL_WINDOW_SIZE;
+        logger.warn(
+          { rtt, newChunkSize: this.chunkSize },
+          "[SENDER] 🐌 Scaling down chunk size (High Latency detected)"
+        );
+        this.onLog?.(
+          `[WARN] [NET] 🐌 High Latency detected (RTT: ${rtt}ms). Scaling down: ${this.chunkSize / 1024}KB, Window: ${this.windowSize}`
+        );
+      }
+    } else {
+      // Moderate speed, reset fast counter but keep size
+      this.fastAckCount = 0;
+    }
   }
 }

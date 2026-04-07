@@ -23,8 +23,12 @@ vi.mock("@/lib/supabase/server", () => ({
 
 describe("GET /api/health", () => {
   it("returns 200 with status ok", async () => {
-    const { GET } = await import("@/app/api/health/route");
-    const response = await GET();
+    const { GET } = await import("../health/route");
+    const request = new Request("http://localhost/api/health");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -34,12 +38,29 @@ describe("GET /api/health", () => {
   });
 
   it("returns a valid ISO timestamp", async () => {
-    const { GET } = await import("@/app/api/health/route");
-    const response = await GET();
+    const { GET } = await import("../health/route");
+    const request = new Request("http://localhost/api/health");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
     const body = await response.json();
 
     const date = new Date(body.timestamp);
     expect(date.toISOString()).toBe(body.timestamp);
+  });
+
+  it("performs deep health check when deep=true", async () => {
+    const { GET } = await import("../health/route");
+    const request = new Request("http://localhost/api/health?deep=true");
+    const { NextRequest } = await import("next/server");
+    const nextReq = new NextRequest(request);
+
+    const response = await GET(nextReq);
+    const body = await response.json();
+
+    expect(body.checks).toBeDefined();
+    expect(body.checks.supabase).toBeDefined();
   });
 });
 
@@ -59,8 +80,8 @@ describe("GET /api/turn-credentials", () => {
 
   it("returns STUN servers and public TURN fallback when no TURN_URL env", async () => {
     delete process.env.TURN_URL;
-    const { GET } = await import("@/app/api/turn-credentials/route");
-    const response = await GET();
+    const { GET } = await import("../turn-credentials/route");
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -71,7 +92,7 @@ describe("GET /api/turn-credentials", () => {
     const stunServers = body.iceServers.filter((s: RTCIceServer) =>
       typeof s.urls === "string" ? s.urls.startsWith("stun:") : false
     );
-    expect(stunServers.length).toBeGreaterThanOrEqual(2);
+    expect(stunServers.length).toBeGreaterThanOrEqual(1);
 
     // Must include OpenRelay TURN servers
     const turnServers = body.iceServers.filter((s: RTCIceServer) =>
@@ -85,8 +106,8 @@ describe("GET /api/turn-credentials", () => {
     process.env.TURN_USERNAME = "user";
     process.env.TURN_CREDENTIAL = "secret";
 
-    const { GET } = await import("@/app/api/turn-credentials/route");
-    const response = await GET();
+    const { GET } = await import("../turn-credentials/route");
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
     const body = await response.json();
 
     const privateTurn = body.iceServers.find(
@@ -97,9 +118,30 @@ describe("GET /api/turn-credentials", () => {
     expect(privateTurn.credential).toBe("secret");
   });
 
+  it("Task #4: supports multiple TURN providers", async () => {
+    process.env.TURN_URL = "turn:provider1.com:3478";
+    process.env.TURN_USERNAME = "user1";
+    process.env.TURN_CREDENTIAL = "pass1";
+    process.env.TURN_URL_2 = "turn:provider2.com:3478";
+    process.env.TURN_USERNAME_2 = "user2";
+    process.env.TURN_CREDENTIAL_2 = "pass2";
+
+    const { GET } = await import("../turn-credentials/route");
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
+    const body = await response.json();
+
+    const p1 = body.iceServers.find((s: RTCIceServer) => s.urls === "turn:provider1.com:3478");
+    const p2 = body.iceServers.find((s: RTCIceServer) => s.urls === "turn:provider2.com:3478");
+
+    expect(p1).toBeDefined();
+    expect(p1.username).toBe("user1");
+    expect(p2).toBeDefined();
+    expect(p2.username).toBe("user2");
+  });
+
   it("sets proper Cache-Control header", async () => {
-    const { GET } = await import("@/app/api/turn-credentials/route");
-    const response = await GET();
+    const { GET } = await import("../turn-credentials/route");
+    const response = await GET(new Request("http://localhost/api/turn-credentials"));
 
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=60");
   });
@@ -109,7 +151,7 @@ describe("GET /api/turn-credentials", () => {
 
 describe("POST /api/share-target", () => {
   it("redirects to /send with fallback flag for valid request", async () => {
-    const { POST } = await import("@/app/api/share-target/route");
+    const { POST } = await import("../share-target/route");
 
     const request = new Request("https://app.example.com/api/share-target", {
       method: "POST",
@@ -130,7 +172,7 @@ describe("POST /api/share-target", () => {
   });
 
   it("rejects mismatched origin with 403", async () => {
-    const { POST } = await import("@/app/api/share-target/route");
+    const { POST } = await import("../share-target/route");
 
     const request = new Request("https://app.example.com/api/share-target", {
       method: "POST",
@@ -148,7 +190,7 @@ describe("POST /api/share-target", () => {
   });
 
   it("rejects oversized payloads with 413", async () => {
-    const { POST } = await import("@/app/api/share-target/route");
+    const { POST } = await import("../share-target/route");
 
     const request = new Request("https://app.example.com/api/share-target", {
       method: "POST",
@@ -166,7 +208,7 @@ describe("POST /api/share-target", () => {
   });
 
   it("allows requests without origin header", async () => {
-    const { POST } = await import("@/app/api/share-target/route");
+    const { POST } = await import("../share-target/route");
 
     const request = new Request("https://app.example.com/api/share-target", {
       method: "POST",

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 import { useRequireAuth } from "@/lib/hooks/use-require-auth";
-import { EmptyState } from "@/components/empty-state";
+import EmptyState from "@/components/empty-state";
 import { Ripple } from "@/components/ripple";
 import { Button } from "@/components/ui/button";
 import { formatFileSize, STATUS_CONFIG } from "@repo/utils";
@@ -11,12 +11,78 @@ import type { StatusConfigKey } from "@repo/utils";
 import AppHeader from "@/components/app-header";
 import Link from "next/link";
 
+// Admin Quick Access Component
+function AdminQuickAccess({ userId }: { userId: string }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const { supabase } = await import("@/lib/supabase/client");
+        const { data } = await supabase
+          .from("user_profiles")
+          .select("is_admin")
+          .eq("user_id", userId)
+          .single();
+        setIsAdmin(data?.is_admin || false);
+      } catch {
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-purple-500 relative overflow-hidden animate-pulse">
+        <div className="h-20 bg-white/5 rounded"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null; // Don't show for non-admin users
+  }
+
+  return (
+    <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-purple-500 relative overflow-hidden">
+      <div className="relative z-10">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Administration
+          </h3>
+          <span className="material-symbols-outlined text-purple-400">security</span>
+        </div>
+        <div className="space-y-3">
+          <Link
+            href="/admin"
+            className="block w-full bg-purple-900/20 hover:bg-purple-900/40 border border-purple-500/30 hover:border-purple-400 text-purple-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider text-center"
+          >
+            Admin Dashboard
+          </Link>
+          <Link
+            href="/admin/incidents"
+            className="block w-full bg-orange-900/20 hover:bg-orange-900/40 border border-orange-500/30 hover:border-orange-400 text-orange-300 font-bold py-2 px-3 transition-all text-xs uppercase tracking-wider text-center"
+          >
+            Manage Incidents
+          </Link>
+        </div>
+      </div>
+      <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-purple-500/5 rounded-full blur-xl"></div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { transfers, loading: transfersLoading, removeTransfer } = useUserTransfersRealtime();
 
-  const { loading } = useRequireAuth();
+  const { user, loading } = useRequireAuth();
 
   // Timer that pauses when tab is hidden to save CPU
   useEffect(() => {
@@ -26,7 +92,10 @@ export default function DashboardPage() {
       interval = setInterval(() => setCurrentTime(new Date()), 1000);
     };
     const stopTimer = () => {
-      if (interval) { clearInterval(interval); interval = null; }
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
     };
 
     const handleVisibility = () => {
@@ -39,11 +108,11 @@ export default function DashboardPage() {
     };
 
     startTimer();
-    document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       stopTimer();
-      document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
@@ -114,16 +183,16 @@ export default function DashboardPage() {
   const totalShared = transfers.reduce((acc, t) => acc + (t.file_size || 0), 0);
 
   const formatTime = () => {
-    return currentTime.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+    return currentTime.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
     });
   };
 
   const getTimezone = () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return timezone.split('/').pop() || timezone;
+    return timezone.split("/").pop() || timezone;
   };
 
   async function handleDelete(transferId: string) {
@@ -133,8 +202,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black animate-reveal">
-
-
       <AppHeader variant="app" />
 
       {/* Main Dashboard */}
@@ -151,18 +218,27 @@ export default function DashboardPage() {
               </div>
               <div className="relative z-10 flex flex-col h-full justify-between gap-8">
                 <div>
-                  <h2 className="font-black text-3xl md:text-4xl text-white mb-2 uppercase tracking-tight">Send File</h2>
-                  <p className="text-gray-400 max-w-md">Secure peer-to-peer transfer. Navigate to the send page to select and transfer files.</p>
+                  <h2 className="font-black text-3xl md:text-4xl text-white mb-2 uppercase tracking-tight">
+                    Send File
+                  </h2>
+                  <p className="text-gray-400 max-w-md">
+                    Secure peer-to-peer transfer. Navigate to the send page to select and transfer
+                    files.
+                  </p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex-1 flex items-center gap-3 text-gray-500">
-                    <span className="material-symbols-outlined text-bauhaus-blue text-3xl">cloud_upload</span>
+                    <span className="material-symbols-outlined text-bauhaus-blue text-3xl">
+                      cloud_upload
+                    </span>
                     <span className="text-sm">P2P encrypted transfer ready</span>
                   </div>
                   <Button className="relative overflow-hidden" size="lg">
                     <Link href="/send">
                       <span className="relative z-10">Go to Send</span>
-                      <span className="material-symbols-outlined text-lg relative z-10">arrow_forward</span>
+                      <span className="material-symbols-outlined text-lg relative z-10">
+                        arrow_forward
+                      </span>
                       <Ripple color="rgba(0,0,0,0.2)" />
                     </Link>
                   </Button>
@@ -174,11 +250,19 @@ export default function DashboardPage() {
             <div className="bg-surface-elevated border-l-[8px] border-bauhaus-red p-8 rounded-r-sm hover:bg-surface-elevated interactive-card">
               <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
                 <div className="flex-1">
-                  <h2 className="font-black text-2xl text-white mb-2 uppercase tracking-tight">Receive File</h2>
-                  <p className="text-gray-400 text-sm">Enter the secure key provided by the sender to establish connection.</p>
+                  <h2 className="font-black text-2xl text-white mb-2 uppercase tracking-tight">
+                    Receive File
+                  </h2>
+                  <p className="text-gray-400 text-sm">
+                    Enter the secure key provided by the sender to establish connection.
+                  </p>
                 </div>
                 <div className="flex-1 w-full flex justify-end">
-                  <Button variant="outline" className="relative overflow-hidden whitespace-nowrap" size="lg">
+                  <Button
+                    variant="outline"
+                    className="relative overflow-hidden whitespace-nowrap"
+                    size="lg"
+                  >
                     <Link href="/receive">
                       <span className="relative z-10">Go to Receive</span>
                       <Ripple />
@@ -195,10 +279,15 @@ export default function DashboardPage() {
             <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-primary relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Data Moved</h3>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    Total Data Moved
+                  </h3>
                   <span className="material-symbols-outlined text-primary">analytics</span>
                 </div>
-                <p data-testid="data-moved-value" className="font-black text-5xl text-white uppercase tracking-tight">
+                <p
+                  data-testid="data-moved-value"
+                  className="font-black text-5xl text-white uppercase tracking-tight"
+                >
                   {formatFileSize(totalShared)}
                 </p>
                 <div className="mt-4 flex items-center gap-2 text-xs text-green-400">
@@ -213,10 +302,14 @@ export default function DashboardPage() {
             <div className="flex-1 bg-surface-elevated p-6 rounded-none border-t-4 border-bauhaus-blue relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Local Time</h3>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    Local Time
+                  </h3>
                   <span className="material-symbols-outlined text-bauhaus-blue">schedule</span>
                 </div>
-                <p className="font-black text-5xl text-white uppercase tracking-tight font-mono tabular-nums">{formatTime()}</p>
+                <p className="font-black text-5xl text-white uppercase tracking-tight font-mono tabular-nums">
+                  {formatTime()}
+                </p>
                 <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
                   <span className="material-symbols-outlined text-sm">public</span>
                   <span>{getTimezone()}</span>
@@ -224,16 +317,27 @@ export default function DashboardPage() {
               </div>
               <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-bauhaus-blue/5 rounded-full blur-xl"></div>
             </div>
+
+            {/* Admin Panel - Only show for admin users */}
+            {user && <AdminQuickAccess userId={user.id} />}
           </div>
 
           {/* BOTTOM SECTION (Recent Activity) - Spans 12 cols */}
           <div className="lg:col-span-12 mt-4">
             <div className="flex items-end justify-between mb-6 border-b border-white/10 pb-2">
-              <h3 className="font-black text-xl text-white uppercase tracking-tight">Recent Activity</h3>
-              <Button variant="ghost" size="sm" className="relative overflow-hidden text-gray-400 hover:text-white">
+              <h3 className="font-black text-xl text-white uppercase tracking-tight">
+                Recent Activity
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="relative overflow-hidden text-gray-400 hover:text-white"
+              >
                 <Link href="/history">
                   <span className="relative z-10">View All History</span>
-                  <span className="material-symbols-outlined text-sm relative z-10">arrow_right_alt</span>
+                  <span className="material-symbols-outlined text-sm relative z-10">
+                    arrow_right_alt
+                  </span>
                   <Ripple />
                 </Link>
               </Button>
@@ -251,7 +355,10 @@ export default function DashboardPage() {
               {transfersLoading ? (
                 <div>
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/5 animate-pulse">
+                    <div
+                      key={i}
+                      className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-white/5 animate-pulse"
+                    >
                       <div className="col-span-5 md:col-span-4 flex items-center gap-3">
                         <div className="size-10 bg-white/10 backdrop-blur-sm rounded-none" />
                         <div className="h-4 bg-white/10 backdrop-blur-sm rounded w-32" />
@@ -280,31 +387,61 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 transfers.slice(0, 5).map((transfer, idx) => {
-                  const colorStrip = idx % 3 === 0 ? 'bg-primary' : idx % 3 === 1 ? 'bg-bauhaus-blue' : 'bg-bauhaus-red';
-                  const hoverColor = idx % 3 === 0 ? 'group-hover:text-primary' : idx % 3 === 1 ? 'group-hover:text-bauhaus-blue' : 'group-hover:text-bauhaus-red';
+                  const colorStrip =
+                    idx % 3 === 0
+                      ? "bg-primary"
+                      : idx % 3 === 1
+                        ? "bg-bauhaus-blue"
+                        : "bg-bauhaus-red";
+                  const hoverColor =
+                    idx % 3 === 0
+                      ? "group-hover:text-primary"
+                      : idx % 3 === 1
+                        ? "group-hover:text-bauhaus-blue"
+                        : "group-hover:text-bauhaus-red";
 
-                  const statusStyle = STATUS_CONFIG[transfer.status as StatusConfigKey] || STATUS_CONFIG.cancelled;
+                  const statusStyle =
+                    STATUS_CONFIG[transfer.status as StatusConfigKey] || STATUS_CONFIG.cancelled;
 
                   return (
-                    <div key={transfer.id} className="group grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors border-b border-white/5 relative">
+                    <div
+                      key={transfer.id}
+                      className="group grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors border-b border-white/5 relative"
+                    >
                       <div className={`absolute left-0 top-0 bottom-0 w-1 ${colorStrip}`}></div>
                       <div className="col-span-5 md:col-span-4 flex items-center gap-3">
                         <div className="bg-white/10 p-2 rounded-none text-white">
                           <span className="material-symbols-outlined text-sm">description</span>
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-sm font-bold text-white ${hoverColor} transition-colors truncate`}>{transfer.filename}</p>
-                          <p className="text-xs text-gray-500 md:hidden">{formatFileSize(transfer.file_size)}</p>
+                          <p
+                            className={`text-sm font-bold text-white ${hoverColor} transition-colors truncate`}
+                          >
+                            {transfer.filename}
+                          </p>
+                          <p className="text-xs text-gray-500 md:hidden">
+                            {formatFileSize(transfer.file_size)}
+                          </p>
                         </div>
                       </div>
-                      <div className="col-span-3 md:col-span-2 text-sm text-gray-400">{formatFileSize(transfer.file_size)}</div>
+                      <div className="col-span-3 md:col-span-2 text-sm text-gray-400">
+                        {formatFileSize(transfer.file_size)}
+                      </div>
                       <div className="hidden md:block md:col-span-3">
-                        <span className="text-xs text-gray-400">{new Date(transfer.created_at).toLocaleDateString()}</span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(transfer.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                       <div className="col-span-4 md:col-span-3 flex justify-end gap-2">
-                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusStyle.bg} border ${statusStyle.border}`}>
-                          <span className={`material-symbols-outlined text-xs ${statusStyle.text}`}>{statusStyle.icon}</span>
-                          <span className={`text-xs font-bold ${statusStyle.text} uppercase`}>{transfer.status}</span>
+                        <div
+                          className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusStyle.bg} border ${statusStyle.border}`}
+                        >
+                          <span className={`material-symbols-outlined text-xs ${statusStyle.text}`}>
+                            {statusStyle.icon}
+                          </span>
+                          <span className={`text-xs font-bold ${statusStyle.text} uppercase`}>
+                            {transfer.status}
+                          </span>
                         </div>
                         {confirmDeleteId === transfer.id ? (
                           <div className="flex items-center gap-1">
@@ -344,7 +481,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-
-

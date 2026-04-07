@@ -74,38 +74,79 @@ export async function addChunk(chunk: FileChunk): Promise<void> {
 }
 
 /**
- * Clear all chunks for a transfer (called after download complete)
+ * Clear all chunks for a transfer in batches to prevent browser lockup for large files (Task #6)
  */
-export async function clearTransfer(transferId: string): Promise<void> {
+export async function clearTransfer(
+  transferId: string,
+  onProgress?: (cleared: number, total: number) => void,
+  onLog?: (msg: string) => void
+): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(CHUNK_STORE, "readwrite");
-  const index = tx.store.index("transferId");
-  const keys = await index.getAllKeys(transferId);
+  const BATCH_SIZE = 5000;
 
-  for (const key of keys) {
-    await tx.store.delete(key);
+  // 1. Get total count for progress reporting
+  const total = await db.countFromIndex(CHUNK_STORE, "transferId", transferId);
+  if (total === 0) return;
+
+  let cleared = 0;
+
+  while (true) {
+    const tx = db.transaction(CHUNK_STORE, "readwrite");
+    const index = tx.store.index("transferId");
+    let cursor = await index.openCursor(transferId);
+
+    let batchCount = 0;
+    while (cursor && batchCount < BATCH_SIZE) {
+      await cursor.delete();
+      batchCount++;
+      cleared++;
+      cursor = await cursor.continue();
+    }
+
+    await tx.done;
+
+    if (onProgress) {
+      onProgress(cleared, total);
+    }
+    if (onLog && cleared < total) {
+      onLog(`[DB] Clearing temporary chunks from database (${cleared}/${total})...`);
+    }
+
+    // If we've processed everything, exit
+    if (cleared >= total || batchCount < BATCH_SIZE) {
+      break;
+    }
+
+    // Yield to main thread to permit UI interactions/rendering (Task #6 Requirement)
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  await tx.done;
+  logger.debug({ transferId, totalChunks: total }, "[IDB] Successfully cleared transfer chunks");
+  onLog?.("[DB] Successfully cleared transfer chunks.");
 }
 
 /**
- * Get the highest chunk index received for a transfer (for resumption)
- * Returns -1 if no chunks exist
+ * Get the highest chunk index received for a transfer (for resumption).
+ * Returns -1 if no chunks exist.
+ *
+ * AUDIT FIX: Scans all chunks to find the max chunkIndex instead of relying
+ * on lexicographic key ordering (which fails when "9" > "10" as strings).
  */
 export async function getLastReceivedChunkIndex(transferId: string): Promise<number> {
   const db = await getDB();
   const tx = db.transaction(CHUNK_STORE, "readonly");
   const index = tx.store.index("transferId");
 
-  let maxIndex = -1;
   let cursor = await index.openCursor(transferId);
+  let maxIndex = -1;
+
   while (cursor) {
     if (cursor.value.chunkIndex > maxIndex) {
       maxIndex = cursor.value.chunkIndex;
     }
     cursor = await cursor.continue();
   }
+
   await tx.done;
   return maxIndex;
 }
@@ -122,15 +163,21 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
   // Get all keys/values is too heavy for 2GB. We use openCursor.
   let cursor = await index.openCursor(transferId);
 
-  // We need to sort chunks, so we must collect them. Since we convert ArrayBuffer 
-  // to a Blob immediately, the RAM footprint of this object is minimal.
+  // We need to sort chunks because:
+  // 1. The transferId index doesn't guarantee chunkIndex order
+  // 2. Chunks may arrive out of order due to network conditions
+  // 3. The primary key format (transferId:chunkIndex) has lexicographic ordering issues
+  // Since we convert ArrayBuffer to Blob immediately, RAM footprint is minimal.
+  // For very large files (millions of chunks), this O(n log n) sort is acceptable
+  // because the alternative (iterating primary keys in order) would require zero-padded
+  // chunk indices in the key format, which would need a migration.
   const chunkBlobs: { index: number; blob: Blob }[] = [];
 
   while (cursor) {
     const chunk = cursor.value;
     chunkBlobs.push({
       index: chunk.chunkIndex,
-      blob: new Blob([chunk.data], { type: fileType })
+      blob: new Blob([chunk.data], { type: fileType }),
     });
     cursor = await cursor.continue();
   }
@@ -139,7 +186,7 @@ export async function assembleFileFromCursor(transferId: string, fileType: strin
   chunkBlobs.sort((a, b) => a.index - b.index);
 
   // Combine all small bloblets into one final Blob
-  const finalParts = chunkBlobs.map(c => c.blob);
+  const finalParts = chunkBlobs.map((c) => c.blob);
   return new Blob(finalParts, { type: fileType });
 }
 

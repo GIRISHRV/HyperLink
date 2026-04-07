@@ -31,7 +31,7 @@ describe("validatePeerMessage — valid messages", () => {
     it(`accepts a valid "${type}" message`, () => {
       const msg = {
         type,
-        transferId: "abc-123",
+        transferId: "11111111-1111-4111-a111-111111111111",
         timestamp: Date.now(),
         payload: {},
       };
@@ -39,14 +39,14 @@ describe("validatePeerMessage — valid messages", () => {
     });
   }
 
-  it("accepts transferId of length 1", () => {
+  it("rejects transferId of length 1 as invalid UUID", () => {
     const msg = { type: "chunk-ack", transferId: "x", timestamp: 1, payload: null };
-    expect(validatePeerMessage(msg)).not.toBeNull();
+    expect(validatePeerMessage(msg)).toBeNull();
   });
 
-  it("accepts transferId of length 128", () => {
+  it("rejects transferId of length 128 as invalid UUID", () => {
     const msg = { type: "chunk-ack", transferId: "a".repeat(128), timestamp: 1, payload: null };
-    expect(validatePeerMessage(msg)).not.toBeNull();
+    expect(validatePeerMessage(msg)).toBeNull();
   });
 
   it("accepts UUID-style transferIds", () => {
@@ -61,7 +61,7 @@ describe("validatePeerMessage — valid messages", () => {
   it("allows extra fields (they pass through without stripping)", () => {
     const msg = {
       type: "file-accept",
-      transferId: "id-1",
+      transferId: "11111111-1111-4111-a111-111111111111",
       timestamp: 1,
       payload: { extra: true },
       somethingElse: "test",
@@ -115,9 +115,7 @@ describe("validatePeerMessage — rejected inputs", () => {
   });
 
   it("rejects non-string transferId", () => {
-    expect(
-      validatePeerMessage({ type: "chunk", transferId: 123, timestamp: 1 })
-    ).toBeNull();
+    expect(validatePeerMessage({ type: "chunk", transferId: 123, timestamp: 1 })).toBeNull();
   });
 
   it("rejects missing timestamp", () => {
@@ -125,9 +123,7 @@ describe("validatePeerMessage — rejected inputs", () => {
   });
 
   it("rejects non-number timestamp", () => {
-    expect(
-      validatePeerMessage({ type: "chunk", transferId: "id", timestamp: "now" })
-    ).toBeNull();
+    expect(validatePeerMessage({ type: "chunk", transferId: "id", timestamp: "now" })).toBeNull();
   });
 
   it("rejects unknown message type", () => {
@@ -137,9 +133,7 @@ describe("validatePeerMessage — rejected inputs", () => {
   });
 
   it("rejects empty transferId", () => {
-    expect(
-      validatePeerMessage({ type: "chunk", transferId: "", timestamp: 1 })
-    ).toBeNull();
+    expect(validatePeerMessage({ type: "chunk", transferId: "", timestamp: 1 })).toBeNull();
   });
 
   it("rejects transferId longer than 128 characters", () => {
@@ -173,7 +167,7 @@ describe("validatePeerMessage — rejected inputs", () => {
   it("rejects extremely large object (DoS payload size doesn't crash)", () => {
     const bigPayload = {
       type: "chunk",
-      transferId: "id",
+      transferId: "11111111-1111-4111-a111-111111111111",
       timestamp: 1,
       data: "x".repeat(10_000_000),
     };
@@ -186,13 +180,17 @@ describe("validatePeerMessage — rejected inputs", () => {
 
 describe("validatePeerMessage — edge cases", () => {
   it("handles timestamp of 0", () => {
-    const msg = { type: "chunk", transferId: "id", timestamp: 0 };
+    const msg = { type: "chunk", transferId: "11111111-1111-4111-a111-111111111111", timestamp: 0 };
     // 0 is a valid number
     expect(validatePeerMessage(msg)).not.toBeNull();
   });
 
   it("handles negative timestamp", () => {
-    const msg = { type: "chunk", transferId: "id", timestamp: -1 };
+    const msg = {
+      type: "chunk",
+      transferId: "11111111-1111-4111-a111-111111111111",
+      timestamp: -1,
+    };
     // -1 is a valid number (validator doesn't range-check)
     expect(validatePeerMessage(msg)).not.toBeNull();
   });
@@ -200,7 +198,11 @@ describe("validatePeerMessage — edge cases", () => {
   it("handles NaN timestamp", () => {
     // NaN is typeof 'number' but semantically invalid
     // The current validator accepts it — this test documents that behavior.
-    const msg = { type: "chunk", transferId: "id", timestamp: NaN };
+    const msg = {
+      type: "chunk",
+      transferId: "11111111-1111-4111-a111-111111111111",
+      timestamp: NaN,
+    };
     expect(validatePeerMessage(msg)).not.toBeNull();
   });
 });

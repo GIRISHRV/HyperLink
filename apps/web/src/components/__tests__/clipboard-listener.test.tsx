@@ -19,7 +19,7 @@ vi.mock("@/lib/hooks/use-clipboard-file", () => ({
 
 vi.mock("@repo/utils", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@repo/utils")>();
-    return { ...actual, logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } };
+    return { ...actual, logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } };
 });
 
 function triggerPaste(name = "screenshot.png") {

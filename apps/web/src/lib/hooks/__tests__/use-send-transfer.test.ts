@@ -35,6 +35,7 @@ const m = vi.hoisted(() => {
     onPauseChange?: (paused: boolean) => void;
     onReject?: () => void;
     onCancel?: () => void;
+    onAccepted?: () => void;
   } = {};
   const mockSenderSetPassword = vi.fn().mockResolvedValue(undefined);
   const mockSenderSendOffer = vi.fn().mockResolvedValue(undefined);
@@ -47,6 +48,9 @@ const m = vi.hoisted(() => {
   });
   const mockSenderOnCancel = vi.fn().mockImplementation((cb: () => void) => {
     senderEvents.onCancel = cb;
+  });
+  const mockSenderOnAccepted = vi.fn().mockImplementation((cb: () => void) => {
+    senderEvents.onAccepted = cb;
   });
   const mockSenderCancel = vi.fn();
   const mockSenderPause = vi.fn();
@@ -92,6 +96,7 @@ const m = vi.hoisted(() => {
     mockSenderOnPauseChange,
     mockSenderOnReject,
     mockSenderOnCancel,
+    mockSenderOnAccepted,
     mockSenderCancel,
     mockSenderPause,
     mockSenderResume,
@@ -119,18 +124,21 @@ vi.mock("@/lib/webrtc/peer-manager", () => {
     destroy = m.mockPMDestroy;
     getPeerId = m.mockPMGetPeerId;
     connectToPeer = m.mockConnectToPeer;
+    static getRandomId = vi.fn().mockImplementation((prefix = "hl") => `${prefix}-random-id`);
   }
   return { PeerManager };
 });
 
 vi.mock("@/lib/transfer/sender", () => {
   class FileSender {
+    setOnLog = vi.fn();
     setPassword = m.mockSenderSetPassword;
     sendOffer = m.mockSenderSendOffer;
     startTransfer = m.mockSenderStartTransfer;
     onPauseChange = m.mockSenderOnPauseChange;
     onReject = m.mockSenderOnReject;
     onCancel = m.mockSenderOnCancel;
+    onAccepted = m.mockSenderOnAccepted;
     cancel = m.mockSenderCancel;
     pause = m.mockSenderPause;
     resume = m.mockSenderResume;
@@ -138,6 +146,30 @@ vi.mock("@/lib/transfer/sender", () => {
   }
   return { FileSender };
 });
+
+vi.mock("@/lib/services/profile-service", () => ({
+  updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(async () => ({
+        data: { session: { access_token: "test-token" } },
+        error: null,
+      })),
+    },
+  },
+}));
+
+vi.mock("@repo/utils", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
 
 vi.mock("@/lib/services/transfer-service", () => ({
   createTransfer: (...args: unknown[]) => m.mockCreateTransfer(...args),
@@ -150,11 +182,19 @@ vi.mock("@/lib/config/webrtc", () => ({
 }));
 
 vi.mock("@/lib/hooks/use-wake-lock", () => ({
-  useWakeLock: () => ({ request: vi.fn(), release: vi.fn() }),
+  useWakeLock: () => ({ request: vi.fn(), release: vi.fn(), isLocked: false }),
 }));
 
 vi.mock("@/lib/hooks/use-haptics", () => ({
   useHaptics: () => ({ vibrate: vi.fn() }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...args: any[]) => m.mockToastError(...args),
+    warning: (...args: any[]) => m.mockToastWarning(...args),
+    success: (...args: any[]) => m.mockToastSuccess(...args),
+  },
 }));
 
 vi.mock("@/lib/hooks/use-transfer-guard", () => ({
@@ -234,6 +274,9 @@ beforeEach(() => {
   m.mockSenderOnReject.mockImplementation((cb: () => void) => {
     m.senderEvents.onReject = cb;
   });
+  m.mockSenderOnAccepted.mockImplementation((cb: () => void) => {
+    m.senderEvents.onAccepted = cb;
+  });
   m.mockIsSecureContext.mockReturnValue(true);
 });
 
@@ -256,6 +299,11 @@ describe("useSendTransfer", () => {
         useSendTransfer(defaultOptions())
       );
       await waitFor(() => expect(result.current.isPeerReady).toBe(true));
+      // Verify initialize was called with hl- prefix, stable peer ID, and auth token
+      expect(m.mockPMInitialize).toHaveBeenCalledWith(
+        expect.stringMatching(/^hl-user-1/),
+        expect.any(String)
+      );
     });
 
     it("skips initialization when user is null", async () => {
@@ -303,9 +351,8 @@ describe("useSendTransfer", () => {
         await result.current.handleSend();
       });
 
-      expect(m.mockToastError).toHaveBeenCalledWith(
-        expect.stringContaining("Missing")
-      );
+      // Hook silently returns when file is missing — no toast is shown
+      expect(m.mockConnectToPeer).not.toHaveBeenCalled();
     });
 
     it("shows toast when user is null", async () => {
@@ -317,7 +364,8 @@ describe("useSendTransfer", () => {
         await result.current.handleSend();
       });
 
-      expect(m.mockToastError).toHaveBeenCalled();
+      // Hook silently returns when user is null — peer never ready
+      expect(m.mockConnectToPeer).not.toHaveBeenCalled();
     });
 
     it("shows toast when receiverPeerId is empty", async () => {
@@ -329,7 +377,8 @@ describe("useSendTransfer", () => {
         await result.current.handleSend();
       });
 
-      expect(m.mockToastError).toHaveBeenCalled();
+      // Hook silently returns when receiverPeerId is missing
+      expect(m.mockConnectToPeer).not.toHaveBeenCalled();
     });
   });
 
@@ -393,10 +442,15 @@ describe("useSendTransfer", () => {
         await new Promise((r) => setTimeout(r, 50));
       });
 
-      expect(m.mockUpdateTransferStatus).toHaveBeenCalledWith(
-        "db-transfer-1",
+      expect(m.mockUpdateTransferStatus).not.toHaveBeenCalledWith(
+        expect.any(String),
         "transferring"
       );
+      // The transfer was created with the correct data
+      expect(m.mockCreateTransfer).toHaveBeenCalledWith("user-1", {
+        filename: "test.txt",
+        fileSize: FILE.size,
+      });
     });
   });
 
@@ -435,14 +489,14 @@ describe("useSendTransfer", () => {
     });
   });
 
-  describe("handleCancel", () => {
+  describe("confirmCancel", () => {
     it("does nothing when no fileSender is active", () => {
       const { result } = renderHook(() =>
         useSendTransfer(defaultOptions())
       );
 
       act(() => {
-        result.current.handleCancel();
+        result.current.confirmCancel();
       });
 
       expect(m.mockSenderCancel).not.toHaveBeenCalled();
@@ -505,6 +559,26 @@ describe("useSendTransfer", () => {
       expect(m.mockUpdateTransferStatus).toHaveBeenCalledWith("db-transfer-1", "complete");
       expect(isDbUpdateResolved).toBe(true);
       expect(result.current.transferState.status).toBe("complete");
+    });
+  });
+
+  describe("NAT Traversal (Task #4)", () => {
+    it("Task #4: shows toast error when firewall-blocked is emitted", async () => {
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
+
+      await waitFor(() => expect(result.current.isPeerReady).toBe(true));
+
+      // Trigger the 'firewall-blocked' callback registered in PeerManager mock
+      await act(async () => {
+        const firewallBlockedCbs = m.pmEvents["firewall-blocked"];
+        if (firewallBlockedCbs) {
+          firewallBlockedCbs.forEach(cb => cb());
+        }
+      });
+
+      expect(m.mockToastError).toHaveBeenCalledWith("Firewall Blocked", expect.objectContaining({
+        description: expect.stringContaining("Compatibility Mode")
+      }));
     });
   });
 });

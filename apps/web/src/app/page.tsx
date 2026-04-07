@@ -29,21 +29,27 @@ export default function LandingPage() {
         <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[600px] border-b border-subtle">
           {/* Text & Hero Content (Left/Top) */}
           <div className="lg:col-span-7 p-8 md:p-16 flex flex-col justify-center relative overflow-hidden">
-
             <div className="relative z-10 flex flex-col gap-6">
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-1 w-12 bg-bauhaus-red"></div>
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">P2P Encrypted Protocol</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                  P2P Encrypted Protocol
+                </span>
               </div>
 
               <h1 className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter uppercase">
-                Secure.<br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-blue-400">Direct.</span><br />
+                Secure.
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-bauhaus-blue to-blue-400">
+                  Direct.
+                </span>
+                <br />
                 Fast.
               </h1>
 
               <p className="text-lg md:text-xl font-medium text-gray-600 dark:text-gray-400 max-w-lg mt-4 leading-relaxed">
-                Peer-to-peer encrypted file transfer. No servers. Just geometry and code. Drag, drop, and vanish.
+                Peer-to-peer encrypted file transfer. No servers. Just geometry and code. Drag,
+                drop, and vanish.
               </p>
 
               {/* WebRTC Status Indicator (Visual) */}
@@ -52,7 +58,7 @@ export default function LandingPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </div>
-                <span className="text-sm font-mono text-gray-400">WebRTC Ready // 128-bit AES</span>
+                <span className="text-sm font-mono text-gray-400">WebRTC Ready // 256-bit AES</span>
               </div>
             </div>
           </div>
@@ -75,19 +81,31 @@ export default function LandingPage() {
             {/* Action Blocks */}
             <div className="grid grid-cols-2 h-[200px] md:h-[240px]">
               {/* Send Block */}
-              <Link href={user ? "/send" : "/auth"} className="bg-bauhaus-blue hover:bg-blue-600 text-white flex flex-col items-center justify-center gap-4 group transition-all duration-300 relative overflow-hidden">
+              <Link
+                href={user ? "/send" : "/auth"}
+                className="bg-bauhaus-blue hover:bg-blue-600 text-white flex flex-col items-center justify-center gap-4 group transition-all duration-300 relative overflow-hidden"
+              >
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                <span className="material-symbols-outlined text-4xl md:text-5xl group-hover:-translate-y-2 transition-transform">arrow_upward</span>
+                <span className="material-symbols-outlined text-4xl md:text-5xl group-hover:-translate-y-2 transition-transform">
+                  arrow_upward
+                </span>
                 <div className="flex flex-col items-center text-center">
                   <span className="font-bold text-xl tracking-wider uppercase">SEND</span>
-                  <span className="text-xs text-white/70 uppercase tracking-wider">Drag & Drop</span>
+                  <span className="text-xs text-white/70 uppercase tracking-wider">
+                    Drag & Drop
+                  </span>
                 </div>
               </Link>
 
               {/* Receive Block */}
-              <Link href={user ? "/receive" : "/auth"} className="bg-bauhaus-red hover:bg-red-600 text-white flex flex-col items-center justify-center gap-4 group transition-all duration-300 relative overflow-hidden">
+              <Link
+                href={user ? "/receive" : "/auth"}
+                className="bg-bauhaus-red hover:bg-red-600 text-white flex flex-col items-center justify-center gap-4 group transition-all duration-300 relative overflow-hidden"
+              >
                 <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                <span className="material-symbols-outlined text-4xl md:text-5xl group-hover:translate-y-2 transition-transform">arrow_downward</span>
+                <span className="material-symbols-outlined text-4xl md:text-5xl group-hover:translate-y-2 transition-transform">
+                  arrow_downward
+                </span>
                 <div className="flex flex-col items-center text-center">
                   <span className="font-bold text-xl tracking-wider uppercase">RECEIVE</span>
                   <span className="text-xs text-white/70 uppercase tracking-wider">Enter Code</span>
@@ -107,7 +125,8 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black uppercase tracking-tight">End-to-End Encrypted</h3>
               <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                Your data never touches a server. The keys are generated on your device and only shared with the recipient.
+                Your data never touches a server. The keys are generated on your device and only
+                shared with the recipient.
               </p>
               <div className="h-1 w-0 group-hover:w-full bg-bauhaus-blue transition-all duration-500 ease-out"></div>
             </div>
@@ -119,7 +138,8 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black uppercase tracking-tight">WebRTC Speed</h3>
               <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                Direct browser-to-browser transfer path ensures maximum bandwidth utilization. No middleman throttling.
+                Direct browser-to-browser transfer path ensures maximum bandwidth utilization. No
+                middleman throttling.
               </p>
               <div className="h-1 w-0 group-hover:w-full bg-primary transition-all duration-500 ease-out"></div>
             </div>
@@ -131,15 +151,14 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-black uppercase tracking-tight">No File Limits</h3>
               <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                Send gigabytes of data as easily as a text message. If your browser can handle it, we can send it.
+                Send gigabytes of data as easily as a text message. If your browser can handle it,
+                we can send it.
               </p>
               <div className="h-1 w-0 group-hover:w-full bg-bauhaus-red transition-all duration-500 ease-out"></div>
             </div>
           </div>
         </div>
       </main>
-
-
     </div>
   );
 }

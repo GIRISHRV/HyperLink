@@ -2,7 +2,7 @@
 node_modules/
 .pnp
 .pnp.js
-
+.auth/*
 # Build outputs
 .next/
 .turbo/
@@ -14,6 +14,12 @@ test-results
 playwright-report
 playwright
 coverage
+storybook-static/
+
+# Service Worker (generated at build time)
+public/sw.js
+public/swe-worker.js
+public/workbox-*.js
 
 # Environment variables
 .env
@@ -26,6 +32,7 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 .eslintcache
+*.tsbuildinfo
 
 # OS
 .DS_Store
@@ -47,7 +54,6 @@ coverage/
 
 # AI/Agent
 .agent/
-.gemini/
 .antigravity/
 tomorrow.md
 
@@ -56,3 +62,16 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Kiro specs (keep these in version control for team collaboration)
+# Only ignore the .kiro/cache if it exists
+.kiro/cache/
+
+# Test files
+E2E_CI_CONFIGURATION.md
+*.png
+test-file-*.bin
+.auth
+.auth/
+**/e2e/.auth/
+*roadmap.md

@@ -77,9 +77,13 @@ const mockSession = {
   user: mockUser,
 };
 
-export const mockAuth = {
-  signUp: vi.fn().mockResolvedValue({ data: { user: mockUser, session: mockSession }, error: null }),
-  signInWithPassword: vi.fn().mockResolvedValue({ data: { user: mockUser, session: mockSession }, error: null }),
+export const mockAuth: Record<string, any> = {
+  signUp: vi
+    .fn()
+    .mockResolvedValue({ data: { user: mockUser, session: mockSession }, error: null }),
+  signInWithPassword: vi
+    .fn()
+    .mockResolvedValue({ data: { user: mockUser, session: mockSession }, error: null }),
   signInWithOtp: vi.fn().mockResolvedValue({ data: {}, error: null }),
   resetPasswordForEmail: vi.fn().mockResolvedValue({ data: {}, error: null }),
   signOut: vi.fn().mockResolvedValue({ error: null }),
@@ -105,7 +109,7 @@ const mockChannel = {
 // ---------------------------------------------------------------------------
 // Main supabase export
 // ---------------------------------------------------------------------------
-export const supabase = {
+export const supabase: Record<string, any> = {
   auth: mockAuth,
   from: vi.fn(() => createQueryBuilder()),
   rpc: mockRpc,

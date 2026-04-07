@@ -1,16 +1,8 @@
-import withPWAInit from "@ducanh2912/next-pwa";
 import withBundleAnalyzerInit from "@next/bundle-analyzer";
+import path from "path";
 
 const withBundleAnalyzer = withBundleAnalyzerInit({
   enabled: process.env.ANALYZE === "true",
-});
-
-const withPWA = withPWAInit({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  customWorkerSrc: "worker",
-  disable: false,
 });
 
 // Build peer server origin for CSP connect-src from env vars
@@ -25,6 +17,9 @@ import packageJson from "./package.json" with { type: "json" };
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fix workspace root warning
+  outputFileTracingRoot: path.join(process.cwd(), "../../"),
+
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
@@ -37,10 +32,14 @@ const nextConfig = {
       net: false,
       tls: false,
     };
+
+    // Silence PackFileCacheStrategy big string warnings during build
+    config.infrastructureLogging = {
+      ...config.infrastructureLogging,
+      level: "error",
+    };
+
     return config;
-  },
-  experimental: {
-    instrumentationHook: true,
   },
   async rewrites() {
     return [
@@ -64,12 +63,16 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // SEC-008: Removed 'unsafe-eval' — eliminates eval()/new Function() XSS attack vector.
+              // 'unsafe-inline' kept temporarily (required by Next.js App Router inline scripts).
+              // TODO: migrate to nonce-based CSP when Next.js natively supports it in App Router.
+              // Allow 'unsafe-eval' in development for Next.js hot reloading
+              `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
               "media-src 'self' blob:",
-              `connect-src 'self' ${peerConnectSrc} https://*.supabase.co wss://*.supabase.co https://*.sentry.io`,
+              `connect-src 'self' ${peerConnectSrc} https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://va.vercel-scripts.com https://fonts.googleapis.com https://fonts.gstatic.com`,
               "worker-src 'self' blob:",
               "frame-src 'none'",
               "object-src 'none'",
@@ -85,7 +88,7 @@ const nextConfig = {
 import { withSentryConfig } from "@sentry/nextjs";
 
 export default withSentryConfig(
-  withBundleAnalyzer(withPWA(nextConfig)),
+  withBundleAnalyzer(nextConfig),
   {
     // For all available options, see:
     // https://github.com/getsentry/sentry-webpack-plugin#options

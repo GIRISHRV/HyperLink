@@ -3,9 +3,9 @@ import { getUserTransferStats } from "@/lib/services/transfer-service";
 import { logger } from "@repo/utils";
 
 export interface TransferStats {
-    totalBytes: number;
-    totalTransfers: number;
-    isLoading: boolean;
+  totalBytes: number;
+  totalTransfers: number;
+  isLoading: boolean;
 }
 
 /**
@@ -13,38 +13,38 @@ export interface TransferStats {
  * The RPC uses auth.uid() server-side — no user ID is sent over the wire.
  */
 export function useTransferStats(userId?: string) {
-    const [stats, setStats] = useState<TransferStats>({
-        totalBytes: 0,
-        totalTransfers: 0,
-        isLoading: true,
-    });
+  const [stats, setStats] = useState<TransferStats>({
+    totalBytes: 0,
+    totalTransfers: 0,
+    isLoading: true,
+  });
 
-    useEffect(() => {
-        async function fetchStats() {
-            if (!userId) {
-                setStats((prev) => ({ ...prev, isLoading: false }));
-                return;
-            }
+  useEffect(() => {
+    async function fetchStats() {
+      if (!userId) {
+        setStats((prev) => ({ ...prev, isLoading: false }));
+        return;
+      }
 
-            try {
-                const data = await getUserTransferStats();
-                if (data) {
-                    setStats({
-                        totalBytes: data.totalBytesSent,
-                        totalTransfers: data.totalTransfers,
-                        isLoading: false,
-                    });
-                } else {
-                    setStats((prev) => ({ ...prev, isLoading: false }));
-                }
-            } catch (error) {
-                logger.error({ error }, "Failed to fetch transfer stats");
-                setStats((prev) => ({ ...prev, isLoading: false }));
-            }
+      try {
+        const data = await getUserTransferStats();
+        if (data) {
+          setStats({
+            totalBytes: data.totalBytesSent,
+            totalTransfers: data.totalTransfers,
+            isLoading: false,
+          });
+        } else {
+          setStats((prev) => ({ ...prev, isLoading: false }));
         }
+      } catch (error) {
+        logger.error({ error }, "Failed to fetch transfer stats");
+        setStats((prev) => ({ ...prev, isLoading: false }));
+      }
+    }
 
-        fetchStats();
-    }, [userId]);
+    fetchStats();
+  }, [userId]);
 
-    return stats;
+  return stats;
 }

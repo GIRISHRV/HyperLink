@@ -1,0 +1,28 @@
+# HyperLink Code Owners
+# These owners will be automatically requested for review when PRs modify these paths
+
+# Critical transfer logic - requires careful review
+/apps/web/src/lib/transfer/ @GIRISHRV
+/apps/web/src/lib/webrtc/ @GIRISHRV
+
+# Security-sensitive middleware and auth
+/apps/web/src/middleware.ts @GIRISHRV
+/apps/web/src/lib/middleware/ @GIRISHRV
+/apps/web/src/lib/services/auth-service.ts @GIRISHRV
+
+# Database schema changes
+/supabase/schema.sql @GIRISHRV
+/supabase/reset_database.sql @GIRISHRV
+/supabase/migrations/ @GIRISHRV
+
+# Signaling server
+/apps/signaling/ @GIRISHRV
+
+# Encryption and security
+/apps/web/src/lib/crypto/ @GIRISHRV
+/apps/web/src/lib/workers/encryption-worker.ts @GIRISHRV
+
+# Configuration files
+/.github/ @GIRISHRV
+/turbo.json @GIRISHRV
+/package.json @GIRISHRV

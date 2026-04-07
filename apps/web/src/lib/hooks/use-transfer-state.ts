@@ -19,6 +19,8 @@ export interface TransferState {
     speedBytesPerSecond?: number;
     estimatedSecondsRemaining?: number;
     pausedBy?: "local" | "remote";
+    chunkSize?: number;
+    windowSize?: number;
 }
 
 export type TransferAction =
@@ -26,7 +28,7 @@ export type TransferAction =
     | { type: "OFFER" }
     | { type: "AWAIT_ACCEPTANCE" }
     | { type: "START_TRANSFER"; totalBytes: number }
-    | { type: "PROGRESS"; bytesTransferred: number; speed?: number; remaining?: number }
+    | { type: "PROGRESS"; bytesTransferred: number; speed?: number; remaining?: number; chunkSize?: number; windowSize?: number }
     | { type: "PAUSE"; pausedBy: "local" | "remote" }
     | { type: "RESUME" }
     | { type: "COMPLETE" }
@@ -52,12 +54,27 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
                 pausedBy: undefined
             };
         case "PROGRESS":
-            if (state.status !== "transferring" && state.status !== "paused") return state; // Only update progress if we're actually active
+            // If chunks are flowing but we're still in the offer/acceptance phase,
+            // transition to transferring so the progress panel becomes visible.
+            if (state.status === "awaiting_acceptance" || state.status === "offering" || state.status === "connecting") {
+                return {
+                    ...state,
+                    status: "transferring",
+                    bytesTransferred: action.bytesTransferred,
+                    speedBytesPerSecond: action.speed,
+                    estimatedSecondsRemaining: action.remaining,
+                    chunkSize: action.chunkSize,
+                    windowSize: action.windowSize,
+                };
+            }
+            if (state.status !== "transferring" && state.status !== "paused") return state;
             return {
                 ...state,
                 bytesTransferred: action.bytesTransferred,
                 speedBytesPerSecond: action.speed,
-                estimatedSecondsRemaining: action.remaining
+                estimatedSecondsRemaining: action.remaining,
+                chunkSize: action.chunkSize,
+                windowSize: action.windowSize,
             };
         case "PAUSE":
             if (state.status !== "transferring") return state;

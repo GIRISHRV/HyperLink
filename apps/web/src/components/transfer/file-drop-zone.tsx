@@ -5,7 +5,7 @@ import type { RefObject } from "react";
 
 interface FileDropZoneProps {
   file: File | null;
-  fileInputRef: RefObject<HTMLInputElement>;
+  fileInputRef: RefObject<HTMLInputElement | null>;
   onDrop: (e: React.DragEvent) => void;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -61,9 +61,7 @@ export default function FileDropZone({
             <p className="text-xl font-bold uppercase tracking-widest text-primary drop-shadow-md">
               {file.name}
             </p>
-            <p className="text-sm font-mono text-white/50">
-              {formatFileSize(file.size)}
-            </p>
+            <p className="text-sm font-mono text-white/50">{formatFileSize(file.size)}</p>
           </div>
         ) : (
           <div className="text-center space-y-2">

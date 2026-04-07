@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { logger } from "@repo/utils";
 
 /**
  * Sign up with email and password
@@ -59,10 +60,20 @@ export async function signOut() {
  * Get current user
  */
 export async function getCurrentUser() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      // Log the error but don't throw, allowing the app to treat the user as unauthenticated
+      logger.error({ error: error.message }, "Supabase auth error in getCurrentUser");
+      return null;
+    }
+    return user;
+  } catch (err) {
+    logger.error({ err }, "getCurrentUser unexpected error");
+    return null;
+  }
 }
-
-

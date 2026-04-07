@@ -1,3 +1,0 @@
--- No-op: "paused" is a local UI-only state and does not need to be stored in the database.
--- The valid_status constraint remains unchanged:
--- ('pending', 'connecting', 'transferring', 'complete', 'failed', 'cancelled')

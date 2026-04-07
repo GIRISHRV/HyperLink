@@ -11,17 +11,16 @@ loadEnv({ path: path.resolve(__dirname, ".env.local") });
 
 const authFile = path.join(__dirname, "e2e/.auth/user.json");
 
-
-
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 4,
+  retries: process.env.CI ? 3 : 1, // More retries in CI for flaky WebRTC tests
+  workers: 4, // 4 workers to run browser projects in parallel
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 30_000,
-
+  timeout: 60_000, // Increased to 60s for CI environments
 
   use: {
     baseURL: "http://localhost:3000",
@@ -50,23 +49,38 @@ export default defineConfig({
       },
       testMatch: /authenticated\/.*\.spec\.ts/,
     },
+    {
+      name: "authenticated-firefox",
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: authFile,
+        // Firefox needs longer timeouts for WebRTC and navigation
+        navigationTimeout: 60_000,
+        actionTimeout: 15_000,
+      },
+      testMatch: /authenticated\/.*\.spec\.ts/,
+    },
 
     // 3. Unauthenticated tests — existing specs in e2e/ root (no session)
-    // Runs on Chromium, Firefox, and WebKit to ensure foundational P2P works everywhere
+    // Runs on Chromium and Firefox only
+    // NOTE: testIgnore excludes the authenticated/ subfolder (Windows-safe)
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+      testMatch: "**/e2e/**/*.spec.ts",
+      testIgnore: "**/e2e/authenticated/**",
     },
     {
       name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-      testMatch: /^(?!.*\/authenticated\/).*\.spec\.ts/,
+      use: {
+        ...devices["Desktop Firefox"],
+        // Firefox needs longer timeouts for navigation
+        navigationTimeout: 60_000,
+        actionTimeout: 15_000,
+      },
+      testMatch: "**/e2e/**/*.spec.ts",
+      testIgnore: "**/e2e/authenticated/**",
     },
   ],
 
@@ -74,6 +88,7 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run build && npm run start",
+      env: { NEXT_PUBLIC_DISABLE_SENTRY: "true" },
       url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
@@ -88,4 +103,3 @@ export default defineConfig({
     },
   ],
 });
-

@@ -1,0 +1,268 @@
+openapi: 3.0.3
+info:
+  title: HyperLink Signaling Server API
+  description: |
+    WebRTC signaling server for HyperLink P2P file transfer application.
+    
+    This server facilitates peer discovery and connection establishment using PeerJS.
+    It handles WebSocket connections for real-time signaling between peers.
+    
+    **Authentication**: All endpoints (except `/health` and `/`) require a valid Supabase JWT token.
+    
+    **Rate Limiting**:
+    - General endpoints: 200 requests per minute per IP
+    - Health endpoint: 60 requests per minute per IP
+    
+    **Base URL**: `https://your-signaling-server.railway.app` or `http://localhost:9000`
+  version: 1.0.0
+  contact:
+    name: HyperLink Team
+    url: https://github.com/GIRISHRV/HyperLink
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:9000
+    description: Local development server
+  - url: https://hyperlink-signaling.railway.app
+    description: Production server (Railway)
+
+tags:
+  - name: Health
+    description: Server health and status endpoints
+  - name: PeerJS
+    description: WebRTC signaling endpoints (PeerJS protocol)
+
+paths:
+  /:
+    get:
+      summary: Root endpoint
+      description: Returns a simple message indicating the server is running
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "HyperLink Signaling Server is running 🚀"
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns server health status, uptime, and connected peer count
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server health information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: HyperLink Signaling Server
+                  uptime:
+                    type: number
+                    description: Server uptime in seconds
+                    example: 3600.5
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-03-09T10:30:00.000Z"
+                  peers:
+                    type: integer
+                    description: Number of currently connected peers
+                    example: 5
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /myapp/{peerId}:
+    get:
+      summary: Get peer information
+      description: Retrieve information about a specific peer connection
+      tags:
+        - PeerJS
+      security:
+        - BearerAuth: []
+        - QueryAuth: []
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          description: Unique identifier for the peer
+          schema:
+            type: string
+            example: "user-123-abc"
+      responses:
+        '200':
+          description: Peer information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "user-123-abc"
+                  token:
+                    type: string
+                    description: Connection token
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: Peer not found
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /myapp/{peerId}/id:
+    post:
+      summary: Register a new peer
+      description: Register a new peer with the signaling server
+      tags:
+        - PeerJS
+      security:
+        - BearerAuth: []
+        - QueryAuth: []
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          description: Unique identifier for the peer to register
+          schema:
+            type: string
+            example: "user-123-abc"
+      responses:
+        '200':
+          description: Peer registered successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          description: Peer ID already in use
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /myapp/{peerId}/connections:
+    get:
+      summary: List peer connections
+      description: Get all active connections for a specific peer
+      tags:
+        - PeerJS
+      security:
+        - BearerAuth: []
+        - QueryAuth: []
+      parameters:
+        - name: peerId
+          in: path
+          required: true
+          description: Unique identifier for the peer
+          schema:
+            type: string
+            example: "user-123-abc"
+      responses:
+        '200':
+          description: List of active connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    peer:
+                      type: string
+                      description: Connected peer ID
+                    type:
+                      type: string
+                      enum: [data, media]
+                      description: Connection type
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Supabase JWT token passed in the Authorization header.
+        
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+    
+    QueryAuth:
+      type: apiKey
+      in: query
+      name: token
+      description: |
+        Supabase JWT token passed as a query parameter (alternative to Bearer auth).
+        
+        Example: `?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+  schemas:
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Too many requests, please slow down."
+    
+    UnauthorizedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Authentication required"
+    
+    ForbiddenError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid or expired token"
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required - No token provided
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UnauthorizedError'
+    
+    ForbiddenError:
+      description: Invalid or expired JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ForbiddenError'
+    
+    RateLimitError:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimitError'
+
+security:
+  - BearerAuth: []
+  - QueryAuth: []

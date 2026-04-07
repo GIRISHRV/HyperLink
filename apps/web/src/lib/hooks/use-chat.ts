@@ -23,11 +23,19 @@ export function useChat(userId: string | undefined) {
   }, []);
 
   const sendMessage = useCallback(
-    (text: string, connection: DataConnection | null, transferId: string) => {
+    (
+      text: string,
+      connection: DataConnection | null,
+      transferId: string,
+      senderName?: string,
+      senderPeerId?: string
+    ) => {
       if (!connection || !userId) return;
       const msg: ChatMessage = {
         id: crypto.randomUUID(),
         senderId: userId,
+        senderName,
+        senderPeerId,
         text,
         timestamp: Date.now(),
       };

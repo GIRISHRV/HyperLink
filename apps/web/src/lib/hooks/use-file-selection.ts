@@ -10,6 +10,7 @@ interface UseFileSelectionOptions {
 export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
   const [file, setFile] = useState<File | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
   const [error, setError] = useState("");
@@ -24,6 +25,9 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
 
   const processFiles = useCallback(
     async (files: File[]) => {
+      setIsProcessing(true);
+      setError("");
+
       const totalSize = files.reduce((acc, f) => acc + f.size, 0);
       const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10GB
       if (totalSize > MAX_SIZE) {
@@ -31,13 +35,12 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
           `Total size (${formatFileSize(totalSize)}) exceeds the 10GB limit for browser zipping.`
         );
         addLog(`✗ Size limit exceeded: ${formatFileSize(totalSize)}`);
+        setIsProcessing(false);
         return;
       }
 
       const isSingleFile = files.length === 1;
-      const hasPath =
-        files[0].webkitRelativePath &&
-        files[0].webkitRelativePath.includes("/");
+      const hasPath = files[0].webkitRelativePath && files[0].webkitRelativePath.includes("/");
 
       if (isSingleFile && !hasPath) {
         const selectedFile = files[0];
@@ -45,26 +48,22 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
         if (!validation.valid) {
           setError(validation.error!);
           addLog(`✗ File validation failed: ${validation.error}`);
+          setIsProcessing(false);
           return;
         }
         setFile(selectedFile);
         setError("");
-        addLog(
-          `✓ File selected: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`
-        );
+        addLog(`✓ File selected: ${selectedFile.name} (${formatFileSize(selectedFile.size)})`);
+        setIsProcessing(false);
       } else {
         try {
+          setIsProcessing(false);
           setIsZipping(true);
           setZipProgress(0);
-          setError("");
           addLog(`> Zipping ${files.length} files...`);
-          const zippedFile = await zipFiles(files, (percent) =>
-            setZipProgress(percent)
-          );
+          const zippedFile = await zipFiles(files, (percent) => setZipProgress(percent));
           setFile(zippedFile);
-          addLog(
-            `✓ Zipping complete: ${zippedFile.name} (${formatFileSize(zippedFile.size)})`
-          );
+          addLog(`✓ Zipping complete: ${zippedFile.name} (${formatFileSize(zippedFile.size)})`);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           logger.error({ err }, "Zipping failed:");
@@ -108,9 +107,7 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
       setIsDraggingOver(false);
 
       if (e.dataTransfer && e.dataTransfer.items) {
-        const droppedFiles = await getFilesFromDataTransferItems(
-          e.dataTransfer.items
-        );
+        const droppedFiles = await getFilesFromDataTransferItems(e.dataTransfer.items);
         if (droppedFiles.length > 0) {
           addLog(`✓ Dropped ${droppedFiles.length} file(s)`);
           await processFiles(droppedFiles);
@@ -169,6 +166,7 @@ export function useFileSelection({ onLog }: UseFileSelectionOptions = {}) {
     file,
     setFile,
     isDraggingOver,
+    isProcessing,
     isZipping,
     zipProgress,
     error,

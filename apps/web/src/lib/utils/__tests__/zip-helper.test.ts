@@ -4,26 +4,27 @@
  * Tests for: zipFiles (multi-file zip, progress callback, single file),
  * getFilesFromDataTransferItems (drag-and-drop flat files, directory recursion).
  *
- * fflate is mocked to avoid real compression and keep tests fast.
+ * Workers are mocked to avoid real worker instantiation in tests.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ─── Mock fflate ────────────────────────────────────────────────────────
+// ─── Mock Worker and WorkerPool ────────────────────────────────────────
 
-vi.mock("fflate", () => ({
-  zip: vi.fn(
-    (
-      _data: unknown,
-      _opts: unknown,
-      cb: (err: Error | null, data: Uint8Array) => void
-    ) => {
-      cb(null, new Uint8Array([80, 75, 5, 6])); // minimal ZIP end-of-central-dir signature
-    }
-  ),
-}));
+const mockExecute = vi.fn().mockResolvedValue(new Uint8Array([80, 75, 5, 6]));
+const mockTerminate = vi.fn();
+const mockIsActive = vi.fn().mockReturnValue(true);
+
+vi.mock("@/lib/utils/worker-pool", () => {
+  return {
+    WorkerPool: class MockWorkerPool {
+      execute = mockExecute;
+      terminate = mockTerminate;
+      isActive = mockIsActive;
+    },
+  };
+});
 
 import { zipFiles, getFilesFromDataTransferItems } from "../zip-helper";
-import { zip } from "fflate";
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ function makeFile(name: string, content = "hello"): File {
 describe("zip-helper", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecute.mockResolvedValue(new Uint8Array([80, 75, 5, 6]));
   });
 
   // ─── zipFiles ─────────────────────────────────────────────────────────
@@ -48,14 +50,20 @@ describe("zip-helper", () => {
       expect(result.name).toMatch(/^archive_\d+\.zip$/);
     });
 
-    it("calls fflate zip with all input files", async () => {
+    it("calls worker pool execute with file data", async () => {
       const files = [makeFile("a.txt", "AAA"), makeFile("b.txt", "BBB")];
       await zipFiles(files);
 
-      expect(zip).toHaveBeenCalledOnce();
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("a.txt");
-      expect(Object.keys(zipData)).toContain("b.txt");
+      expect(mockExecute).toHaveBeenCalledWith(
+        "zip",
+        expect.objectContaining({
+          files: expect.arrayContaining([
+            expect.objectContaining({ path: "a.txt" }),
+            expect.objectContaining({ path: "b.txt" }),
+          ]),
+        }),
+        expect.any(Function)
+      );
     });
 
     it("calls onProgress with 100 on completion", async () => {
@@ -74,28 +82,24 @@ describe("zip-helper", () => {
 
       await zipFiles([file]);
 
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("folder/image.png");
+      const executeCall = mockExecute.mock.calls[mockExecute.mock.calls.length - 1];
+      const filesArg = executeCall[1].files;
+      expect(filesArg[0].path).toBe("folder/image.png");
     });
 
     it("falls back to file.name when webkitRelativePath is empty", async () => {
       const file = makeFile("plain.txt");
       await zipFiles([file]);
 
-      const [zipData] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(Object.keys(zipData)).toContain("plain.txt");
+      const executeCall = mockExecute.mock.calls[mockExecute.mock.calls.length - 1];
+      const filesArg = executeCall[1].files;
+      expect(filesArg[0].path).toBe("plain.txt");
     });
 
-    it("rejects when fflate returns an error", async () => {
-      (zip as ReturnType<typeof vi.fn>).mockImplementationOnce(
-        (_: unknown, __: unknown, cb: (err: Error | null) => void) => {
-          cb(new Error("Compression failed"));
-        }
-      );
+    it("rejects when worker returns an error", async () => {
+      mockExecute.mockRejectedValueOnce(new Error("Compression failed"));
 
-      await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow(
-        "Compression failed"
-      );
+      await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow("Compression failed");
     });
 
     it("works with a single file", async () => {
@@ -103,11 +107,10 @@ describe("zip-helper", () => {
       expect(result).toBeInstanceOf(File);
     });
 
-    it("uses level 0 (store) compression for speed", async () => {
+    it("uses worker for compression", async () => {
       await zipFiles([makeFile("fast.txt")]);
 
-      const [, opts] = (zip as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(opts).toMatchObject({ level: 0 });
+      expect(mockExecute).toHaveBeenCalledWith("zip", expect.any(Object), expect.any(Function));
     });
   });
 
@@ -124,9 +127,7 @@ describe("zip-helper", () => {
       } as unknown as FileSystemFileEntry;
     }
 
-    function makeDataTransferItemList(
-      entries: (FileSystemEntry | null)[]
-    ): DataTransferItemList {
+    function makeDataTransferItemList(entries: (FileSystemEntry | null)[]): DataTransferItemList {
       const obj: Record<string | symbol, unknown> & { length: number } = {
         length: entries.length,
         [Symbol.iterator]: function* () {
@@ -145,13 +146,13 @@ describe("zip-helper", () => {
       const f1 = makeFile("drop1.txt");
       const f2 = makeFile("drop2.txt");
 
-      const items = makeDataTransferItemList([
-        makeFileEntry(f1),
-        makeFileEntry(f2),
-      ]);
+      const items = makeDataTransferItemList([makeFileEntry(f1), makeFileEntry(f2)]);
 
       // Access via index like the real impl
-      const itemsWithIndex = items as unknown as Record<number, { webkitGetAsEntry: () => FileSystemEntry }> & { length: number };
+      const itemsWithIndex = items as unknown as Record<
+        number,
+        { webkitGetAsEntry: () => FileSystemEntry }
+      > & { length: number };
 
       const files = await getFilesFromDataTransferItems(
         itemsWithIndex as unknown as DataTransferItemList
@@ -173,7 +174,7 @@ describe("zip-helper", () => {
               isDirectory: false,
               fullPath: "/subdir/note.txt",
               file: (success: (fi: File) => void) => success(f),
-            } as unknown as FileSystemFileEntry),
+            }) as unknown as FileSystemFileEntry,
         },
       } as unknown as DataTransferItemList;
 

@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import {
-  useTransferRealtime,
-  useUserTransfersRealtime,
-} from "@/lib/hooks/use-transfer-realtime";
+import { useUserTransfersRealtime } from "@/lib/hooks/use-transfer-realtime";
 
 // ──────────────────────────────────────────────────────────────
 // Supabase mock (vi.hoisted so factory can reference these vars)
@@ -51,9 +48,7 @@ const {
     channel: vi.fn().mockReturnValue(channelMock),
     removeChannel: vi.fn(),
     auth: {
-      getUser: vi
-        .fn()
-        .mockResolvedValue({ data: { user: { id: "user-1" } } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: "user-1" } } }),
     },
   };
 
@@ -74,8 +69,7 @@ vi.mock("@/lib/supabase/client", () => ({ supabase: supabaseMock }));
 
 vi.mock("@/lib/services/transfer-service", () => ({
   deleteTransfer: (...args: unknown[]) => deleteTransferMock(...args),
-  deleteMultipleTransfers: (...args: unknown[]) =>
-    deleteMultipleMock(...args),
+  deleteMultipleTransfers: (...args: unknown[]) => deleteMultipleMock(...args),
 }));
 
 // ──────────────────────────────────────────────────────────────
@@ -136,72 +130,6 @@ beforeEach(() => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// useTransferRealtime
-// ──────────────────────────────────────────────────────────────
-
-describe("useTransferRealtime", () => {
-  it("returns loading=false immediately when transferId is null", async () => {
-    const { result } = renderHook(() => useTransferRealtime(null));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.transfer).toBeNull();
-  });
-
-  it("fetches initial transfer and sets loading=false", async () => {
-    queryMock.single.mockResolvedValueOnce({ data: TRANSFER_A });
-
-    const { result } = renderHook(() => useTransferRealtime("transfer-a"));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.transfer).toMatchObject({ id: "transfer-a" });
-  });
-
-  it("leaves transfer null when fetch returns no data", async () => {
-    queryMock.single.mockResolvedValueOnce({ data: null });
-
-    const { result } = renderHook(() => useTransferRealtime("transfer-a"));
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.transfer).toBeNull();
-  });
-
-  it("updates transfer on UPDATE channel event", async () => {
-    queryMock.single.mockResolvedValueOnce({ data: TRANSFER_A });
-
-    const { result } = renderHook(() => useTransferRealtime("transfer-a"));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    act(() => {
-      channelHandlers["UPDATE"]?.({ new: { ...TRANSFER_A, status: "failed" } });
-    });
-
-    expect(result.current.transfer).toMatchObject({ status: "failed" });
-  });
-
-  it("nullifies transfer on DELETE channel event", async () => {
-    queryMock.single.mockResolvedValueOnce({ data: TRANSFER_A });
-
-    const { result } = renderHook(() => useTransferRealtime("transfer-a"));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    act(() => {
-      channelHandlers["DELETE"]?.({});
-    });
-
-    expect(result.current.transfer).toBeNull();
-  });
-
-  it("calls removeChannel on unmount", async () => {
-    queryMock.single.mockResolvedValueOnce({ data: TRANSFER_A });
-    const { unmount } = renderHook(() => useTransferRealtime("transfer-a"));
-    await waitFor(() => channelMock.subscribe.mock.calls.length > 0);
-
-    unmount();
-
-    expect(supabaseMock.removeChannel).toHaveBeenCalledWith(channelMock);
-  });
-});
-
-// ──────────────────────────────────────────────────────────────
 // useUserTransfersRealtime
 // ──────────────────────────────────────────────────────────────
 
@@ -242,26 +170,20 @@ describe("useUserTransfersRealtime", () => {
     });
 
     const { result } = renderHook(() => useUserTransfersRealtime());
-    await waitFor(() =>
-      expect(result.current.transfers.length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
 
     act(() => {
       channelHandlers["DELETE"]?.({ old: { id: "transfer-a" } });
     });
 
-    expect(
-      result.current.transfers.find((t) => t.id === "transfer-a")
-    ).toBeUndefined();
+    expect(result.current.transfers.find((t) => t.id === "transfer-a")).toBeUndefined();
   });
 
   it("updates a transfer via UPDATE channel event", async () => {
     queryMock.range.mockResolvedValueOnce({ data: [TRANSFER_A] });
 
     const { result } = renderHook(() => useUserTransfersRealtime());
-    await waitFor(() =>
-      expect(result.current.transfers.length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
 
     act(() => {
       channelHandlers["UPDATE"]?.({
@@ -269,9 +191,7 @@ describe("useUserTransfersRealtime", () => {
       });
     });
 
-    expect(
-      result.current.transfers.find((t) => t.id === "transfer-a")?.status
-    ).toBe("failed");
+    expect(result.current.transfers.find((t) => t.id === "transfer-a")?.status).toBe("failed");
   });
 
   it("optimistically removes a transfer via removeTransfer()", async () => {
@@ -280,17 +200,13 @@ describe("useUserTransfersRealtime", () => {
     });
 
     const { result } = renderHook(() => useUserTransfersRealtime());
-    await waitFor(() =>
-      expect(result.current.transfers.length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
 
     await act(async () => {
       await result.current.removeTransfer("transfer-a");
     });
 
-    expect(
-      result.current.transfers.find((t) => t.id === "transfer-a")
-    ).toBeUndefined();
+    expect(result.current.transfers.find((t) => t.id === "transfer-a")).toBeUndefined();
     expect(deleteTransferMock).toHaveBeenCalledWith("transfer-a");
   });
 
@@ -300,22 +216,14 @@ describe("useUserTransfersRealtime", () => {
     });
 
     const { result } = renderHook(() => useUserTransfersRealtime());
-    await waitFor(() =>
-      expect(result.current.transfers.length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
 
     await act(async () => {
-      await result.current.removeMultipleTransfers([
-        "transfer-a",
-        "transfer-b",
-      ]);
+      await result.current.removeMultipleTransfers(["transfer-a", "transfer-b"]);
     });
 
     expect(result.current.transfers).toHaveLength(0);
-    expect(deleteMultipleMock).toHaveBeenCalledWith([
-      "transfer-a",
-      "transfer-b",
-    ]);
+    expect(deleteMultipleMock).toHaveBeenCalledWith(["transfer-a", "transfer-b"]);
   });
 
   it("calls removeChannel on unmount", async () => {

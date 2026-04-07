@@ -1,0 +1,13 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🚀 Running validate script before push..."
+npm run validate
+
+# If validate fails, exit with error to block the push
+if [ $? -ne 0 ]; then
+  echo "❌ Push blocked: Validation failed. Please fix tests, types, or linting errors."
+  exit 1
+fi
+
+echo "✅ Validation passed. Pushing to remote..."

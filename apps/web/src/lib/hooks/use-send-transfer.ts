@@ -4,10 +4,7 @@ import { FileSender } from "@/lib/transfer/sender";
 import type { DataConnection } from "peerjs";
 import { getIceServers, getPeerConfigAsync } from "@/lib/config/webrtc";
 import { validatePeerMessage } from "@/lib/utils/peer-message-validator";
-import {
-  createTransfer,
-  updateTransferStatus,
-} from "@/lib/services/transfer-service";
+import { createTransfer, updateTransferStatus } from "@/lib/services/transfer-service";
 import { useWakeLock } from "@/lib/hooks/use-wake-lock";
 import { useHaptics } from "@/lib/hooks/use-haptics";
 import { useTransferGuard } from "@/lib/hooks/use-transfer-guard";
@@ -22,6 +19,8 @@ import {
 } from "@/lib/utils/notification";
 import { logger } from "@repo/utils";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase/client";
+import { updateUserProfile } from "@/lib/services/profile-service";
 
 interface UseSendTransferOptions {
   user: { id: string } | null;
@@ -46,10 +45,13 @@ export function useSendTransfer({
     state: transferState,
     dispatch: dispatchTransfer,
     isActive: isTransferActive,
+    isPaused,
   } = useTransferState();
   const [error, setError] = useState("");
   const [transferId, setTransferId] = useState<string | null>(null);
   const [isPeerReady, setIsPeerReady] = useState(false);
+  const [myPeerId, setMyPeerId] = useState("");
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const peerManagerRef = useRef<PeerManager | null>(null);
   const initializingRef = useRef(false);
@@ -70,11 +72,17 @@ export function useSendTransfer({
     onResetRef.current = onReset;
   }, [onReset]);
 
-  const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock();
+  const {
+    request: requestWakeLock,
+    release: releaseWakeLock,
+    isLocked: isWakeLockActive,
+  } = useWakeLock();
   const { vibrate } = useHaptics();
 
-  const { showBackModal, confirmBackNavigation, cancelBackNavigation } =
-    useTransferGuard(transferId, isTransferActive);
+  const { showBackModal, confirmBackNavigation, cancelBackNavigation } = useTransferGuard(
+    transferId,
+    isTransferActive
+  );
 
   const addLog = useCallback((message: string) => {
     onLogRef.current?.(message);
@@ -84,23 +92,14 @@ export function useSendTransfer({
   useEffect(() => {
     requestNotificationPermission();
     if (!isSecureContext() && window.location.hostname !== "localhost") {
-      setError(
-        "Insecure Context: WebRTC is likely blocked. Please use HTTPS."
-      );
-    }
-    if ("clearAppBadge" in navigator) {
-      navigator.clearAppBadge().catch((err: unknown) => logger.error({ err }, "[SEND] clearAppBadge failed:"));
+      setError("Insecure Context: WebRTC is likely blocked. Please use HTTPS.");
     }
   }, []);
 
   // Title updates, notifications, wake lock
   useEffect(() => {
-    if (
-      transferState.status === "transferring" &&
-      transferState.totalBytes > 0
-    ) {
-      const percentage =
-        (transferState.bytesTransferred / transferState.totalBytes) * 100;
+    if (transferState.status === "transferring" && transferState.totalBytes > 0) {
+      const percentage = (transferState.bytesTransferred / transferState.totalBytes) * 100;
       document.title = `${percentage.toFixed(0)}% - Sending...`;
     } else if (transferState.status === "complete") {
       document.title = "File Sent - HyperLink";
@@ -136,49 +135,52 @@ export function useSendTransfer({
     initializingRef.current = true;
     try {
       if (!user) {
-        logger.info("[SEND] No user yet, waiting...");
+        logger.debug("[SEND] No user yet, waiting...");
         initializingRef.current = false;
         return;
       }
-      logger.info({ userId: user.id }, "[SEND] User authenticated");
 
       const iceServers = await getIceServers();
-      const config = await getPeerConfigAsync(iceServers);
+      // Task #4: Support Compatibility Mode (Forced Relay)
+      const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
+      const config = await getPeerConfigAsync(iceServers, forceRelay);
+      config.onLog = addLog;
+
       peerManagerRef.current = new PeerManager(config);
 
-      await peerManagerRef.current.initialize();
-      addLog("✓ Peer manager initialized successfully");
-      setIsPeerReady(true);
-
-      peerManagerRef.current.on("incoming-connection", (rawConnection: unknown) => {
-        const connection = rawConnection as DataConnection;
-        // Reject incoming connections — sender initiates outward
-        connection.on("open", () => {
-          connection.send({
-            type: "sender-busy",
-            transferId: "",
-            payload: null,
-            timestamp: Date.now(),
-          });
-          setTimeout(() => connection.close(), 100);
+      // Task #4: Listen for firewall blocked events
+      peerManagerRef.current.on("firewall-blocked", () => {
+        toast.error("Firewall Blocked", {
+          description:
+            "Your network is preventing a direct connection. Try enabling 'Compatibility Mode' in Settings.",
+          duration: 10000,
         });
       });
 
-      peerManagerRef.current.on("reconnecting", (data: unknown) => {
-        const info = data as { attempt: number; maxAttempts: number };
-        toast.warning(
-          `Reconnecting to server... (${info.attempt}/${info.maxAttempts})`,
-          { id: "reconnect" }
-        );
+      // Task #3: Fetch Supabase JWT for signaling authentication
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // Task #9: Generate a stable, user-linked Peer ID
+      const stablePeerId = PeerManager.getRandomId(`hl-${user.id.slice(0, 8)}`);
+
+      // Add timeout wrapper for initialization
+      const INIT_TIMEOUT = 45000; // 45 seconds (increased for slower browsers/networks)
+      const initPromise = peerManagerRef.current.initialize(stablePeerId, token);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("PeerManager initialization timed out")), INIT_TIMEOUT);
       });
-      peerManagerRef.current.on("reconnected", () => {
-        toast.success("Reconnected to server", { id: "reconnect" });
-      });
-      peerManagerRef.current.on("reconnect-failed", () => {
-        toast.error(
-          "Failed to reconnect to server. Please refresh the page.",
-          { id: "reconnect" }
-        );
+
+      const id = await Promise.race([initPromise, timeoutPromise]);
+      setMyPeerId(id);
+      setIsPeerReady(true);
+      addLog("✓ Peer manager initialized successfully");
+
+      // Task #5: Update Supabase with the active Peer ID for discovery (non-blocking)
+      updateUserProfile(user.id, { active_peer_id: id }).catch((err) => {
+        logger.error({ err }, "[SEND] Failed to update user profile with Peer ID");
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -214,271 +216,206 @@ export function useSendTransfer({
     onResetRef.current?.();
   }, [dispatchTransfer]);
 
+  const handleCancelClick = useCallback(() => {
+    setShowCancelModal(true);
+  }, []);
+
+  const confirmCancel = useCallback(async () => {
+    setShowCancelModal(false);
+    if (fileSenderRef.current) {
+      fileSenderRef.current.cancel();
+    }
+    dispatchTransfer({ type: "CANCEL" });
+    if (transferId) {
+      try {
+        await updateTransferStatus(transferId, "cancelled");
+      } catch (err) {
+        logger.error({ err }, "[SEND] Failed to update transfer status to cancelled");
+      }
+    }
+  }, [dispatchTransfer, transferId]);
+
+  const handlePauseResume = useCallback(() => {
+    if (!fileSenderRef.current) return;
+    if (isPaused) {
+      fileSenderRef.current.resume();
+      dispatchTransfer({ type: "RESUME" });
+    } else {
+      fileSenderRef.current.pause();
+      dispatchTransfer({ type: "PAUSE", pausedBy: "local" });
+    }
+  }, [isPaused, dispatchTransfer]);
+
   const handleSend = useCallback(async () => {
-    if (!file || !receiverPeerId || !user) {
-      toast.error("Missing file, recipient ID, or authentication");
+    if (!file || !receiverPeerId || !peerManagerRef.current || !isPeerReady || !user) {
       return;
     }
 
-    dispatchTransfer({ type: "CONNECT" });
-    setError("");
-    dispatchTransfer({
-      type: "PROGRESS",
-      bytesTransferred: 0,
-      speed: 0,
-      remaining: 0,
-    });
-    addLog(`> Connecting to peer: ${receiverPeerId.slice(0, 8)}...`);
-
-    let dbTransferId: string | null = null;
-
     try {
-      const transfer = await createTransfer(user.id, {
-        filename: file.name,
-        fileSize: file.size,
-      });
-      if (!transfer) throw new Error("Failed to create transfer record");
+      setError("");
+      dispatchTransfer({ type: "CONNECT" });
+      addLog(`Connecting to peer: ${receiverPeerId}...`);
 
-      setTransferId(transfer.id);
-      dbTransferId = transfer.id;
-      addLog(`✓ Transfer record created: ${transfer.id.slice(0, 8)}`);
+      const conn = peerManagerRef.current.connectToPeer(receiverPeerId);
+      connectionRef.current = conn;
 
-      addLog(`> Initiating connection to ${receiverPeerId}...`);
-      const connection =
-        peerManagerRef.current!.connectToPeer(receiverPeerId);
-      connectionRef.current = connection;
-
-      connection.on("close", () => {
-        logger.info("[CONNECTION] Connection closed by remote peer");
-        if (transferState.status === "complete") return;
-        resetSend();
-      });
-
-      connection.on("error", (err: unknown) => {
-        logger.error({ err }, "[CONNECTION] Error on active connection");
-        dispatchTransfer({
-          type: "FAIL",
-          error: "Connection error: " + err,
-        });
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(
-          () => reject(new Error("Connection timeout")),
-          30000
-        );
-        connection.on("open", () => {
-          clearTimeout(timeout);
-          addLog("✓ Peer connection established");
-          vibrate("medium");
+      conn.on("open", async () => {
+        logger.debug({ receiverPeerId }, "[useSendTransfer] Connection opened");
+        try {
+          addLog("✓ Connection established");
           playConnectionSound();
-          resolve();
-        });
-        connection.on("data", (data: unknown) => {
-          onDataRef.current?.(data);
+          vibrate([50]);
 
-          // FINDING-017: Validate message shape before processing
-          const message = validatePeerMessage(data);
-          if (!message) return;
-
-          // Handle early rejection/cancellation before FileSender starts its internal listener
-          if (message.type === "file-reject" || message.type === "transfer-cancel") {
-            const isIdle = !fileSenderRef.current || fileSenderRef.current.getStatus() === "idle";
-            if (isIdle) {
-              logger.info({ type: message.type }, "[SEND] Received early control message, updating UI");
-              dispatchTransfer({ type: "CANCEL" });
-              addLog(message.type === "file-reject" ? "✗ Receiver rejected the file" : "✗ Transfer cancelled by peer");
-              vibrate("error");
-              playErrorSound();
-            }
-          }
-        });
-        connection.on("error", (err: unknown) => {
-          if (connectionRef.current !== connection) return;
-          logger.error({ err }, "[CONNECTION] Error");
-          dispatchTransfer({
-            type: "FAIL",
-            error: "Connection error: " + err,
+          const dbTransfer = await createTransfer(user.id, {
+            filename: file.name,
+            fileSize: file.size,
           });
-        });
-      });
+          const dbId = dbTransfer?.id || "";
+          setTransferId(dbId);
 
-      await updateTransferStatus(transfer.id, "transferring");
-      addLog("> Setting up file transfer...");
-      const sender = new FileSender(file, connection, dbTransferId);
-      fileSenderRef.current = sender;
+          const sender = new FileSender(file, conn, dbId);
+          sender.setOnLog(addLog);
+          fileSenderRef.current = sender;
 
-      if (password) {
-        addLog("> Setting up end-to-end encryption...");
-        await sender.setPassword(password);
-      }
+          if (password) {
+            await sender.setPassword(password);
+          }
 
-      addLog(
-        "> Sending exact file metadata and waiting for acceptance..."
-      );
-      dispatchTransfer({ type: "AWAIT_ACCEPTANCE" });
-      await sender.sendOffer();
+          addLog("Sending file offer...");
+          logger.debug(
+            { filename: file.name, fileSize: file.size },
+            "[useSendTransfer] Sending file offer"
+          );
+          await sender.sendOffer();
+          dispatchTransfer({ type: "AWAIT_ACCEPTANCE" });
 
-      sender.onPauseChange((paused) => {
-        dispatchTransfer(paused ? { type: "PAUSE", pausedBy: "remote" } : { type: "RESUME" });
-        addLog(
-          paused
-            ? "> Transfer paused by receiver"
-            : "> Transfer resumed by receiver"
-        );
-      });
-
-      sender.onReject(() => {
-        dispatchTransfer({
-          type: "FAIL",
-          error: "Receiver rejected the file offer",
-        });
-        addLog("✗ Receiver rejected the file");
-        vibrate("error");
-        playErrorSound();
-      });
-
-      sender.onCancel(() => {
-        dispatchTransfer({ type: "CANCEL" });
-        addLog("✗ Transfer cancelled by peer");
-        vibrate("error");
-        playErrorSound();
-      });
-
-      sender
-        .startTransfer((progressData) => {
-          if (
-            fileSenderRef.current?.getStatus() === "transferring" &&
-            transferState.status !== "transferring"
-          ) {
+          sender.onAccepted(() => {
+            logger.debug("[useSendTransfer] Peer accepted the file");
             dispatchTransfer({
               type: "START_TRANSFER",
               totalBytes: file.size,
             });
-          }
-          dispatchTransfer({
-            type: "PROGRESS",
-            bytesTransferred: progressData.bytesTransferred,
-            speed: progressData.speed,
-            remaining: progressData.timeRemaining,
+            addLog("✓ Peer accepted the file");
           });
-          if (
-            Math.floor(progressData.percentage) % 10 === 0 &&
-            Math.floor(progressData.percentage) !==
-            Math.floor(
-              ((progressData.bytesTransferred - 16384) /
-                progressData.totalBytes) *
-              100
-            )
-          ) {
-            addLog(
-              `> Progress: ${progressData.percentage.toFixed(0)}%`
-            );
-          }
-        })
-        .then(async () => {
-          addLog("✓ Transfer complete");
-          dispatchTransfer({ type: "COMPLETE" });
-          vibrate("success");
-          playSuccessSound();
-          if (dbTransferId)
-            await updateTransferStatus(dbTransferId, "complete");
-          if ("setAppBadge" in navigator) {
-            navigator.setAppBadge(1)
-              .catch((err: unknown) => logger.error({ err }, "[SEND] setAppBadge failed:"));
-          }
-        })
-        .catch((err) => {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          if (
-            errorMsg === "Transfer cancelled by receiver" ||
-            errorMsg === "File offer rejected by receiver"
-          ) {
-            dispatchTransfer({ type: "CANCEL" });
-            vibrate("error");
+
+          sender.onPauseChange((paused) => {
+            if (paused) {
+              dispatchTransfer({ type: "PAUSE", pausedBy: "remote" });
+            } else {
+              dispatchTransfer({ type: "RESUME" });
+            }
+          });
+
+          sender.onReject(() => {
+            setError("Transfer rejected by receiver");
+            addLog("✗ Transfer rejected");
             playErrorSound();
-            if (dbTransferId)
-              updateTransferStatus(dbTransferId, "cancelled");
-            return;
-          }
-          addLog(`✗ Transfer failed: ${errorMsg}`);
-          logger.error({ err }, "[SEND] Transfer failed:");
-          dispatchTransfer({
-            type: "FAIL",
-            error: errorMsg || "Transfer failed due to an unknown connectivity issue",
+            dispatchTransfer({ type: "FAIL", error: "Transfer rejected by receiver" });
           });
-          if (dbTransferId)
-            updateTransferStatus(dbTransferId, "failed");
-        });
+
+          sender.onCancel(() => {
+            setError("Transfer cancelled by receiver");
+            addLog("✗ Transfer cancelled");
+            playErrorSound();
+            dispatchTransfer({ type: "FAIL", error: "Transfer cancelled by receiver" });
+          });
+
+          await sender.startTransfer((p) => {
+            dispatchTransfer({
+              type: "PROGRESS",
+              bytesTransferred: p.bytesTransferred,
+              speed: p.speed,
+              remaining: p.timeRemaining,
+              chunkSize: p.chunkSize,
+              windowSize: p.windowSize,
+            });
+            // Removed redundant onData call here as Progress is handled via dispatch
+          });
+
+          if (dbId) {
+            await updateTransferStatus(dbId, "complete");
+          }
+          dispatchTransfer({ type: "COMPLETE" });
+          addLog("✓ Transfer complete!");
+          playSuccessSound();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(`Transfer failed: ${msg}`);
+          addLog(`✗ Error: ${msg}`);
+          playErrorSound();
+          dispatchTransfer({ type: "FAIL", error: msg });
+        }
+      });
+
+      conn.on("data", (data: unknown) => {
+        try {
+          // Task: Fix Chat Reception - This listener handles chat messages
+          // and other non-transfer control messages.
+          onDataRef.current?.(data);
+
+          const message = validatePeerMessage(data);
+          if (message && message.type === "chunk-ack") {
+            // Handled internally by FileSender
+          }
+        } catch (err) {
+          logger.error({ err }, "[SEND] Invalid peer message");
+        }
+      });
+
+      conn.on("error", (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(`Connection error: ${msg}`);
+        addLog(`✗ Connection error: ${msg}`);
+        playErrorSound();
+        resetSend();
+      });
+
+      conn.on("close", () => {
+        // Use ref to avoid stale closure - check current status from FileSender
+        const currentStatus = fileSenderRef.current?.getStatus();
+        if (currentStatus !== "complete") {
+          setError("Connection closed");
+          addLog("✗ Connection closed");
+          resetSend();
+        }
+      });
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Unknown error occurred";
-      logger.error({ err }, "Transfer failed:");
-      if (errMsg.includes("peer-unavailable")) {
-        dispatchTransfer({
-          type: "FAIL",
-          error:
-            "Peer is unavailable. Ensure they have the site open and the ID is correct.",
-        });
-      } else {
-        dispatchTransfer({
-          type: "FAIL",
-          error: errMsg,
-        });
-      }
-      addLog(`✗ Transfer failed: ${errMsg}`);
-      vibrate("error");
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Failed to initiate transfer: ${msg}`);
+      addLog(`✗ Error: ${msg}`);
       playErrorSound();
-      if (dbTransferId) {
-        updateTransferStatus(dbTransferId, "failed");
-      }
+      resetSend();
     }
   }, [
     file,
     receiverPeerId,
     user,
     password,
+    isPeerReady,
     addLog,
     dispatchTransfer,
-    vibrate,
-    transferState.status,
     resetSend,
+    vibrate,
+    // transferState.status removed - we now use fileSenderRef.current?.getStatus() to avoid stale closure
   ]);
-
-  const handlePauseResume = useCallback(async () => {
-    if (!fileSenderRef.current) return;
-    if (transferState.status === "paused") {
-      if (transferState.pausedBy === "remote") return;
-      await fileSenderRef.current.resume();
-      dispatchTransfer({ type: "RESUME" });
-    } else {
-      await fileSenderRef.current.pause();
-      dispatchTransfer({ type: "PAUSE", pausedBy: "local" });
-    }
-  }, [transferState.status, transferState.pausedBy, dispatchTransfer]);
-
-  const handleCancel = useCallback(async () => {
-    if (!fileSenderRef.current) return;
-    await fileSenderRef.current.cancel();
-    dispatchTransfer({ type: "CANCEL" });
-    addLog("✗ Transfer cancelled by user");
-    if (transferId) updateTransferStatus(transferId, "cancelled");
-  }, [dispatchTransfer, addLog, transferId]);
 
   return {
     transferState,
-    dispatchTransfer,
-    isTransferActive,
-    isPeerReady,
-    transferId,
     error,
-    connectionRef,
-    peerManagerRef,
-    handleSend,
-    resetSend,
-    handlePauseResume,
-    handleCancel,
+    isPeerReady,
+    myPeerId,
+    isWakeLockActive,
     showBackModal,
     confirmBackNavigation,
     cancelBackNavigation,
+    connectionRef,
+    peerManagerRef,
+    handleSend,
+    handlePauseResume,
+    handleCancelClick,
+    confirmCancel,
+    showCancelModal,
+    setShowCancelModal,
+    resetSend,
   };
 }

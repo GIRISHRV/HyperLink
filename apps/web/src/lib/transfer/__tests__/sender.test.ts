@@ -6,7 +6,7 @@
  *
  * All PeerJS and crypto dependencies are mocked.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { FileSender } from "../sender";
 
 // ─── Mock dependencies ─────────────────────────────────────────────────
@@ -24,7 +24,9 @@ vi.mock("@repo/utils", () => ({
 
 vi.mock("@/lib/utils/crypto", () => ({
   generateSalt: vi.fn(() => new Uint8Array(16)),
-  deriveKey: vi.fn(async () => ({ type: "secret", algorithm: { name: "AES-GCM" } } as unknown as CryptoKey)),
+  deriveKey: vi.fn(
+    async () => ({ type: "secret", algorithm: { name: "AES-GCM" } }) as unknown as CryptoKey
+  ),
   encryptChunk: vi.fn(async (data: ArrayBuffer) => {
     // Return data with 28 bytes overhead (12 IV + 16 tag)
     const result = new Uint8Array(data.byteLength + 28);
@@ -32,6 +34,23 @@ vi.mock("@/lib/utils/crypto", () => ({
     return result.buffer;
   }),
   arrayBufferToBase64: vi.fn(() => "bW9ja19zYWx0"),
+}));
+
+vi.mock("@/lib/utils/encryption-worker-client", () => ({
+  encryptionWorkerClient: {
+    decrypt: vi.fn(async (data: ArrayBuffer) => data),
+    encrypt: vi.fn(async (data: ArrayBuffer) => {
+      // Return data with 28 bytes overhead (12 IV + 16 tag)
+      const result = new Uint8Array(data.byteLength + 28);
+      result.set(new Uint8Array(data), 0);
+      return result.buffer;
+    }),
+    deriveKey: vi.fn(async (_password: string, salt: ArrayBuffer) => ({
+      key: { type: "secret", algorithm: { name: "AES-GCM" } } as unknown as CryptoKey,
+      salt,
+    })),
+    terminate: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/utils/peer-message-validator", () => ({
@@ -249,7 +268,7 @@ describe("FileSender", () => {
       // jsdom does not define Blob/File.prototype.arrayBuffer.
       // Polyfill it so slice().arrayBuffer() resolves with a real buffer.
       const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
-        return Promise.resolve(new ArrayBuffer(64));
+        return Promise.resolve(new ArrayBuffer(this.size));
       };
       Object.defineProperty(Blob.prototype, "arrayBuffer", {
         value: arrayBufferImpl,
@@ -279,7 +298,7 @@ describe("FileSender", () => {
       conn._emit("data", {
         type: "chunk-ack",
         transferId: "mock-transfer-id",
-        payload: null,
+        payload: { chunkIndex: 0 },
         timestamp: Date.now(),
       });
 
@@ -341,7 +360,7 @@ describe("FileSender", () => {
       const pauseCb = vi.fn();
       sender.onPauseChange(pauseCb);
 
-      sender.startTransfer().catch(() => { });
+      sender.startTransfer().catch(() => {});
 
       conn._emit("data", {
         type: "file-accept",
@@ -411,7 +430,7 @@ describe("FileSender", () => {
       const sender = new FileSender(file, conn as any);
 
       // p1 starts and sets status to "transferring" immediately (synchronously)
-      const p1 = sender.startTransfer().catch(() => { });
+      const p1 = sender.startTransfer().catch(() => {});
 
       // p2 should resolve immediately since status is already "transferring"
       await sender.startTransfer();
@@ -428,15 +447,173 @@ describe("FileSender", () => {
     });
 
     it("completes immediately for 0-chunk file", async () => {
-      const { calculateChunkCount } = await import("@repo/utils");
-      (calculateChunkCount as ReturnType<typeof vi.fn>).mockReturnValueOnce(0);
-
       const file = createMockFile(0, "empty.txt");
       const sender = new FileSender(file, conn as any);
 
       await sender.startTransfer();
 
       expect(sender.getStatus()).toBe("complete");
+    });
+  });
+
+  describe("heartbeat and probes (Task 2)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Polyfill arrayBuffer for jsdom
+      const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
+        return Promise.resolve(new ArrayBuffer(this.size));
+      };
+      Object.defineProperty(Blob.prototype, "arrayBuffer", {
+        value: arrayBufferImpl,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("sends a chunk-probe if no ACK received for 3 seconds", async () => {
+      const file = createMockFile(65536 * 5); // 5 chunks
+      const sender = new FileSender(file, conn as any);
+
+      sender.startTransfer().catch(() => {});
+
+      // Accept
+      conn._emit("data", {
+        type: "file-accept",
+        transferId: "mock-transfer-id",
+      });
+
+      // Wait a bit for initial pump
+      await vi.advanceTimersByTimeAsync(50);
+      conn.send.mockClear();
+
+      // Wait more than PROBE_INTERVAL (3000ms) + initial drift
+      await vi.advanceTimersByTimeAsync(5000);
+
+      const probeMsg = conn.send.mock.calls.find((c) => c[0].type === "chunk-probe");
+      expect(probeMsg).toBeDefined();
+      expect(probeMsg![0].payload.chunkIndex).toBe(0); // first un-acked
+    });
+
+    it("stalls after max probes reached", async () => {
+      const file = createMockFile(64);
+      const sender = new FileSender(file, conn as any);
+
+      sender.startTransfer().catch(() => {});
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+      await vi.advanceTimersByTimeAsync(50);
+
+      // Trigger 5 probes (MAX_PROBES)
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(3500);
+      }
+
+      // Next heartbeat check (after 1s) should see probeCount >= MAX_PROBES
+      await vi.advanceTimersByTimeAsync(1500);
+
+      expect(sender.getStatus()).toBe("cancelled");
+    });
+  });
+
+  describe("adaptive scaling", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      const arrayBufferImpl = function (this: Blob): Promise<ArrayBuffer> {
+        return Promise.resolve(new ArrayBuffer(this.size));
+      };
+      Object.defineProperty(Blob.prototype, "arrayBuffer", {
+        value: arrayBufferImpl,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("increases chunk size after consecutive fast ACKs", async () => {
+      const file = createMockFile(1024 * 1024 * 10);
+      const sender = new FileSender(file, conn as any);
+
+      let now = 1000;
+      vi.setSystemTime(now);
+      sender.startTransfer().catch(() => {});
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+
+      // Advance to allow initial pump to record start times
+      await Promise.resolve();
+      now += 1;
+      vi.setSystemTime(now);
+
+      // Send 32 ACKs with very small increments to keep RTT fast (< 80ms)
+      for (let i = 0; i < 32; i++) {
+        now += 1;
+        vi.setSystemTime(now);
+        conn._emit("data", {
+          type: "chunk-ack",
+          transferId: "mock-transfer-id",
+          payload: { chunkIndex: i },
+        });
+        await Promise.resolve();
+        now += 1;
+        vi.setSystemTime(now);
+      }
+
+      const hasLargeChunk = conn.send.mock.calls.some(
+        (c) => c[0].payload?.data?.byteLength >= 131072
+      );
+      expect(hasLargeChunk).toBe(true);
+    });
+
+    it("decreases chunk size after slow ACK", async () => {
+      const file = createMockFile(1024 * 1024 * 10);
+      const sender = new FileSender(file, conn as any);
+
+      let now = 1000;
+      vi.setSystemTime(now);
+      sender.startTransfer().catch(() => {});
+      conn._emit("data", { type: "file-accept", transferId: "mock-transfer-id" });
+
+      await Promise.resolve();
+      now += 1;
+      vi.setSystemTime(now);
+
+      // 1. Scale up first
+      for (let i = 0; i < 32; i++) {
+        now += 1;
+        vi.setSystemTime(now);
+        conn._emit("data", {
+          type: "chunk-ack",
+          transferId: "mock-transfer-id",
+          payload: { chunkIndex: i },
+        });
+        await Promise.resolve();
+        now += 1;
+        vi.setSystemTime(now);
+      }
+
+      const hasLargeChunk = conn.send.mock.calls.some(
+        (c) => c[0].payload?.data?.byteLength >= 131072
+      );
+      expect(hasLargeChunk).toBe(true);
+
+      // 2. Simulate a slow ACK
+      const slowIndex = 32;
+      now += 500;
+      vi.setSystemTime(now);
+      conn._emit("data", {
+        type: "chunk-ack",
+        transferId: "mock-transfer-id",
+        payload: { chunkIndex: slowIndex },
+      });
+
+      await Promise.resolve();
+      const lastCall = conn.send.mock.calls[conn.send.mock.calls.length - 1][0];
+      expect(lastCall.payload.data.byteLength).toBe(65536);
     });
   });
 });

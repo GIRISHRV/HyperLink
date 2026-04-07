@@ -18,14 +18,15 @@ export async function createClient() {
             cookieStore.set({ name, value, ...options });
           } catch (error) {
             // Server Component cookie operations may fail; log for debugging
-            logger.warn({ error }, '[Supabase Server] Cookie operation failed:');
+            logger.warn({ error }, "[Supabase Server] Cookie operation failed:");
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: "", ...options });
           } catch (error) {
-            // Server Component cookie removal
+            // Server Component cookie removal may fail; log for debugging
+            logger.warn({ error, name }, "[Supabase Server] Cookie remove failed:");
           }
         },
       },

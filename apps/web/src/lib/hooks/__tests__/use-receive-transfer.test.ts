@@ -111,12 +111,18 @@ vi.mock("@/lib/webrtc/peer-manager", () => {
     on = m.mockPMOn;
     destroy = m.mockPMDestroy;
     getPeerId = m.mockPMGetPeerId;
+    static getRandomId = vi.fn().mockImplementation((prefix = "hl") => `${prefix}-random-id`);
   }
   return { PeerManager };
 });
 
+vi.mock("@/lib/services/profile-service", () => ({
+  updateUserProfile: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 vi.mock("@/lib/transfer/receiver", () => {
   class FileReceiver {
+    setOnLog = vi.fn();
     setConnection = m.mockRecvSetConnection;
     setStorageId = m.mockRecvSetStorageId;
     handleOffer = m.mockRecvHandleOffer;
@@ -125,6 +131,9 @@ vi.mock("@/lib/transfer/receiver", () => {
     onCancel = m.mockRecvOnCancel;
     onPauseChange = m.mockRecvOnPauseChange;
     onError = m.mockRecvOnError;
+    onCleanup = vi.fn().mockImplementation(
+      (cb: (...a: unknown[]) => void) => { m.recvCallbacks["cleanupProgress"] = cb; }
+    );
     handleChunk = m.mockRecvHandleChunk;
     handleControlMessage = m.mockRecvHandleControlMessage;
     sendResumeFrom = m.mockRecvSendResumeFrom;
@@ -143,14 +152,43 @@ vi.mock("@/lib/services/transfer-service", () => ({
     m.mockUpdateTransferStatus(...args),
 }));
 
+vi.mock("@/lib/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(async () => ({
+        data: { session: { access_token: "test-token" } },
+        error: null,
+      })),
+    },
+  },
+}));
+
+vi.mock("@repo/utils", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 vi.mock("@/lib/config/webrtc", () => ({
   getIceServers: () => m.mockGetIceServers(),
   getPeerConfigAsync: (...args: unknown[]) =>
     m.mockGetPeerConfigAsync(...args),
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...args: any[]) => m.mockToastError(...args),
+    warning: (...args: any[]) => m.mockToastWarning(...args),
+    success: (...args: any[]) => m.mockToastSuccess(...args),
+    info: (...args: any[]) => m.mockToastInfo(...args),
+  },
+}));
+
 vi.mock("@/lib/hooks/use-wake-lock", () => ({
-  useWakeLock: () => ({ request: vi.fn(), release: vi.fn() }),
+  useWakeLock: () => ({ request: vi.fn(), release: vi.fn(), isLocked: false }),
 }));
 
 vi.mock("@/lib/hooks/use-haptics", () => ({
@@ -290,6 +328,11 @@ describe("useReceiveTransfer", () => {
 
       await waitFor(() =>
         expect(result.current.myPeerId).toBe("recv-peer-id")
+      );
+      // Verify initialize was called with hl- prefix + first 8 of user ID + auth token
+      expect(m.mockPMInitialize).toHaveBeenCalledWith(
+        expect.stringMatching(/^hl-user-1/),
+        expect.any(String)
       );
     });
 
@@ -577,6 +620,100 @@ describe("useReceiveTransfer", () => {
       });
       // Verification that the actual DB claim returned our data
       expect(isDbClaimResolved).toBe(true);
+    });
+  });
+
+  describe("cleanupProgress", () => {
+    it("updates cleanupProgress when FileReceiver emits cleanup status", async () => {
+      const { result } = renderHook(() =>
+        useReceiveTransfer(defaultOptions())
+      );
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+      // 1. Simulate incoming connection and offer so we can start the sequence
+      const { conn, connEvents } = buildMockConnection();
+      await act(async () => {
+        await m.pmEvents["incoming-connection"][0](conn);
+      });
+      const offerMsg = makeFileOfferMessage();
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(offerMsg));
+      });
+
+      // 2. Accept offer to create internal FileReceiver and register cleanup callback
+      await act(async () => {
+        result.current.handleAcceptOffer();
+      });
+
+      // 3. Now the callback should be in m.recvCallbacks
+      await act(async () => {
+        const cleanupCb = m.recvCallbacks["cleanupProgress"] as any;
+        if (cleanupCb) {
+          cleanupCb(50, 100);
+        }
+      });
+
+      expect(result.current.cleanupProgress).toEqual({ cleared: 50, total: 100 });
+    });
+  });
+
+  describe("Task 2: ACK Resilience routing", () => {
+    it("routes chunk-probe to FileReceiver.handleChunk", async () => {
+      const { result } = renderHook(() =>
+        useReceiveTransfer(defaultOptions())
+      );
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+      const { connEvents, conn } = buildMockConnection();
+      await act(async () => {
+        const incomingHandlers = m.pmEvents["incoming-connection"];
+        if (incomingHandlers) await incomingHandlers[0](conn);
+      });
+
+      const offerMsg = makeFileOfferMessage();
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(offerMsg));
+      });
+
+      await act(async () => {
+        result.current.handleAcceptOffer();
+        await new Promise((r) => setTimeout(r, 200));
+      });
+
+      const probeMsg = {
+        type: "chunk-probe",
+        transferId: "tx-001",
+        payload: { chunkIndex: 0, data: new ArrayBuffer(10) },
+        timestamp: Date.now()
+      };
+
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(probeMsg as any));
+      });
+
+      expect(m.mockRecvHandleChunk).toHaveBeenCalledWith(probeMsg);
+    });
+    describe("NAT Traversal (Task #4)", () => {
+      it("Task #4: shows toast error when firewall-blocked is emitted", async () => {
+        const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+
+        await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+        // Trigger the 'firewall-blocked' callback registered in PeerManager mock
+        await act(async () => {
+          const firewallBlockedCbs = m.pmEvents["firewall-blocked"];
+          if (firewallBlockedCbs) {
+            firewallBlockedCbs.forEach((cb) => cb());
+          }
+        });
+
+        expect(m.mockToastError).toHaveBeenCalledWith(
+          "Firewall Blocked",
+          expect.objectContaining({
+            description: expect.stringContaining("Compatibility Mode"),
+          })
+        );
+      });
     });
   });
 });

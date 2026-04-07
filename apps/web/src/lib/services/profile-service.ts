@@ -8,6 +8,7 @@ export interface UserProfile {
   display_name: string | null;
   avatar_icon: string;
   avatar_color: string;
+  active_peer_id: string | null; // Added for Task #9
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +17,7 @@ export interface UpdateProfileData {
   display_name?: string;
   avatar_icon?: string;
   avatar_color?: string;
+  active_peer_id?: string; // Added for Task #9
 }
 
 /**
@@ -47,24 +49,29 @@ export async function updateUserProfile(
   userId: string,
   updates: UpdateProfileData
 ): Promise<UserProfile | null> {
-  // Use upsert to handle cases where the profile might not exist yet (e.g. older users)
+  // Try to update first. Since user_profiles are auto-created by a trigger on auth.users,
+  // the profile should almost always exist.
   const { data, error } = await withRetry(() =>
     supabase
       .from("user_profiles")
-      .upsert(
-        {
-          user_id: userId,
-          ...updates,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
+      .update(updates)
+      .eq("user_id", userId)
       .select()
       .single()
   );
 
   if (error) {
-    logger.error({ error }, "Error updating user profile");
+    // If it doesn't exist (PGRST116), try to insert it once.
+    if (error.code === "PGRST116") {
+      logger.debug({ userId }, "[PROFILE] Profile not found, attempting to create...");
+      return await createUserProfile(userId, updates.display_name || "User");
+    }
+    logger.error({
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      userId
+    }, "Error updating user profile");
     throw error;
   }
 
