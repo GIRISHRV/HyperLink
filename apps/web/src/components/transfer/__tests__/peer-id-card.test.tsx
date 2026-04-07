@@ -23,9 +23,9 @@ describe("PeerIdCard", () => {
     expect(screen.getByTestId("my-peer-id").textContent).toBe("abc-123");
   });
 
-  it("shows 'Generating' loading state when peerId is empty string", () => {
+  it("shows 'Loading...' state when peerId is empty string", () => {
     render(<PeerIdCard peerId="" onCopy={onCopy} onShowQR={onShowQR} />);
-    expect(screen.getByTestId("my-peer-id").textContent).toContain("Generating");
+    expect(screen.getByTestId("my-peer-id").textContent).toContain("Loading...");
   });
 
   it("renders 'Copy ID' button", () => {
