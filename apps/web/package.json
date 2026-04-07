@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.1.6",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.59.1",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@testing-library/dom": "^10.4.1",
