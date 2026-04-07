@@ -54,8 +54,8 @@
     "serialize-javascript": "^7.0.4",
     "elliptic": "^6.6.1",
     "eslint": "8.57.1",
-    "next": "15.5.12",
-    "eslint-config-next": "15.5.12"
+    "next": "15.5.14",
+    "eslint-config-next": "15.5.14"
   },
   "packageManager": "npm@11.11.0"
 }
