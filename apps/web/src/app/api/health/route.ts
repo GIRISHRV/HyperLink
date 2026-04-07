@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase/client";
 
+export const dynamic = "force-dynamic";
+
 /**
  * FINDING-029: Health check endpoint for the web application.
  * Allows load balancers, uptime monitors, and Kubernetes readiness probes
