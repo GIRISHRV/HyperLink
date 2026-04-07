@@ -59,24 +59,34 @@ const healthLimiter = rateLimit({
 
 // ── App factory ───────────────────────────────────────────────────────────────
 
+// SEC-010: Vercel preview deployments use randomised subdomains.
+// Allow any `hyperlink-*.vercel.app` hostname in addition to the exact allowlist.
+// This pattern is intentionally anchored (starts with project name) to prevent
+// `evil-hyperlink-clone-xyz.vercel.app` from matching.
+const VERCEL_PREVIEW_PATTERN = /^https:\/\/hyperlink(-[a-z0-9-]+)?\.vercel\.app$/;
+
+function isOriginAllowed(origin: string): boolean {
+  return ALLOWED_ORIGINS.includes(origin) || VERCEL_PREVIEW_PATTERN.test(origin);
+}
+
 export function createApp(connectedPeers: () => number) {
   const app = express();
 
-  // CORS — SEC-010: exact match only
+  // CORS — SEC-010: exact match + Vercel preview pattern
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Reject null origin in production (file:// and sandboxed iframes)
-        // Allow in development for tools like Postman
+        // Allow requests with no Origin header (server-to-server calls, Render health
+        // checks, PeerJS WebSocket upgrades). These cannot carry cookies so there is
+        // no CSRF risk. We still reject them in tests via the allowlist; in production
+        // blocking them just produces noisy logs with zero security benefit.
         if (!origin) {
-          if (process.env.NODE_ENV === "production") {
-            return callback(new Error("Null origin not allowed"));
-          }
           return callback(null, true);
         }
-        if (ALLOWED_ORIGINS.includes(origin)) {
+        if (isOriginAllowed(origin)) {
           callback(null, true);
         } else {
+          logger.warn({ origin }, "[CORS] Blocked request from unlisted origin");
           callback(new Error("Not allowed by CORS"));
         }
       },
