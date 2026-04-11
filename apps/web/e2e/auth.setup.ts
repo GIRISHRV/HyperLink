@@ -5,10 +5,11 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const senderFile = path.join(__dirname, ".auth/user.json");
-const receiverFile = path.join(__dirname, ".auth/receiver.json");
+const senderFile = (browserName: string) => path.join(__dirname, `.auth/user-${browserName}.json`);
+const receiverFile = (browserName: string) =>
+  path.join(__dirname, `.auth/receiver-${browserName}.json`);
 
-setup("authenticate sender", async ({ page, context }) => {
+setup("authenticate sender", async ({ page, context, browserName }) => {
   const email = process.env.E2E_TEST_EMAIL;
   const password = process.env.E2E_TEST_PASSWORD;
 
@@ -49,10 +50,10 @@ setup("authenticate sender", async ({ page, context }) => {
   await expect(page).toHaveURL("/dashboard");
 
   // Save the authenticated state
-  await page.context().storageState({ path: senderFile });
+  await page.context().storageState({ path: senderFile(browserName) });
 });
 
-setup("authenticate receiver", async ({ page, context }) => {
+setup("authenticate receiver", async ({ page, context, browserName }) => {
   const email = process.env.E2E_RECEIVER_EMAIL;
   const password = process.env.E2E_RECEIVER_PASSWORD;
 
@@ -122,5 +123,5 @@ setup("authenticate receiver", async ({ page, context }) => {
   await expect(page).toHaveURL("/dashboard");
 
   // Save the authenticated state
-  await page.context().storageState({ path: receiverFile });
+  await page.context().storageState({ path: receiverFile(browserName) });
 });

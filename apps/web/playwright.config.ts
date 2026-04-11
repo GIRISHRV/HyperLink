@@ -9,7 +9,8 @@ const __dirname = path.dirname(__filename);
 // Load .env.local so E2E_TEST_EMAIL / E2E_TEST_PASSWORD are available to auth.setup.ts
 loadEnv({ path: path.resolve(__dirname, ".env.local") });
 
-const authFile = path.join(__dirname, "e2e/.auth/user.json");
+const authFileChrome = path.join(__dirname, "e2e/.auth/user-chromium.json");
+const authFileFirefox = path.join(__dirname, "e2e/.auth/user-firefox.json");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -33,9 +34,16 @@ export default defineConfig({
   },
 
   projects: [
-    // 1. Run auth setup once — logs in and saves storageState
+    // 1(a). Run auth setup for Chromium — logs in and saves storageState
     {
       name: "setup",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /auth\.setup\.ts/,
+    },
+    // 1(b). Run auth setup for Firefox — handles unique cross-origin localhost cookie states
+    {
+      name: "setup-firefox",
+      use: { ...devices["Desktop Firefox"] },
       testMatch: /auth\.setup\.ts/,
     },
 
@@ -45,16 +53,16 @@ export default defineConfig({
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: authFile,
+        storageState: authFileChrome,
       },
       testMatch: /authenticated\/.*\.spec\.ts/,
     },
     {
       name: "authenticated-firefox",
-      dependencies: ["setup"],
+      dependencies: ["setup-firefox"],
       use: {
         ...devices["Desktop Firefox"],
-        storageState: authFile,
+        storageState: authFileFirefox,
         // Firefox needs longer timeouts for WebRTC and navigation
         navigationTimeout: 60_000,
         actionTimeout: 15_000,
