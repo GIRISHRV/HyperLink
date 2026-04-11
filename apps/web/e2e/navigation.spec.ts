@@ -11,19 +11,13 @@ test.describe("Navigation", () => {
     const link = page.getByRole("link", { name: /how it works/i }).first();
     await expect(link).toBeVisible({ timeout: 15000 });
 
-    // Use Promise.race to handle Firefox navigation issues
-    await Promise.race([link.click(), page.waitForTimeout(1000)]);
+    await link.click();
 
-    // Wait for navigation by checking URL or content
-    try {
-      await page.waitForURL("/about", {
-        timeout: navigationTimeout,
-        waitUntil: "domcontentloaded",
-      });
-    } catch {
-      // Fallback: check if we're on the right page by content
-      await expect(page).toHaveURL(/\/about/, { timeout: 5000 });
-    }
+    // Wait for navigation
+    await page.waitForURL("/about", {
+      timeout: navigationTimeout,
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(page.getByRole("heading", { name: /how it works/i })).toBeVisible({
       timeout: 10_000,
@@ -40,19 +34,13 @@ test.describe("Navigation", () => {
     const link = page.getByRole("link", { name: /status/i }).first();
     await expect(link).toBeVisible({ timeout: 15000 });
 
-    // Use Promise.race to handle Firefox navigation issues
-    await Promise.race([link.click(), page.waitForTimeout(1000)]);
+    await link.click();
 
-    // Wait for navigation by checking URL or content
-    try {
-      await page.waitForURL("/status", {
-        timeout: navigationTimeout,
-        waitUntil: "domcontentloaded",
-      });
-    } catch {
-      // Fallback: check if we're on the right page by content
-      await expect(page).toHaveURL(/\/status/, { timeout: 5000 });
-    }
+    // Wait for navigation
+    await page.waitForURL("/status", {
+      timeout: navigationTimeout,
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(page.locator("body")).toContainText(/signaling server/i, { timeout: 10_000 });
   });
@@ -67,16 +55,10 @@ test.describe("Navigation", () => {
     const link = page.getByRole("link", { name: /login/i }).first();
     await expect(link).toBeVisible({ timeout: 15000 });
 
-    // Use Promise.race to handle Firefox navigation issues
-    await Promise.race([link.click(), page.waitForTimeout(1000)]);
+    await link.click();
 
-    // Wait for navigation by checking URL or content
-    try {
-      await page.waitForURL("/auth", { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
-    } catch {
-      // Fallback: check if we're on the right page by content
-      await expect(page).toHaveURL(/\/auth/, { timeout: 5000 });
-    }
+    // Wait for navigation
+    await page.waitForURL("/auth", { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
 
     await expect(page.locator("#auth-email")).toBeVisible({ timeout: 10_000 });
   });
