@@ -444,7 +444,7 @@ export class FileSender {
     this.bytesSent += data.byteLength;
 
     // Log progress periodically
-    const percentage = (this.bytesSent / this.file.size) * 100;
+    const percentage = Math.min((this.bytesSent / this.file.size) * 100, 100);
 
     // Update progress callback
     if (this.progressCallback) {

@@ -7,7 +7,7 @@ This guide covers deploying HyperLink to production environments.
 HyperLink consists of three main components:
 
 1. **Frontend** (Next.js) - Deployed to Vercel
-2. **Signaling Server** (Node.js) - Deployed to Railway
+2. **Signaling Server** (Node.js) - Deployed to Render
 3. **Database** (PostgreSQL) - Hosted on Supabase
 
 ## Frontend Deployment (Vercel)
@@ -35,7 +35,7 @@ HyperLink consists of three main components:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-   NEXT_PUBLIC_PEER_SERVER_HOST=your-signaling-server.railway.app
+   NEXT_PUBLIC_PEER_SERVER_HOST=your-signaling-server.onrender.com
    NEXT_PUBLIC_PEER_SERVER_PORT=443
    NEXT_PUBLIC_PEER_SERVER_PATH=/myapp
    NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
@@ -53,19 +53,19 @@ HyperLink consists of three main components:
 3. Configure DNS records as instructed
 4. Update `ALLOWED_ORIGIN` in signaling server
 
-## Signaling Server Deployment (Railway)
+## Signaling Server Deployment (Render)
 
 ### Prerequisites
 
-- Railway account
-- GitHub repository connected to Railway
+- Render account
+- GitHub repository connected to Render
 
 ### Steps
 
-1. **Create New Project**
-   - Go to [Railway Dashboard](https://railway.app/dashboard)
-   - Click "New Project"
-   - Select "Deploy from GitHub repo"
+1. **Create New Service**
+   - Go to [Render Dashboard](https://dashboard.render.com)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repo
 
 2. **Configure Service**
    - **Root Directory**: `apps/signaling`
@@ -83,12 +83,12 @@ HyperLink consists of three main components:
    **Note**: Get `SUPABASE_JWT_SECRET` from Supabase Dashboard > Settings > API > JWT Secret
 
 4. **Configure Networking**
-   - Railway will automatically assign a public URL
-   - Note the URL (e.g., `your-app.railway.app`)
+   - Render will automatically assign a public URL
+   - Note the URL (e.g., `your-app.onrender.com`)
    - Use this URL in frontend's `NEXT_PUBLIC_PEER_SERVER_HOST`
 
 5. **Deploy**
-   - Railway will automatically build and deploy
+   - Render will automatically build and deploy
    - Future pushes to `main` branch will auto-deploy
 
 ### Health Check
@@ -96,7 +96,7 @@ HyperLink consists of three main components:
 Verify deployment:
 
 ```bash
-curl https://your-app.railway.app/health
+curl https://your-app.onrender.com/health
 ```
 
 Expected response:
@@ -236,14 +236,14 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 | ------------------------------- | --------------------- | --------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL  | `https://xxx.supabase.co`   |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key     | `eyJhbGc...`                |
-| `NEXT_PUBLIC_PEER_SERVER_HOST`  | Signaling server host | `app.railway.app`           |
+| `NEXT_PUBLIC_PEER_SERVER_HOST`  | Signaling server host | `app.onrender.com`          |
 | `NEXT_PUBLIC_PEER_SERVER_PORT`  | Signaling server port | `443`                       |
 | `NEXT_PUBLIC_PEER_SERVER_PATH`  | Signaling server path | `/myapp`                    |
 | `NEXT_PUBLIC_SENTRY_DSN`        | Sentry DSN            | `https://xxx@sentry.io/xxx` |
 | `TWILIO_ACCOUNT_SID`            | Twilio account SID    | `ACxxx`                     |
 | `TWILIO_AUTH_TOKEN`             | Twilio auth token     | `xxx`                       |
 
-### Signaling Server (Railway)
+### Signaling Server (Render)
 
 | Variable              | Description         | Example                     |
 | --------------------- | ------------------- | --------------------------- |
@@ -293,7 +293,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 
 **Solutions**:
 
-- Check Railway logs
+- Check Render logs
 - Verify server is running
 - Check port configuration
 - Verify environment variables
@@ -335,7 +335,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 2. Find previous working deployment
 3. Click "..." > "Promote to Production"
 
-### Signaling Server (Railway)
+### Signaling Server (Render)
 
 1. Go to Deployments
 2. Find previous working deployment
@@ -357,7 +357,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 
 ### Signaling Server
 
-- Railway auto-scales on Pro plan
+- Render auto-scales on paid plans
 - Consider multiple instances for high traffic
 - Use load balancer if needed
 
@@ -389,7 +389,7 @@ For production WebRTC connections, configure TURN servers for NAT traversal.
 ### Tools
 
 - **Vercel Analytics**: Frontend performance
-- **Railway Metrics**: Server performance
+- **Render Metrics**: Server performance
 - **Supabase Dashboard**: Database metrics
 - **Sentry**: Error tracking
 

@@ -337,6 +337,20 @@ class TransferMetricsCollector {
   getMetrics(transferId: string): TransferMetrics | undefined {
     return this.metrics.get(transferId);
   }
+
+  /**
+   * Get all metrics
+   */
+  getAllMetrics(): TransferMetrics[] {
+    return Array.from(this.metrics.values());
+  }
+
+  /**
+   * Get all connection qualities
+   */
+  getConnectionQualities(transferId: string): ConnectionQuality[] {
+    return this.connectionQualities.get(transferId) || [];
+  }
 }
 
 // Export singleton instance

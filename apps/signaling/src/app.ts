@@ -24,7 +24,7 @@ if (!SUPABASE_JWT_SECRET && process.env.NODE_ENV === "production") {
   logger.fatal(
     "[FATAL] SUPABASE_JWT_SECRET is not set. " +
       "Refusing to start in production without auth. " +
-      "Set the env var on Railway (or your deployment platform) and redeploy."
+      "Set the env var on Render (or your deployment platform) and redeploy."
   );
   process.exit(1);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getIceServers, getPeerConfigAsync, getPeerConfig } from "../webrtc";
+import { getIceServers, getPeerConfigAsync } from "../webrtc";
 
 describe("webrtc config", () => {
   beforeEach(() => {
@@ -76,14 +76,6 @@ describe("webrtc config", () => {
     it("sets debug to 0", async () => {
       const config = await getPeerConfigAsync([]);
       expect(config.debug).toBe(0);
-    });
-  });
-
-  // ── getPeerConfig (deprecated) ────────────────────────────────────────
-
-  describe("getPeerConfig (deprecated)", () => {
-    it("throws an error directing callers to use getPeerConfigAsync", () => {
-      expect(() => getPeerConfig()).toThrow();
     });
   });
 });

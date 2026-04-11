@@ -29,7 +29,7 @@ graph TB
 
     subgraph "Cloud Services"
         C1[Vercel<br/>Frontend Host]
-        C2[Railway<br/>Signaling Server]
+        C2[Render<br/>Signaling Server]
         C3[Supabase<br/>Auth + DB]
         C4[STUN/TURN<br/>NAT Traversal]
     end
@@ -365,7 +365,7 @@ sequenceDiagram
 | Technology     | Purpose                  |
 | -------------- | ------------------------ |
 | Vercel         | Frontend hosting         |
-| Railway        | Signaling server hosting |
+| Render         | Signaling server hosting |
 | GitHub Actions | CI/CD                    |
 | Sentry         | Error tracking           |
 
@@ -387,7 +387,7 @@ graph TB
             V2[Static Assets<br/>CDN]
         end
 
-        subgraph "Railway"
+        subgraph "Render"
             R1[Signaling Server<br/>Node.js]
         end
 
@@ -422,7 +422,7 @@ graph TB
 - Automatic HTTPS
 - Environment variables managed in dashboard
 
-**Signaling Server (Railway)**:
+**Signaling Server (Render)**:
 
 - Auto-deploys from `main` branch
 - Single instance (stateless)

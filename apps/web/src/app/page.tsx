@@ -1,22 +1,12 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { getCurrentUser } from "@/lib/services/auth-service";
-import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import AppHeader from "@/components/app-header";
+import { createClient } from "@/lib/supabase/server";
 
-export default function LandingPage() {
-  const [user, setUser] = useState<User | null>(null);
-
-  const checkAuth = useCallback(async () => {
-    const currentUser = await getCurrentUser();
-    setUser(currentUser);
-  }, []);
-
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+export default async function LandingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-background-dark dark:text-white overflow-x-hidden font-display flex flex-col flex-1">

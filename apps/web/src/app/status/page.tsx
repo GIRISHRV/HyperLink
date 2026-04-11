@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { logger } from "@repo/utils";
 import AppHeader from "@/components/app-header";
+import { transferMetrics } from "@/lib/monitoring/transfer-metrics";
+import type { TransferMetrics } from "@/lib/monitoring/transfer-metrics";
 
 interface HealthData {
   status: string;
@@ -63,6 +65,7 @@ export default function StatusPage() {
     }
     return true;
   });
+  const [localMetrics, setLocalMetrics] = useState<TransferMetrics[]>([]);
 
   useEffect(() => {
     // Check browser compatibility
@@ -159,8 +162,14 @@ export default function StatusPage() {
     // Only set up auto-refresh interval if enabled
     let healthInterval: NodeJS.Timeout | null = null;
     if (autoRefreshEnabled) {
-      healthInterval = setInterval(checkHealth, 10000); // Check every 10s
+      healthInterval = setInterval(() => {
+        checkHealth();
+        setLocalMetrics(transferMetrics.getAllMetrics());
+      }, 10000); // Check every 10s
     }
+
+    // Load initial metrics immediately
+    setLocalMetrics(transferMetrics.getAllMetrics());
 
     // Countdown timer - only runs if auto-refresh is enabled
     const countdownInterval = setInterval(() => {
@@ -864,6 +873,93 @@ export default function StatusPage() {
               </div>
             </div>
           ) : null}
+
+          {/* Local WebRTC Metrics Dashboard */}
+          <div className="bg-surface border border-subtle p-6 mt-6">
+            <h3 className="text-base font-black uppercase tracking-tight text-white mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-lg">monitoring</span>
+              Client Transfer Diagnostics
+            </h3>
+
+            {localMetrics.length === 0 ? (
+              <div className="text-sm text-gray-500 font-mono italic">
+                No transfers recorded in this session.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {localMetrics.map((m) => {
+                  const qualities = transferMetrics.getConnectionQualities(m.transferId);
+                  const avgRtt =
+                    qualities.length > 0
+                      ? qualities.reduce((sum, q) => sum + q.rtt, 0) / qualities.length
+                      : 0;
+                  const speedMbps = m.finalSpeed
+                    ? ((m.finalSpeed * 8) / 1024 / 1024).toFixed(2)
+                    : "Calculating...";
+
+                  return (
+                    <div key={m.transferId} className="bg-surface-inset border border-subtle p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <span
+                          className="text-xs font-bold uppercase text-white truncate max-w-[200px]"
+                          title={m.transferId}
+                        >
+                          ID: {m.transferId.split("-")[0]}...
+                        </span>
+                        <span
+                          className={`text-xs font-bold uppercase ${m.endTime ? "text-green-500" : "text-bauhaus-yellow"}`}
+                        >
+                          {m.endTime ? "Completed" : "In Progress"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs font-mono text-gray-400">
+                        <div>
+                          Connection:{" "}
+                          <span className="text-white font-bold">
+                            {m.connectionType.toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          Speed:{" "}
+                          <span className="text-white font-bold">
+                            {speedMbps} {m.finalSpeed ? "Mbps" : ""}
+                          </span>
+                        </div>
+                        <div>
+                          Avg RTT:{" "}
+                          <span className="text-white font-bold">
+                            {avgRtt > 0 ? `${Math.round(avgRtt)}ms` : "---"}
+                          </span>
+                        </div>
+                        <div>
+                          Transferred:{" "}
+                          <span className="text-white font-bold">
+                            {((m.bytesTransferred / m.fileSize) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div>
+                          Errors:{" "}
+                          <span
+                            className={
+                              m.errorCount > 0
+                                ? "text-bauhaus-red font-bold"
+                                : "text-white font-bold"
+                            }
+                          >
+                            {m.errorCount}
+                          </span>
+                        </div>
+                        <div>
+                          Pauses: <span className="text-white font-bold">{m.pauseCount}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {/* Overall Status Banner */}
         </div>
       </main>

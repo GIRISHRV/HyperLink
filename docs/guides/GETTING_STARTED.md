@@ -7,7 +7,7 @@ This guide will help you set up HyperLink for local development.
 - **Node.js** 20+ and npm 10+
 - **Git** for version control
 - **Supabase account** (free tier works)
-- **Railway account** (optional, for signaling server deployment)
+- **Render account** (optional, for signaling server deployment)
 
 ## Quick Start
 

@@ -1,4 +1,5 @@
 # Software Requirements Specification (SRS)
+
 # HyperLink - P2P File Transfer Application
 
 **Version**: 1.0.0  
@@ -24,17 +25,17 @@ HyperLink is a web-based peer-to-peer file transfer application that enables use
 
 ### 1.3 Definitions, Acronyms, and Abbreviations
 
-| Term | Definition |
-|------|------------|
-| P2P | Peer-to-Peer: Direct communication between two clients |
-| WebRTC | Web Real-Time Communication: Browser API for P2P connections |
-| ICE | Interactive Connectivity Establishment: NAT traversal protocol |
-| STUN | Session Traversal Utilities for NAT: Server for NAT discovery |
-| TURN | Traversal Using Relays around NAT: Relay server for restricted networks |
-| IndexedDB | Browser-based NoSQL database for client-side storage |
-| RLS | Row Level Security: Database security policy |
-| ACK | Acknowledgment: Confirmation message |
-| NAT | Network Address Translation: Router IP mapping |
+| Term      | Definition                                                              |
+| --------- | ----------------------------------------------------------------------- |
+| P2P       | Peer-to-Peer: Direct communication between two clients                  |
+| WebRTC    | Web Real-Time Communication: Browser API for P2P connections            |
+| ICE       | Interactive Connectivity Establishment: NAT traversal protocol          |
+| STUN      | Session Traversal Utilities for NAT: Server for NAT discovery           |
+| TURN      | Traversal Using Relays around NAT: Relay server for restricted networks |
+| IndexedDB | Browser-based NoSQL database for client-side storage                    |
+| RLS       | Row Level Security: Database security policy                            |
+| ACK       | Acknowledgment: Confirmation message                                    |
+| NAT       | Network Address Translation: Router IP mapping                          |
 
 ### 1.4 References
 
@@ -46,6 +47,7 @@ HyperLink is a web-based peer-to-peer file transfer application that enables use
 ### 1.5 Overview
 
 This document is organized into the following sections:
+
 - Section 2: Overall Description - High-level system overview
 - Section 3: Functional Requirements - Detailed feature requirements
 - Section 4: Non-Functional Requirements - Performance, security, usability
@@ -58,7 +60,6 @@ This document is organized into the following sections:
 ### 2.1 Product Perspective
 
 HyperLink is a standalone web application that operates within the following ecosystem:
-
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -100,12 +101,14 @@ The major functions of HyperLink include:
 **Primary Users**: Individuals who need to transfer large files securely
 
 **User Profiles**:
+
 - **Technical Proficiency**: Basic to intermediate computer skills
 - **Age Range**: 18-65 years
 - **Use Cases**: Sharing large files (videos, datasets, backups) with colleagues, friends, or family
 - **Frequency**: Occasional to regular use
 
 **Assumptions**:
+
 - Users have modern web browsers (Chrome, Firefox, Safari, Edge)
 - Users have stable internet connections
 - Users understand basic file management concepts
@@ -113,6 +116,7 @@ The major functions of HyperLink include:
 ### 2.4 Operating Environment
 
 **Client-Side Requirements**:
+
 - Modern web browser with WebRTC support (Chrome 80+, Firefox 75+, Safari 14+, Edge 80+)
 - JavaScript enabled
 - Minimum 2GB RAM
@@ -120,25 +124,29 @@ The major functions of HyperLink include:
 - Internet connection (minimum 1 Mbps, recommended 10+ Mbps)
 
 **Server-Side Environment**:
+
 - Frontend: Vercel (Node.js 20+)
-- Signaling Server: Railway (Node.js 20+)
+- Signaling Server: Render (Node.js 20+)
 - Database: Supabase (PostgreSQL 15+)
 - STUN/TURN Servers: Third-party providers
 
 ### 2.5 Design and Implementation Constraints
 
 **Technical Constraints**:
+
 - Must work within browser security sandbox
 - Limited by browser IndexedDB storage quotas
 - WebRTC requires HTTPS in production
 - File System Access API not available on all platforms
 
 **Business Constraints**:
+
 - No file storage on servers (privacy requirement)
 - Free tier limitations on cloud services
 - Must comply with data privacy regulations
 
 **Regulatory Constraints**:
+
 - GDPR compliance for EU users
 - No storage of file contents (only metadata)
 - User data must be deletable on request
@@ -148,6 +156,7 @@ The major functions of HyperLink include:
 ### 3.1 User Authentication
 
 **FR-AUTH-001**: User Registration
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to create accounts using email and password
 - **Acceptance Criteria**:
@@ -157,6 +166,7 @@ The major functions of HyperLink include:
   - User profile is created in database
 
 **FR-AUTH-002**: User Login
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to log in with email and password
 - **Acceptance Criteria**:
@@ -166,6 +176,7 @@ The major functions of HyperLink include:
   - Invalid credentials show error message
 
 **FR-AUTH-003**: User Logout
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to log out of their accounts
 - **Acceptance Criteria**:
@@ -174,6 +185,7 @@ The major functions of HyperLink include:
   - All sensitive data is cleared from browser
 
 **FR-AUTH-004**: Password Reset
+
 - **Priority**: Should Have
 - **Description**: Users shall be able to reset forgotten passwords
 - **Acceptance Criteria**:
@@ -185,6 +197,7 @@ The major functions of HyperLink include:
 ### 3.2 Peer Connection
 
 **FR-PEER-001**: Connection Establishment
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to establish P2P connections with other users
 - **Acceptance Criteria**:
@@ -194,6 +207,7 @@ The major functions of HyperLink include:
   - Connection status is displayed
 
 **FR-PEER-002**: NAT Traversal
+
 - **Priority**: Must Have
 - **Description**: System shall handle NAT traversal automatically
 - **Acceptance Criteria**:
@@ -203,6 +217,7 @@ The major functions of HyperLink include:
   - Multiple TURN providers for redundancy
 
 **FR-PEER-003**: Connection Monitoring
+
 - **Priority**: Must Have
 - **Description**: System shall monitor connection health
 - **Acceptance Criteria**:
@@ -212,6 +227,7 @@ The major functions of HyperLink include:
   - User is notified of connection issues
 
 **FR-PEER-004**: Connection Termination
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to disconnect from peers
 - **Acceptance Criteria**:
@@ -223,6 +239,7 @@ The major functions of HyperLink include:
 ### 3.3 File Transfer
 
 **FR-TRANSFER-001**: File Selection
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to select files to send
 - **Acceptance Criteria**:
@@ -232,6 +249,7 @@ The major functions of HyperLink include:
   - Large files (10GB+) are supported
 
 **FR-TRANSFER-002**: File Sending
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to send files to connected peers
 - **Acceptance Criteria**:
@@ -241,6 +259,7 @@ The major functions of HyperLink include:
   - Progress is reported in real-time
 
 **FR-TRANSFER-003**: File Receiving
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to receive files from connected peers
 - **Acceptance Criteria**:
@@ -250,6 +269,7 @@ The major functions of HyperLink include:
   - File is assembled on completion
 
 **FR-TRANSFER-004**: Progress Monitoring
+
 - **Priority**: Must Have
 - **Description**: Users shall see real-time transfer progress
 - **Acceptance Criteria**:
@@ -259,6 +279,7 @@ The major functions of HyperLink include:
   - Progress bar is updated smoothly
 
 **FR-TRANSFER-005**: Transfer Cancellation
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to cancel transfers
 - **Acceptance Criteria**:
@@ -268,6 +289,7 @@ The major functions of HyperLink include:
   - Both peers are notified
 
 **FR-TRANSFER-006**: Transfer Pause/Resume
+
 - **Priority**: Should Have
 - **Description**: Users shall be able to pause and resume transfers
 - **Acceptance Criteria**:
@@ -279,6 +301,7 @@ The major functions of HyperLink include:
 ### 3.4 Transfer History
 
 **FR-HISTORY-001**: History Recording
+
 - **Priority**: Must Have
 - **Description**: System shall record transfer metadata
 - **Acceptance Criteria**:
@@ -288,6 +311,7 @@ The major functions of HyperLink include:
   - Associated with user account
 
 **FR-HISTORY-002**: History Viewing
+
 - **Priority**: Must Have
 - **Description**: Users shall be able to view transfer history
 - **Acceptance Criteria**:
@@ -297,6 +321,7 @@ The major functions of HyperLink include:
   - Paginated for large lists
 
 **FR-HISTORY-003**: History Filtering
+
 - **Priority**: Should Have
 - **Description**: Users shall be able to filter transfer history
 - **Acceptance Criteria**:
@@ -306,6 +331,7 @@ The major functions of HyperLink include:
   - Date range filtering
 
 **FR-HISTORY-004**: History Deletion
+
 - **Priority**: Should Have
 - **Description**: Users shall be able to delete history entries
 - **Acceptance Criteria**:
@@ -317,6 +343,7 @@ The major functions of HyperLink include:
 ### 3.5 Error Handling
 
 **FR-ERROR-001**: Connection Errors
+
 - **Priority**: Must Have
 - **Description**: System shall handle connection errors gracefully
 - **Acceptance Criteria**:
@@ -326,6 +353,7 @@ The major functions of HyperLink include:
   - Errors are logged for debugging
 
 **FR-ERROR-002**: Transfer Errors
+
 - **Priority**: Must Have
 - **Description**: System shall handle transfer errors gracefully
 - **Acceptance Criteria**:
@@ -335,6 +363,7 @@ The major functions of HyperLink include:
   - Transfer is marked as failed in history
 
 **FR-ERROR-003**: Storage Errors
+
 - **Priority**: Must Have
 - **Description**: System shall handle storage quota errors
 - **Acceptance Criteria**:
@@ -348,6 +377,7 @@ The major functions of HyperLink include:
 ### 4.1 Performance Requirements
 
 **NFR-PERF-001**: Transfer Speed
+
 - **Priority**: Must Have
 - **Description**: System shall achieve high transfer speeds
 - **Acceptance Criteria**:
@@ -357,6 +387,7 @@ The major functions of HyperLink include:
   - No artificial throttling
 
 **NFR-PERF-002**: Memory Usage
+
 - **Priority**: Must Have
 - **Description**: System shall use minimal memory during transfers
 - **Acceptance Criteria**:
@@ -366,6 +397,7 @@ The major functions of HyperLink include:
   - Browser remains responsive
 
 **NFR-PERF-003**: UI Responsiveness
+
 - **Priority**: Must Have
 - **Description**: User interface shall remain responsive
 - **Acceptance Criteria**:
@@ -375,6 +407,7 @@ The major functions of HyperLink include:
   - Background transfers don't block UI
 
 **NFR-PERF-004**: Startup Time
+
 - **Priority**: Should Have
 - **Description**: Application shall load quickly
 - **Acceptance Criteria**:
@@ -386,6 +419,7 @@ The major functions of HyperLink include:
 ### 4.2 Security Requirements
 
 **NFR-SEC-001**: Authentication Security
+
 - **Priority**: Must Have
 - **Description**: User authentication shall be secure
 - **Acceptance Criteria**:
@@ -395,6 +429,7 @@ The major functions of HyperLink include:
   - Tokens expire after 24 hours
 
 **NFR-SEC-002**: Data Encryption
+
 - **Priority**: Must Have
 - **Description**: Data transfers shall be encrypted
 - **Acceptance Criteria**:
@@ -404,6 +439,7 @@ The major functions of HyperLink include:
   - Encryption keys are ephemeral
 
 **NFR-SEC-003**: Access Control
+
 - **Priority**: Must Have
 - **Description**: Users shall only access their own data
 - **Acceptance Criteria**:
@@ -413,6 +449,7 @@ The major functions of HyperLink include:
   - Unauthorized access returns 401/403
 
 **NFR-SEC-004**: Input Validation
+
 - **Priority**: Must Have
 - **Description**: All user inputs shall be validated
 - **Acceptance Criteria**:
@@ -424,6 +461,7 @@ The major functions of HyperLink include:
 ### 4.3 Reliability Requirements
 
 **NFR-REL-001**: Uptime
+
 - **Priority**: Must Have
 - **Description**: System shall be highly available
 - **Acceptance Criteria**:
@@ -433,6 +471,7 @@ The major functions of HyperLink include:
   - Status page for monitoring
 
 **NFR-REL-002**: Data Integrity
+
 - **Priority**: Must Have
 - **Description**: Transferred files shall be identical to originals
 - **Acceptance Criteria**:
@@ -442,6 +481,7 @@ The major functions of HyperLink include:
   - Checksum validation (future)
 
 **NFR-REL-003**: Error Recovery
+
 - **Priority**: Must Have
 - **Description**: System shall recover from errors
 - **Acceptance Criteria**:
@@ -453,6 +493,7 @@ The major functions of HyperLink include:
 ### 4.4 Usability Requirements
 
 **NFR-USE-001**: Ease of Use
+
 - **Priority**: Must Have
 - **Description**: Application shall be easy to use
 - **Acceptance Criteria**:
@@ -462,6 +503,7 @@ The major functions of HyperLink include:
   - No technical jargon
 
 **NFR-USE-002**: Accessibility
+
 - **Priority**: Should Have
 - **Description**: Application shall be accessible
 - **Acceptance Criteria**:
@@ -471,6 +513,7 @@ The major functions of HyperLink include:
   - Sufficient color contrast
 
 **NFR-USE-003**: Mobile Support
+
 - **Priority**: Should Have
 - **Description**: Application shall work on mobile devices
 - **Acceptance Criteria**:
@@ -480,6 +523,7 @@ The major functions of HyperLink include:
   - Reduced data usage on mobile
 
 **NFR-USE-004**: Internationalization
+
 - **Priority**: Could Have
 - **Description**: Application shall support multiple languages
 - **Acceptance Criteria**:
@@ -491,6 +535,7 @@ The major functions of HyperLink include:
 ### 4.5 Maintainability Requirements
 
 **NFR-MAINT-001**: Code Quality
+
 - **Priority**: Must Have
 - **Description**: Code shall be maintainable
 - **Acceptance Criteria**:
@@ -500,6 +545,7 @@ The major functions of HyperLink include:
   - 80%+ test coverage
 
 **NFR-MAINT-002**: Documentation
+
 - **Priority**: Must Have
 - **Description**: System shall be well-documented
 - **Acceptance Criteria**:
@@ -509,6 +555,7 @@ The major functions of HyperLink include:
   - README with setup instructions
 
 **NFR-MAINT-003**: Monitoring
+
 - **Priority**: Must Have
 - **Description**: System shall be monitored
 - **Acceptance Criteria**:
@@ -516,7 +563,6 @@ The major functions of HyperLink include:
   - Performance monitoring
   - Usage analytics
   - Alerting on critical errors
-
 
 ## 5. Use Cases
 
@@ -527,11 +573,13 @@ The major functions of HyperLink include:
 **Actor**: Sender (authenticated user)
 
 **Preconditions**:
+
 - User is logged in
 - User has file to send
 - Receiver is available and logged in
 
 **Main Flow**:
+
 1. Sender navigates to "Send" page
 2. Sender clicks "Select File" button
 3. System displays file picker dialog
@@ -551,12 +599,14 @@ The major functions of HyperLink include:
 17. System saves transfer metadata to history
 
 **Alternative Flows**:
+
 - **3a. User cancels file selection**: Return to step 2
 - **11a. Connection fails**: Display error, offer retry
 - **13a. Transfer is cancelled**: Clean up partial data, mark as cancelled
 - **15a. Transfer fails**: Display error, offer retry, mark as failed
 
 **Postconditions**:
+
 - File has been transferred to receiver
 - Transfer metadata is saved in database
 - Both users see success notification
@@ -572,11 +622,13 @@ The major functions of HyperLink include:
 **Actor**: Receiver (authenticated user)
 
 **Preconditions**:
+
 - User is logged in
 - Sender has generated connection code
 - User has received code from sender
 
 **Main Flow**:
+
 1. Receiver navigates to "Receive" page
 2. Receiver enters connection code
 3. Receiver clicks "Connect" button
@@ -596,6 +648,7 @@ The major functions of HyperLink include:
 17. System saves transfer metadata to history
 
 **Alternative Flows**:
+
 - **4a. Invalid code format**: Display error, return to step 2
 - **5a. Connection fails**: Display error, offer retry
 - **9a. Receiver declines**: Notify sender, close connection
@@ -604,6 +657,7 @@ The major functions of HyperLink include:
 - **14a. Insufficient storage**: Display error, clean up chunks
 
 **Postconditions**:
+
 - File has been downloaded to receiver's device
 - Transfer metadata is saved in database
 - Both users see success notification
@@ -619,10 +673,12 @@ The major functions of HyperLink include:
 **Actor**: User (authenticated)
 
 **Preconditions**:
+
 - User is logged in
 - User has completed at least one transfer
 
 **Main Flow**:
+
 1. User navigates to "History" page
 2. System fetches transfer history from database
 3. System displays list of transfers
@@ -636,10 +692,12 @@ The major functions of HyperLink include:
 6. User can click on transfer for details
 
 **Alternative Flows**:
+
 - **2a. No history exists**: Display empty state message
 - **2a. Database error**: Display error message, offer retry
 
 **Postconditions**:
+
 - User has viewed their transfer history
 
 **Frequency**: Medium
@@ -653,10 +711,12 @@ The major functions of HyperLink include:
 **Actor**: User (sender or receiver)
 
 **Preconditions**:
+
 - User is logged in
 - Transfer is in progress
 
 **Main Flow**:
+
 1. User clicks "Cancel" button during transfer
 2. System displays confirmation dialog
 3. User confirms cancellation
@@ -668,10 +728,12 @@ The major functions of HyperLink include:
 9. System displays cancellation message
 
 **Alternative Flows**:
+
 - **3a. User declines confirmation**: Return to transfer
 - **5a. Peer already disconnected**: Skip notification
 
 **Postconditions**:
+
 - Transfer is stopped
 - Partial data is cleaned up
 - Transfer is marked as cancelled in history
@@ -687,11 +749,13 @@ The major functions of HyperLink include:
 **Actor**: User (sender or receiver)
 
 **Preconditions**:
+
 - User is logged in
 - Transfer was interrupted (not cancelled)
 - Partial data exists in IndexedDB
 
 **Main Flow**:
+
 1. User navigates to "History" page
 2. System displays interrupted transfer with "Resume" button
 3. User clicks "Resume" button
@@ -703,11 +767,13 @@ The major functions of HyperLink include:
 9. System updates transfer status to "completed"
 
 **Alternative Flows**:
+
 - **4a. Peer is offline**: Display error, offer to retry later
 - **5a. Partial data corrupted**: Restart transfer from beginning
 - **8a. Transfer fails again**: Mark as failed, offer retry
 
 **Postconditions**:
+
 - Transfer is completed
 - Transfer status is updated in history
 
@@ -722,10 +788,12 @@ The major functions of HyperLink include:
 **Actor**: New User
 
 **Preconditions**:
+
 - User has valid email address
 - User is not already registered
 
 **Main Flow**:
+
 1. User navigates to registration page
 2. User enters email address
 3. User enters password (minimum 8 characters)
@@ -742,12 +810,14 @@ The major functions of HyperLink include:
 14. User is redirected to login page
 
 **Alternative Flows**:
+
 - **6a. Invalid email format**: Display error, return to step 2
 - **7a. Weak password**: Display error, return to step 3
 - **8a. Email already exists**: Display error, offer login
 - **12a. Confirmation link expired**: Offer to resend
 
 **Postconditions**:
+
 - User account is created and activated
 - User can log in
 
@@ -762,10 +832,12 @@ The major functions of HyperLink include:
 **Actor**: Registered User
 
 **Preconditions**:
+
 - User has registered account
 - User account is activated
 
 **Main Flow**:
+
 1. User navigates to login page
 2. User enters email address
 3. User enters password
@@ -776,11 +848,13 @@ The major functions of HyperLink include:
 8. System displays welcome message
 
 **Alternative Flows**:
+
 - **5a. Invalid credentials**: Display error, return to step 2
 - **5b. Account not activated**: Display message, offer to resend confirmation
 - **5c. Too many failed attempts**: Lock account temporarily
 
 **Postconditions**:
+
 - User is authenticated
 - Session token is stored
 - User can access protected features
@@ -794,26 +868,31 @@ The major functions of HyperLink include:
 ### 6.1 Technical Constraints
 
 **CONST-TECH-001**: Browser Compatibility
+
 - System must work on modern browsers (Chrome 80+, Firefox 75+, Safari 14+, Edge 80+)
 - WebRTC support is required
 - JavaScript must be enabled
 
 **CONST-TECH-002**: Network Requirements
+
 - HTTPS is required in production
 - WebRTC requires UDP connectivity
 - Firewall must allow WebRTC traffic (or TURN fallback)
 
 **CONST-TECH-003**: Storage Limitations
+
 - IndexedDB quota varies by browser (typically 50% of free disk space)
 - File System Access API not available on all platforms
 - Mobile browsers have stricter storage limits
 
 **CONST-TECH-004**: Performance Limitations
+
 - Transfer speed limited by network bandwidth
 - Browser memory limits affect maximum concurrent transfers
 - Mobile devices have lower performance
 
 **CONST-TECH-005**: Security Constraints
+
 - No server-side file storage (privacy requirement)
 - All data must be encrypted in transit
 - Authentication required for all features
@@ -821,15 +900,18 @@ The major functions of HyperLink include:
 ### 6.2 Business Constraints
 
 **CONST-BUS-001**: Cost Constraints
+
 - Must use free tiers of cloud services where possible
 - TURN server bandwidth is limited
 - Database storage is limited
 
 **CONST-BUS-002**: Time Constraints
+
 - MVP must be delivered within project timeline
 - Feature prioritization based on must-have vs nice-to-have
 
 **CONST-BUS-003**: Resource Constraints
+
 - Limited development team size
 - Limited testing resources
 - Limited support resources
@@ -837,12 +919,14 @@ The major functions of HyperLink include:
 ### 6.3 Regulatory Constraints
 
 **CONST-REG-001**: Data Privacy
+
 - Must comply with GDPR for EU users
 - Must comply with CCPA for California users
 - No storage of file contents on servers
 - User data must be deletable on request
 
 **CONST-REG-002**: Accessibility
+
 - Should comply with WCAG 2.1 Level AA
 - Must be usable with keyboard only
 - Must work with screen readers
@@ -868,19 +952,22 @@ The major functions of HyperLink include:
 ### 7.2 Dependencies
 
 **Internal Dependencies**:
+
 - Frontend depends on signaling server for peer discovery
 - All components depend on Supabase for authentication
 - Transfer history depends on database availability
 
 **External Dependencies**:
+
 - Vercel for frontend hosting
-- Railway for signaling server hosting
+- Render for signaling server hosting
 - Supabase for authentication and database
 - STUN/TURN servers for NAT traversal
 - Sentry for error tracking
 - Third-party email service for authentication emails
 
 **Technology Dependencies**:
+
 - Next.js 14+ for frontend framework
 - PeerJS for WebRTC abstraction
 - IndexedDB for client-side storage
@@ -904,30 +991,30 @@ The HyperLink system will be considered complete and ready for release when:
 
 ## 9. Traceability Matrix
 
-| Requirement ID | Use Case | Implementation | Test Case | Status |
-|----------------|----------|----------------|-----------|--------|
-| FR-AUTH-001 | UC-006 | Supabase Auth | TEST-AUTH-001 | ✅ Complete |
-| FR-AUTH-002 | UC-007 | Supabase Auth | TEST-AUTH-002 | ✅ Complete |
-| FR-PEER-001 | UC-001, UC-002 | PeerManager | TEST-PEER-001 | ✅ Complete |
-| FR-PEER-002 | UC-001, UC-002 | TURN Config | TEST-PEER-002 | ✅ Complete |
-| FR-TRANSFER-001 | UC-001 | SendTransfer | TEST-TRANSFER-001 | ✅ Complete |
-| FR-TRANSFER-002 | UC-001 | FileSender | TEST-TRANSFER-002 | ✅ Complete |
-| FR-TRANSFER-003 | UC-002 | FileReceiver | TEST-TRANSFER-003 | ✅ Complete |
-| FR-TRANSFER-004 | UC-001, UC-002 | Progress Hooks | TEST-TRANSFER-004 | ✅ Complete |
-| FR-TRANSFER-005 | UC-004 | Cancel Logic | TEST-TRANSFER-005 | ✅ Complete |
-| FR-TRANSFER-006 | UC-005 | Resume Logic | TEST-TRANSFER-006 | 🚧 In Progress |
-| FR-HISTORY-001 | UC-003 | Supabase DB | TEST-HISTORY-001 | ✅ Complete |
-| FR-HISTORY-002 | UC-003 | History Component | TEST-HISTORY-002 | ✅ Complete |
-| NFR-PERF-001 | - | Chunking | TEST-PERF-001 | ✅ Complete |
-| NFR-PERF-002 | - | Memory Management | TEST-PERF-002 | ✅ Complete |
-| NFR-SEC-001 | UC-006, UC-007 | Supabase Auth | TEST-SEC-001 | ✅ Complete |
-| NFR-SEC-002 | UC-001, UC-002 | WebRTC DTLS | TEST-SEC-002 | ✅ Complete |
+| Requirement ID  | Use Case       | Implementation    | Test Case         | Status         |
+| --------------- | -------------- | ----------------- | ----------------- | -------------- |
+| FR-AUTH-001     | UC-006         | Supabase Auth     | TEST-AUTH-001     | ✅ Complete    |
+| FR-AUTH-002     | UC-007         | Supabase Auth     | TEST-AUTH-002     | ✅ Complete    |
+| FR-PEER-001     | UC-001, UC-002 | PeerManager       | TEST-PEER-001     | ✅ Complete    |
+| FR-PEER-002     | UC-001, UC-002 | TURN Config       | TEST-PEER-002     | ✅ Complete    |
+| FR-TRANSFER-001 | UC-001         | SendTransfer      | TEST-TRANSFER-001 | ✅ Complete    |
+| FR-TRANSFER-002 | UC-001         | FileSender        | TEST-TRANSFER-002 | ✅ Complete    |
+| FR-TRANSFER-003 | UC-002         | FileReceiver      | TEST-TRANSFER-003 | ✅ Complete    |
+| FR-TRANSFER-004 | UC-001, UC-002 | Progress Hooks    | TEST-TRANSFER-004 | ✅ Complete    |
+| FR-TRANSFER-005 | UC-004         | Cancel Logic      | TEST-TRANSFER-005 | ✅ Complete    |
+| FR-TRANSFER-006 | UC-005         | Resume Logic      | TEST-TRANSFER-006 | 🚧 In Progress |
+| FR-HISTORY-001  | UC-003         | Supabase DB       | TEST-HISTORY-001  | ✅ Complete    |
+| FR-HISTORY-002  | UC-003         | History Component | TEST-HISTORY-002  | ✅ Complete    |
+| NFR-PERF-001    | -              | Chunking          | TEST-PERF-001     | ✅ Complete    |
+| NFR-PERF-002    | -              | Memory Management | TEST-PERF-002     | ✅ Complete    |
+| NFR-SEC-001     | UC-006, UC-007 | Supabase Auth     | TEST-SEC-001      | ✅ Complete    |
+| NFR-SEC-002     | UC-001, UC-002 | WebRTC DTLS       | TEST-SEC-002      | ✅ Complete    |
 
 ## 10. Revision History
 
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0.0 | 2024 | HyperLink Team | Initial SRS document |
+| Version | Date | Author         | Changes              |
+| ------- | ---- | -------------- | -------------------- |
+| 1.0.0   | 2024 | HyperLink Team | Initial SRS document |
 
 ---
 

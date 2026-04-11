@@ -35,13 +35,3 @@ export async function getPeerConfigAsync(
     },
   };
 }
-
-/**
- * @deprecated Use `getPeerConfigAsync()` with `getIceServers()`.
- * Kept temporarily so IDE can surface remaining call sites.
- */
-export function getPeerConfig(): never {
-  throw new Error(
-    "getPeerConfig() is removed. Use `const ice = await getIceServers(); getPeerConfigAsync(ice)` instead."
-  );
-}

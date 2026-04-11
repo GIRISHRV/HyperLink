@@ -10,34 +10,32 @@ const m = vi.hoisted(() => {
   // PeerManager
   const pmEvents: Record<string, ((...args: unknown[]) => void)[]> = {};
   const mockPMInitialize = vi.fn().mockResolvedValue("recv-peer-id");
-  const mockPMOn = vi.fn().mockImplementation(
-    (event: string, cb: (...a: unknown[]) => void) => {
-      (pmEvents[event] = pmEvents[event] || []).push(cb);
-    }
-  );
+  const mockPMOn = vi.fn().mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+    (pmEvents[event] = pmEvents[event] || []).push(cb);
+  });
   const mockPMDestroy = vi.fn();
   const mockPMGetPeerId = vi.fn().mockReturnValue("recv-peer-id");
 
   // FileReceiver
-  const recvCallbacks: Record<string, ((...a: unknown[]) => void)> = {};
+  const recvCallbacks: Record<string, (...a: unknown[]) => void> = {};
   const mockRecvSetConnection = vi.fn();
   const mockRecvSetStorageId = vi.fn();
   const mockRecvHandleOffer = vi.fn();
-  const mockRecvOnProgress = vi.fn().mockImplementation(
-    (cb: (...a: unknown[]) => void) => { recvCallbacks["progress"] = cb; }
-  );
-  const mockRecvOnComplete = vi.fn().mockImplementation(
-    (cb: (...a: unknown[]) => void) => { recvCallbacks["complete"] = cb; }
-  );
-  const mockRecvOnCancel = vi.fn().mockImplementation(
-    (cb: (...a: unknown[]) => void) => { recvCallbacks["cancel"] = cb; }
-  );
-  const mockRecvOnPauseChange = vi.fn().mockImplementation(
-    (cb: (...a: unknown[]) => void) => { recvCallbacks["pauseChange"] = cb; }
-  );
-  const mockRecvOnError = vi.fn().mockImplementation(
-    (cb: (...a: unknown[]) => void) => { recvCallbacks["error"] = cb; }
-  );
+  const mockRecvOnProgress = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+    recvCallbacks["progress"] = cb;
+  });
+  const mockRecvOnComplete = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+    recvCallbacks["complete"] = cb;
+  });
+  const mockRecvOnCancel = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+    recvCallbacks["cancel"] = cb;
+  });
+  const mockRecvOnPauseChange = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+    recvCallbacks["pauseChange"] = cb;
+  });
+  const mockRecvOnError = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+    recvCallbacks["error"] = cb;
+  });
   const mockRecvHandleChunk = vi.fn();
   const mockRecvHandleControlMessage = vi.fn();
   const mockRecvSendResumeFrom = vi.fn();
@@ -131,9 +129,9 @@ vi.mock("@/lib/transfer/receiver", () => {
     onCancel = m.mockRecvOnCancel;
     onPauseChange = m.mockRecvOnPauseChange;
     onError = m.mockRecvOnError;
-    onCleanup = vi.fn().mockImplementation(
-      (cb: (...a: unknown[]) => void) => { m.recvCallbacks["cleanupProgress"] = cb; }
-    );
+    onCleanup = vi.fn().mockImplementation((cb: (...a: unknown[]) => void) => {
+      m.recvCallbacks["cleanupProgress"] = cb;
+    });
     handleChunk = m.mockRecvHandleChunk;
     handleControlMessage = m.mockRecvHandleControlMessage;
     sendResumeFrom = m.mockRecvSendResumeFrom;
@@ -146,10 +144,8 @@ vi.mock("@/lib/transfer/receiver", () => {
 });
 
 vi.mock("@/lib/services/transfer-service", () => ({
-  claimTransferAsReceiver: (...args: unknown[]) =>
-    m.mockClaimTransfer(...args),
-  updateTransferStatus: (...args: unknown[]) =>
-    m.mockUpdateTransferStatus(...args),
+  claimTransferAsReceiver: (...args: unknown[]) => m.mockClaimTransfer(...args),
+  updateTransferStatus: (...args: unknown[]) => m.mockUpdateTransferStatus(...args),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -174,8 +170,7 @@ vi.mock("@repo/utils", () => ({
 
 vi.mock("@/lib/config/webrtc", () => ({
   getIceServers: () => m.mockGetIceServers(),
-  getPeerConfigAsync: (...args: unknown[]) =>
-    m.mockGetPeerConfigAsync(...args),
+  getPeerConfigAsync: (...args: unknown[]) => m.mockGetPeerConfigAsync(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -205,8 +200,7 @@ vi.mock("@/lib/hooks/use-transfer-guard", () => ({
 
 vi.mock("@/lib/utils/notification", () => ({
   requestNotificationPermission: () => m.mockRequestNotificationPermission(),
-  notifyTransferComplete: (...args: unknown[]) =>
-    m.mockNotifyTransferComplete(...args),
+  notifyTransferComplete: (...args: unknown[]) => m.mockNotifyTransferComplete(...args),
   playErrorSound: () => m.mockPlayErrorSound(),
   playSuccessSound: () => m.mockPlaySuccessSound(),
   isSecureContext: () => m.mockIsSecureContext(),
@@ -214,6 +208,10 @@ vi.mock("@/lib/utils/notification", () => ({
 
 vi.mock("@/lib/utils/mime", () => ({
   getMimeType: vi.fn().mockReturnValue("text/plain"),
+}));
+
+vi.mock("@/lib/utils/peer-message-validator", () => ({
+  validatePeerMessage: vi.fn().mockImplementation((data) => data),
 }));
 
 vi.mock("sonner", () => ({
@@ -238,11 +236,9 @@ function defaultOptions(overrides = {}) {
 /** Build a mock DataConnection that captures its event handlers */
 function buildMockConnection() {
   const connEvents: Record<string, ((...a: unknown[]) => void)[]> = {};
-  const mockOn = vi.fn().mockImplementation(
-    (event: string, cb: (...a: unknown[]) => void) => {
-      (connEvents[event] = connEvents[event] || []).push(cb);
-    }
-  );
+  const mockOn = vi.fn().mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+    (connEvents[event] = connEvents[event] || []).push(cb);
+  });
   const mockSend = vi.fn();
   const mockClose = vi.fn();
   return {
@@ -278,26 +274,24 @@ beforeEach(() => {
   // Re-wire implementations
   m.mockPMInitialize.mockResolvedValue("recv-peer-id");
   m.mockPMGetPeerId.mockReturnValue("recv-peer-id");
-  m.mockPMOn.mockImplementation(
-    (event: string, cb: (...a: unknown[]) => void) => {
-      (m.pmEvents[event] = m.pmEvents[event] || []).push(cb);
-    }
-  );
-  m.mockRecvOnProgress.mockImplementation(
-    (cb: (...a: unknown[]) => void) => { m.recvCallbacks["progress"] = cb; }
-  );
-  m.mockRecvOnComplete.mockImplementation(
-    (cb: (...a: unknown[]) => void) => { m.recvCallbacks["complete"] = cb; }
-  );
-  m.mockRecvOnCancel.mockImplementation(
-    (cb: (...a: unknown[]) => void) => { m.recvCallbacks["cancel"] = cb; }
-  );
-  m.mockRecvOnPauseChange.mockImplementation(
-    (cb: (...a: unknown[]) => void) => { m.recvCallbacks["pauseChange"] = cb; }
-  );
-  m.mockRecvOnError.mockImplementation(
-    (cb: (...a: unknown[]) => void) => { m.recvCallbacks["error"] = cb; }
-  );
+  m.mockPMOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+    (m.pmEvents[event] = m.pmEvents[event] || []).push(cb);
+  });
+  m.mockRecvOnProgress.mockImplementation((cb: (...a: unknown[]) => void) => {
+    m.recvCallbacks["progress"] = cb;
+  });
+  m.mockRecvOnComplete.mockImplementation((cb: (...a: unknown[]) => void) => {
+    m.recvCallbacks["complete"] = cb;
+  });
+  m.mockRecvOnCancel.mockImplementation((cb: (...a: unknown[]) => void) => {
+    m.recvCallbacks["cancel"] = cb;
+  });
+  m.mockRecvOnPauseChange.mockImplementation((cb: (...a: unknown[]) => void) => {
+    m.recvCallbacks["pauseChange"] = cb;
+  });
+  m.mockRecvOnError.mockImplementation((cb: (...a: unknown[]) => void) => {
+    m.recvCallbacks["error"] = cb;
+  });
   m.mockRecvProcessPassword.mockResolvedValue(undefined);
   m.mockClaimTransfer.mockResolvedValue({ id: "claimed-transfer" });
   m.mockUpdateTransferStatus.mockResolvedValue(undefined);
@@ -313,22 +307,16 @@ beforeEach(() => {
 describe("useReceiveTransfer", () => {
   describe("initialization", () => {
     it("starts with empty myPeerId and idle status", () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
       expect(result.current.myPeerId).toBe("");
       expect(result.current.transferState.status).toBe("idle");
     });
 
     it("sets myPeerId after PeerManager initializes", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
       // Verify initialize was called with hl- prefix + first 8 of user ID + auth token
       expect(m.mockPMInitialize).toHaveBeenCalledWith(
         expect.stringMatching(/^hl-user-1/),
@@ -337,9 +325,7 @@ describe("useReceiveTransfer", () => {
     });
 
     it("does not initialize when user is null", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions({ user: null }))
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions({ user: null })));
 
       await new Promise((r) => setTimeout(r, 50));
       expect(result.current.myPeerId).toBe("");
@@ -349,17 +335,13 @@ describe("useReceiveTransfer", () => {
     it("sets error when PeerManager initialization fails", async () => {
       m.mockPMInitialize.mockRejectedValueOnce(new Error("Init failed"));
 
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
       await waitFor(() => expect(result.current.error).toMatch(/Init failed/));
     });
 
     it("unmounts cleanly after initialization", async () => {
-      const { unmount } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { unmount } = renderHook(() => useReceiveTransfer(defaultOptions()));
       await waitFor(() => expect(m.mockPMInitialize).toHaveBeenCalled());
 
       // The receive hook doesn't call destroy on unmount (it lets
@@ -370,14 +352,10 @@ describe("useReceiveTransfer", () => {
 
   describe("incoming connection – file-offer", () => {
     async function setupConnectedHook() {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
       // Wait for peer to initialize
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       // Simulate incoming connection
       const { connEvents, conn } = buildMockConnection();
@@ -393,9 +371,7 @@ describe("useReceiveTransfer", () => {
     it("sets transfer status to 'connecting' on incoming connection", async () => {
       const { result } = await setupConnectedHook();
       // The hook dispatches CONNECT on incoming connection
-      await waitFor(() =>
-        expect(result.current.transferState.status).toBe("connecting")
-      );
+      await waitFor(() => expect(result.current.transferState.status).toBe("connecting"));
     });
 
     it("sets pendingOffer and status='offering' on file-offer data event", async () => {
@@ -407,9 +383,7 @@ describe("useReceiveTransfer", () => {
         await new Promise((r) => setTimeout(r, 0));
       });
 
-      await waitFor(() =>
-        expect(result.current.transferState.status).toBe("offering")
-      );
+      await waitFor(() => expect(result.current.transferState.status).toBe("offering"));
       expect(result.current.pendingOffer).toMatchObject({
         filename: "hello.txt",
         fileSize: 1024,
@@ -433,27 +407,19 @@ describe("useReceiveTransfer", () => {
       });
 
       expect(result.current.pendingOffer).toBeNull();
-      expect(conn.mockSend).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "file-reject" })
-      );
+      expect(conn.mockSend).toHaveBeenCalledWith(expect.objectContaining({ type: "file-reject" }));
     });
 
     it("sends receiver-busy if already in active transfer", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       // First connection triggers CONNECT so status='connecting'
       const { conn: conn1 } = buildMockConnection();
       await act(async () => {
         await m.pmEvents["incoming-connection"][0](conn1);
       });
-      await waitFor(() =>
-        expect(result.current.transferState.status).toBe("connecting")
-      );
+      await waitFor(() => expect(result.current.transferState.status).toBe("connecting"));
 
       // Second connection while busy → should be rejected
       const { conn: conn2 } = buildMockConnection();
@@ -469,9 +435,7 @@ describe("useReceiveTransfer", () => {
 
   describe("resetReceive", () => {
     it("resets to idle state", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
       act(() => {
         result.current.resetReceive();
@@ -491,12 +455,8 @@ describe("useReceiveTransfer", () => {
         configurable: true,
       });
 
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       act(() => {
         result.current.copyPeerId();
@@ -508,12 +468,8 @@ describe("useReceiveTransfer", () => {
 
   describe("handleAcceptOffer – non-encrypted", () => {
     it("creates FileReceiver and transitions to transferring state", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       // Simulate incoming connection + file offer using the SAME connection
       const { connEvents, conn } = buildMockConnection();
@@ -541,12 +497,8 @@ describe("useReceiveTransfer", () => {
 
   describe("handleAcceptOffer – encrypted", () => {
     it("shows password modal when offer is encrypted", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
-      await waitFor(() =>
-        expect(result.current.myPeerId).toBe("recv-peer-id")
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       const { connEvents, conn } = buildMockConnection();
       await act(async () => {
@@ -570,9 +522,7 @@ describe("useReceiveTransfer", () => {
 
   describe("transferState", () => {
     it("starts as idle with zero bytes", () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
 
       expect(result.current.transferState.status).toBe("idle");
       expect(result.current.transferState.bytesTransferred).toBe(0);
@@ -625,9 +575,7 @@ describe("useReceiveTransfer", () => {
 
   describe("cleanupProgress", () => {
     it("updates cleanupProgress when FileReceiver emits cleanup status", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       // 1. Simulate incoming connection and offer so we can start the sequence
@@ -659,9 +607,7 @@ describe("useReceiveTransfer", () => {
 
   describe("Task 2: ACK Resilience routing", () => {
     it("routes chunk-probe to FileReceiver.handleChunk", async () => {
-      const { result } = renderHook(() =>
-        useReceiveTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
 
       const { connEvents, conn } = buildMockConnection();
@@ -684,7 +630,7 @@ describe("useReceiveTransfer", () => {
         type: "chunk-probe",
         transferId: "tx-001",
         payload: { chunkIndex: 0, data: new ArrayBuffer(10) },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       await act(async () => {

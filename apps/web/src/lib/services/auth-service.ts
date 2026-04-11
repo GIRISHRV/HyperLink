@@ -67,8 +67,13 @@ export async function getCurrentUser() {
     } = await supabase.auth.getUser();
 
     if (error) {
-      // Log the error but don't throw, allowing the app to treat the user as unauthenticated
-      logger.error({ error: error.message }, "Supabase auth error in getCurrentUser");
+      // AUTH_SESSION_MISSING is the normal response when no user is logged in — not a real error.
+      // All other codes are unexpected and worth logging at error level.
+      if (error.code === "session_not_found" || error.message === "Auth session missing!") {
+        logger.info({ code: error.code }, "No active auth session (unauthenticated visitor)");
+      } else {
+        logger.error({ error: error.message }, "Supabase auth error in getCurrentUser");
+      }
       return null;
     }
     return user;

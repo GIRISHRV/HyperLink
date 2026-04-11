@@ -18,6 +18,7 @@ import {
 import { logger } from "@repo/utils";
 import { getMimeType } from "@/lib/utils/mime";
 import { supabase } from "@/lib/supabase/client";
+import { validatePeerMessage } from "@/lib/utils/peer-message-validator";
 import { updateUserProfile } from "@/lib/services/profile-service";
 import type { PeerMessage, TransferProgress, ChunkPayload, FileOfferPayload } from "@repo/types";
 import type { DataConnection } from "peerjs";
@@ -318,7 +319,9 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
           connection.on("data", async (data: unknown) => {
             if (activeConnectionRef.current !== connection) return;
             onDataRef.current?.(data); // Forward chat messages
-            const message = data as PeerMessage;
+
+            const message = validatePeerMessage(data);
+            if (!message) return;
 
             if (message.type === "file-offer") {
               logger.debug(
@@ -524,7 +527,7 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
     });
 
     logger.debug("[RECEIVE PAGE] Calling handleOffer on receiver...");
-    receiver.handleOffer(message);
+    await receiver.handleOffer(message);
 
     if (pw) {
       logger.debug("[RECEIVE PAGE] Processing password...");

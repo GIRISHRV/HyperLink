@@ -12,7 +12,11 @@ export function ServiceWorkerRegistration() {
           logger.info({ registration }, "Service worker registered successfully");
         })
         .catch((error) => {
-          logger.error({ error }, "Service worker registration failed");
+          // SW registration failures are non-fatal — the app works fine without one.
+          logger.warn(
+            { error: error.message ?? String(error) },
+            "Service worker registration failed"
+          );
         });
     }
   }, []);

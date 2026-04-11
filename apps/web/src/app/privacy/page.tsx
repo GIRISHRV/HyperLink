@@ -85,7 +85,7 @@ export default function PrivacyPage() {
                 (page views only, no PII).
               </li>
               <li>
-                <span className="text-white font-bold">Railway</span> — Signaling server
+                <span className="text-white font-bold">Render</span> — Signaling server
                 infrastructure.
               </li>
               <li>

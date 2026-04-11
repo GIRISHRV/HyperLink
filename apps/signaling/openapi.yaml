@@ -13,7 +13,7 @@ info:
     - General endpoints: 200 requests per minute per IP
     - Health endpoint: 60 requests per minute per IP
     
-    **Base URL**: `https://your-signaling-server.railway.app` or `http://localhost:9000`
+    **Base URL**: `https://your-signaling-server.onrender.com` or `http://localhost:9000`
   version: 1.0.0
   contact:
     name: HyperLink Team
@@ -25,8 +25,8 @@ info:
 servers:
   - url: http://localhost:9000
     description: Local development server
-  - url: https://hyperlink-signaling.railway.app
-    description: Production server (Railway)
+  - url: https://hyperlink-signaling.onrender.com
+    description: Production server (Render)
 
 tags:
   - name: Health

@@ -50,7 +50,7 @@ coverage/
 
 # Misc
 .vercel
-.railway
+.render
 
 # AI/Agent
 .agent/

@@ -150,22 +150,22 @@ Rate limit headers are included in responses:
 
 ## Deployment
 
-### Railway (Recommended)
+### Render (Recommended)
 
 1. **Connect Repository**:
-   - Go to [Railway](https://railway.app)
-   - Create new project from GitHub repo
+   - Go to [Render](https://render.com)
+   - Create a new **Web Service** from your GitHub repo
    - Select `apps/signaling` as root directory
 
 2. **Configure Environment**:
-   - Add environment variables in Railway dashboard
-   - Set `PORT` (Railway provides this automatically)
+   - Add environment variables in the Render dashboard
+   - Set `PORT` (Render provides this automatically)
    - Set `SUPABASE_JWT_SECRET`
    - Set `ALLOWED_ORIGINS`
 
 3. **Deploy**:
-   - Railway auto-deploys on push to `main` branch
-   - Custom domain available in project settings
+   - Render auto-deploys on push to `main` branch
+   - Custom domain available in service settings
 
 ### Docker
 
@@ -317,7 +317,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 - **Rate Limiting**: Prevents abuse and DoS attacks
 - **CORS**: Restricts access to allowed origins only
 - **No Peer Discovery**: `allow_discovery` disabled to prevent peer enumeration
-- **HTTPS**: Use HTTPS in production (handled by Railway/reverse proxy)
+- **HTTPS**: Use HTTPS in production (handled by Render/reverse proxy)
 
 ## Performance
 
