@@ -14,38 +14,17 @@ import Link from "next/link";
 import AppHeader from "@/components/app-header";
 import { toast } from "sonner";
 import { logger } from "@repo/utils";
-import { supabase } from "@/lib/supabase/client";
+import { useAdminStatus } from "@/lib/hooks/use-admin-status";
 
 // Admin Section Component
 function AdminSection({ userId }: { userId: string }) {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      try {
-        const { data } = await supabase
-          .from("user_profiles")
-          .select("is_admin")
-          .eq("user_id", userId)
-          .single();
-        setIsAdmin(data?.is_admin || false);
-      } catch (error) {
-        logger.error({ error }, "Failed to check admin status");
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdminStatus();
-  }, [userId]);
+  const { isAdmin, loading } = useAdminStatus(userId);
 
   if (loading) {
     return (
-      <section className="bg-surface/60 backdrop-blur-xl border-l-4 border-purple-500 border-y border-r border-white/5 p-6 animate-pulse">
-        <div className="h-6 bg-white/10 rounded w-32 mb-4"></div>
-        <div className="h-16 bg-white/5 rounded"></div>
+      <section className="rounded-xl bg-surface/60 backdrop-blur-xl border border-purple-500/30 p-6 animate-pulse">
+        <div className="h-5 bg-white/10 rounded-full w-36 mb-4"></div>
+        <div className="h-16 bg-white/5 rounded-lg"></div>
       </section>
     );
   }
@@ -242,27 +221,29 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen flex flex-col font-display bg-transparent relative overflow-x-hidden selection:bg-primary selection:text-black">
       {loading ? (
-        <div className="p-6 md:p-8 lg:p-12 animate-pulse relative z-10">
-          <div className="max-w-7xl mx-auto">
+        <div className="p-6 md:p-8 lg:p-12 relative z-10">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Header Skeleton */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className="size-8 bg-white/10 backdrop-blur-sm rounded-none" />
-                <div className="h-6 bg-white/10 backdrop-blur-sm rounded w-32" />
+                <div className="size-8 bg-white/10 rounded-md" />
+                <div className="h-6 bg-white/10 rounded-full w-32" />
               </div>
             </div>
             {/* Page Header Skeleton */}
-            <div className="mb-12">
-              <div className="h-3 bg-white/10 backdrop-blur-sm rounded w-32 mb-4" />
-              <div className="h-16 bg-white/10 backdrop-blur-sm rounded w-96 mb-4" />
+            <div className="animate-pulse rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-6">
+              <div className="h-3 bg-white/10 rounded-full w-32 mb-4" />
+              <div className="h-12 bg-white/10 rounded-lg w-96 max-w-full mb-3" />
+              <div className="h-4 bg-white/5 rounded-full w-[28rem] max-w-full" />
             </div>
             {/* Settings Content Skeleton */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-4">
-                <div className="bg-white/5 backdrop-blur-md p-8 rounded-none border border-white/10 h-96" />
+                <div className="bg-white/[0.04] border border-white/10 rounded-xl h-96 animate-pulse" />
               </div>
               <div className="lg:col-span-8 space-y-6">
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-none h-64" />
+                <div className="bg-white/[0.04] border border-white/10 rounded-xl h-64 animate-pulse" />
+                <div className="bg-white/[0.03] border border-white/10 rounded-xl h-40 animate-pulse" />
               </div>
             </div>
           </div>

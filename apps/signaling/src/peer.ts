@@ -14,7 +14,7 @@ export function createPeerServer(
 ) {
   const peerServer = ExpressPeerServer(server, {
     path: "/myapp",
-    allow_discovery: true,
+    allow_discovery: process.env.PEER_ALLOW_DISCOVERY === "true",
   });
 
   let connectedPeers = 0;

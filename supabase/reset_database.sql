@@ -135,13 +135,27 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_profiles' AND policyname='Users can update own profile') THEN
     CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE
-      USING (auth.uid() = user_id);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_profiles' AND policyname='Users can view active_peer_id of others') THEN
-    CREATE POLICY "Users can view active_peer_id of others" ON public.user_profiles FOR SELECT
-      USING (auth.role() = 'authenticated');
+      USING (auth.uid() = user_id)
+      WITH CHECK (auth.uid() = user_id);
   END IF;
 END $$;
+
+-- Restrict authenticated users to non-privileged profile columns only.
+-- This prevents self-escalation via updates to sensitive fields like is_admin.
+REVOKE UPDATE ON public.user_profiles FROM authenticated;
+GRANT UPDATE (display_name, avatar_icon, avatar_color, active_peer_id) ON public.user_profiles TO authenticated;
+
+-- Create a restricted view for peer discovery that only exposes necessary fields
+-- This prevents authenticated users from seeing sensitive profile data like is_admin, display_name, etc.
+CREATE OR REPLACE VIEW public.peer_discovery AS
+SELECT
+  user_id,
+  active_peer_id
+FROM public.user_profiles
+WHERE active_peer_id IS NOT NULL;
+
+-- Grant SELECT on the view to authenticated users
+GRANT SELECT ON public.peer_discovery TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.update_user_profile_updated_at()
 RETURNS TRIGGER AS $$
@@ -160,7 +174,7 @@ CREATE OR REPLACE FUNCTION public.create_default_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.user_profiles (user_id, display_name, avatar_icon, avatar_color)
-  VALUES (NEW.id, split_part(NEW.email, '@', 1), 'person', 'bg-primary');
+  VALUES (NEW.id, 'User', 'person', 'bg-primary');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -341,6 +355,11 @@ CREATE POLICY "Only admins can view deletion log"
       AND is_admin = TRUE
     )
   );
+
+DROP POLICY IF EXISTS "Users can log own account deletion" ON public.account_deletions;
+CREATE POLICY "Users can log own account deletion"
+  ON public.account_deletions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
 
 REVOKE ALL ON public.account_deletions FROM PUBLIC;
 GRANT INSERT ON public.account_deletions TO authenticated;

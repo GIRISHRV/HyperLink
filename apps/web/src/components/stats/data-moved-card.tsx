@@ -8,9 +8,10 @@ export function DataMovedCard({ userId }: { userId: string }) {
 
   if (isLoading) {
     return (
-      <div className="bg-surface border border-subtle p-6 rounded-none animate-pulse min-h-[120px]">
-        <div className="h-4 w-24 bg-subtle mb-4 rounded"></div>
-        <div className="h-8 w-32 bg-subtle rounded"></div>
+      <div className="bg-surface border border-subtle p-6 rounded-xl animate-pulse min-h-[120px]">
+        <div className="h-3 w-28 bg-subtle rounded-full mb-4"></div>
+        <div className="h-10 w-36 bg-subtle rounded-lg mb-3"></div>
+        <div className="h-3 w-40 bg-white/5 rounded-full"></div>
       </div>
     );
   }

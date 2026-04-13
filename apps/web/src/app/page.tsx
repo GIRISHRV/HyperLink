@@ -38,8 +38,12 @@ export default async function LandingPage() {
               </h1>
 
               <p className="text-lg md:text-xl font-medium text-gray-600 dark:text-gray-400 max-w-lg mt-4 leading-relaxed">
-                Peer-to-peer encrypted file transfer. No servers. Just geometry and code. Drag,
-                drop, and vanish.
+                Peer-to-peer encrypted file transfer with account-based security. Files move
+                directly between browsers and never touch our storage.
+              </p>
+
+              <p className="text-sm font-mono text-gray-500 dark:text-gray-500 max-w-lg">
+                Sign in once to send, receive, and keep transfer history.
               </p>
 
               {/* WebRTC Status Indicator (Visual) */}
@@ -82,7 +86,7 @@ export default async function LandingPage() {
                 <div className="flex flex-col items-center text-center">
                   <span className="font-bold text-xl tracking-wider uppercase">SEND</span>
                   <span className="text-xs text-white/70 uppercase tracking-wider">
-                    Drag & Drop
+                    Sign In Required
                   </span>
                 </div>
               </Link>
@@ -98,7 +102,9 @@ export default async function LandingPage() {
                 </span>
                 <div className="flex flex-col items-center text-center">
                   <span className="font-bold text-xl tracking-wider uppercase">RECEIVE</span>
-                  <span className="text-xs text-white/70 uppercase tracking-wider">Enter Code</span>
+                  <span className="text-xs text-white/70 uppercase tracking-wider">
+                    Sign In Required
+                  </span>
                 </div>
               </Link>
             </div>

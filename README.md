@@ -63,14 +63,14 @@ cp apps/signaling/.env.example apps/signaling/.env.local
 npm run dev
 ```
 
-Frontend: http://localhost:3000  
-Signaling Server: http://localhost:9000
+Frontend: [http://localhost:3000](http://localhost:3000)  
+Signaling Server: [http://localhost:9000](http://localhost:9000)
 
 **For detailed setup instructions, see [Getting Started Guide](./docs/guides/GETTING_STARTED.md)**
 
 ## 📦 Project Structure
 
-```
+```text
 hyperlink/
 ├── apps/
 │   ├── web/              # Next.js frontend

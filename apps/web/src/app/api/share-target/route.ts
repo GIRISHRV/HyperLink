@@ -8,11 +8,15 @@ export async function POST(req: NextRequest) {
   // Validate full origin including scheme to prevent http/https mismatch
   const origin = req.headers.get("origin");
   if (origin) {
-    const originUrl = new URL(origin);
-    const requestUrl = new URL(req.url);
+    try {
+      const originUrl = new URL(origin);
+      const requestUrl = new URL(req.url);
 
-    // Compare full origin (scheme + hostname + port)
-    if (originUrl.origin !== requestUrl.origin) {
+      // Compare full origin (scheme + hostname + port)
+      if (originUrl.origin !== requestUrl.origin) {
+        return new NextResponse("Invalid Origin", { status: 403 });
+      }
+    } catch {
       return new NextResponse("Invalid Origin", { status: 403 });
     }
   }

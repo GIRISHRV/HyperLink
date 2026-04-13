@@ -32,6 +32,27 @@ interface UseSendTransferOptions {
   onReset?: () => void;
 }
 
+function normalizeReceiverPeerId(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  // Accept raw IDs and shared transfer links like /send?peerId=<id>
+  if (trimmed.includes("peerId=")) {
+    try {
+      const url = new URL(trimmed);
+      return (url.searchParams.get("peerId") || "").trim();
+    } catch {
+      // Handle partial links without protocol
+      const match = trimmed.match(/[?&]peerId=([^&]+)/i);
+      if (match?.[1]) {
+        return decodeURIComponent(match[1]).trim();
+      }
+    }
+  }
+
+  return trimmed;
+}
+
 export function useSendTransfer({
   user,
   file,
@@ -141,7 +162,7 @@ export function useSendTransfer({
       }
 
       const iceServers = await getIceServers();
-      // Task #4: Support Compatibility Mode (Forced Relay)
+      // Compatibility mode is opt-in; default keeps direct+relay candidate policy.
       const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
       const config = await getPeerConfigAsync(iceServers, forceRelay);
       config.onLog = addLog;
@@ -247,20 +268,65 @@ export function useSendTransfer({
   }, [isPaused, dispatchTransfer]);
 
   const handleSend = useCallback(async () => {
-    if (!file || !receiverPeerId || !peerManagerRef.current || !isPeerReady || !user) {
+    const targetPeerId = normalizeReceiverPeerId(receiverPeerId);
+
+    if (!file) {
+      const message = "Select a file before sending.";
+      setError(message);
+      addLog(`✗ ${message}`);
+      toast.error(message);
+      return;
+    }
+
+    if (!targetPeerId) {
+      const message = "Enter a valid receiver code.";
+      setError(message);
+      addLog(`✗ ${message}`);
+      toast.error(message);
+      return;
+    }
+
+    if (!peerManagerRef.current || !isPeerReady || !user) {
+      const message = "System not ready yet. Wait for signaling initialization.";
+      setError(message);
+      addLog(`✗ ${message}`);
+      toast.error(message);
       return;
     }
 
     try {
       setError("");
       dispatchTransfer({ type: "CONNECT" });
-      addLog(`Connecting to peer: ${receiverPeerId}...`);
+      addLog(`Connecting to peer: ${targetPeerId}...`);
 
-      const conn = peerManagerRef.current.connectToPeer(receiverPeerId);
+      const conn = peerManagerRef.current.connectToPeer(targetPeerId);
       connectionRef.current = conn;
 
+      const CONNECT_OPEN_TIMEOUT_MS = 25000;
+      let channelOpened = false;
+      const connectTimeout = setTimeout(() => {
+        if (channelOpened) return;
+        const timeoutMessage =
+          "Connection timed out before channel opened. Verify receiver code and try Compatibility Mode.";
+        setError(timeoutMessage);
+        addLog(`✗ ${timeoutMessage}`);
+        playErrorSound();
+        dispatchTransfer({ type: "FAIL", error: timeoutMessage });
+        try {
+          conn.close();
+        } catch {
+          // No-op: closing an already-closed connection is safe to ignore
+        }
+      }, CONNECT_OPEN_TIMEOUT_MS);
+
+      const clearConnectTimeout = () => {
+        clearTimeout(connectTimeout);
+      };
+
       conn.on("open", async () => {
-        logger.debug({ receiverPeerId }, "[useSendTransfer] Connection opened");
+        channelOpened = true;
+        clearConnectTimeout();
+        logger.debug({ receiverPeerId: targetPeerId }, "[useSendTransfer] Connection opened");
         try {
           addLog("✓ Connection established");
           playConnectionSound();
@@ -354,6 +420,15 @@ export function useSendTransfer({
           onDataRef.current?.(data);
 
           const message = validatePeerMessage(data);
+          if (message && message.type === "receiver-busy") {
+            const errorMessage = "Receiver is busy with another transfer.";
+            setError(errorMessage);
+            addLog(`✗ ${errorMessage}`);
+            playErrorSound();
+            dispatchTransfer({ type: "FAIL", error: errorMessage });
+            conn.close();
+            return;
+          }
           if (message && message.type === "chunk-ack") {
             // Handled internally by FileSender
           }
@@ -363,20 +438,24 @@ export function useSendTransfer({
       });
 
       conn.on("error", (err: unknown) => {
+        clearConnectTimeout();
         const msg = err instanceof Error ? err.message : String(err);
-        setError(`Connection error: ${msg}`);
-        addLog(`✗ Connection error: ${msg}`);
+        const errorMessage = `Connection error: ${msg}`;
+        setError(errorMessage);
+        addLog(`✗ ${errorMessage}`);
         playErrorSound();
-        resetSend();
+        dispatchTransfer({ type: "FAIL", error: errorMessage });
       });
 
       conn.on("close", () => {
+        clearConnectTimeout();
         // Use ref to avoid stale closure - check current status from FileSender
         const currentStatus = fileSenderRef.current?.getStatus();
         if (currentStatus !== "complete") {
-          setError("Connection closed");
-          addLog("✗ Connection closed");
-          resetSend();
+          const errorMessage = "Connection closed";
+          setError(errorMessage);
+          addLog(`✗ ${errorMessage}`);
+          dispatchTransfer({ type: "FAIL", error: errorMessage });
         }
       });
     } catch (err: unknown) {

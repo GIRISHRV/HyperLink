@@ -6,10 +6,7 @@ interface TransferVisualizerProps {
   direction: "uplink" | "downlink";
 }
 
-export default function TransferVisualizer({
-  isPaused,
-  direction,
-}: TransferVisualizerProps) {
+export default function TransferVisualizer({ isPaused, direction }: TransferVisualizerProps) {
   const isUplink = direction === "uplink";
 
   return (
@@ -65,20 +62,14 @@ export default function TransferVisualizer({
       {/* Status Overlays */}
       <div className="absolute top-6 left-6 flex flex-col gap-1">
         <span className="text-xs font-bold text-primary uppercase tracking-widest border border-primary px-2 py-1 bg-primary/10">
-          {isUplink ? "Uplink Active" : "Downlink Active"}
+          {isUplink ? "Sending" : "Receiving"}
         </span>
-        <span className="text-xs font-mono text-white/50">
-          E2E_ENCRYPTED
-        </span>
+        <span className="text-xs font-mono text-white/50">End-to-end encrypted</span>
       </div>
 
       <div className="absolute bottom-6 right-6 text-right">
         <p className="text-muted font-mono text-xs uppercase tracking-widest">
-          {isPaused
-            ? "TRANSMISSION HALTED"
-            : isUplink
-              ? "DATA_STREAM_OUT"
-              : "DATA_STREAM_IN"}
+          {isPaused ? "Transfer paused" : isUplink ? "Sending data" : "Receiving data"}
         </p>
         <div className="flex justify-end gap-1 mt-1">
           {[...Array(5)].map((_, i) => (

@@ -41,16 +41,16 @@ function EmptyState({
       <p className="text-gray-400 max-w-sm mb-8 leading-relaxed">{description}</p>
 
       {actionLabel && actionLink && (
-        <Link href={actionLink}>
-          <Button variant="outline">
+        <Button variant="outline" asChild>
+          <Link href={actionLink}>
             <span className="relative z-10 flex items-center gap-2">
               {actionLabel}
               <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">
                 arrow_forward
               </span>
             </span>
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
     </div>
   );

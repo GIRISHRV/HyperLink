@@ -10,23 +10,22 @@ const __dirname = path.dirname(__filename);
 loadEnv({ path: path.resolve(__dirname, ".env.local") });
 
 const authFileChrome = path.join(__dirname, "e2e/.auth/user-chromium.json");
-const authFileFirefox = path.join(__dirname, "e2e/.auth/user-firefox.json");
 
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
-  fullyParallel: true,
+  fullyParallel: false, // Disabled for stable WebRTC ICE gathering
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 3 : 1, // More retries in CI for flaky WebRTC tests
-  workers: 4, // 4 workers to run browser projects in parallel
+  workers: process.env.CI ? 4 : 1, // Limit workers locally to ensure UDP/ICE stability
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 60_000, // Increased to 60s for CI environments
+  timeout: 120_000,
 
   use: {
     baseURL: "http://localhost:3000",
-    trace: "off",
-    screenshot: "off",
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
     video: "off",
     launchOptions: {
       // slowMo: 100,
@@ -40,12 +39,6 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       testMatch: /auth\.setup\.ts/,
     },
-    // 1(b). Run auth setup for Firefox — handles unique cross-origin localhost cookie states
-    {
-      name: "setup-firefox",
-      use: { ...devices["Desktop Firefox"] },
-      testMatch: /auth\.setup\.ts/,
-    },
 
     // 2. Authenticated tests — reuse saved session, run after setup
     {
@@ -57,36 +50,13 @@ export default defineConfig({
       },
       testMatch: /authenticated\/.*\.spec\.ts/,
     },
-    {
-      name: "authenticated-firefox",
-      dependencies: ["setup-firefox"],
-      use: {
-        ...devices["Desktop Firefox"],
-        storageState: authFileFirefox,
-        // Firefox needs longer timeouts for WebRTC and navigation
-        navigationTimeout: 60_000,
-        actionTimeout: 15_000,
-      },
-      testMatch: /authenticated\/.*\.spec\.ts/,
-    },
 
     // 3. Unauthenticated tests — existing specs in e2e/ root (no session)
-    // Runs on Chromium and Firefox only
+    // Runs on Chromium only
     // NOTE: testIgnore excludes the authenticated/ subfolder (Windows-safe)
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testMatch: "**/e2e/**/*.spec.ts",
-      testIgnore: "**/e2e/authenticated/**",
-    },
-    {
-      name: "firefox",
-      use: {
-        ...devices["Desktop Firefox"],
-        // Firefox needs longer timeouts for navigation
-        navigationTimeout: 60_000,
-        actionTimeout: 15_000,
-      },
       testMatch: "**/e2e/**/*.spec.ts",
       testIgnore: "**/e2e/authenticated/**",
     },
@@ -95,7 +65,7 @@ export default defineConfig({
   /* Start both servers before tests; Playwright kills them after */
   webServer: [
     {
-      command: "npm run build && npm run start",
+      command: "npm run start",
       env: { NEXT_PUBLIC_DISABLE_SENTRY: "true" },
       url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,

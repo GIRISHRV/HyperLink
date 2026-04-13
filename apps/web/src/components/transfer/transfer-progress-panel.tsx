@@ -68,10 +68,10 @@ export default function TransferProgressPanel({
           </div>
           <div>
             <p className="text-muted text-xs font-bold uppercase tracking-widest">
-              {isUplink ? "Secure Uplink Established" : "Incoming Data Stream"}
+              {isUplink ? "Connected to Receiver" : "Connected to Sender"}
             </p>
             <p className="text-white font-bold font-mono text-sm tracking-tight">
-              ID: {peerId.slice(0, 8)}...{peerId.slice(-4)}
+              Connection: {peerId.slice(0, 8)}...{peerId.slice(-4)}
             </p>
           </div>
         </div>
@@ -107,7 +107,7 @@ export default function TransferProgressPanel({
         <div className="flex justify-between items-start z-10">
           <div>
             <h3 className="text-white font-black uppercase text-xl tracking-tighter">
-              {isUplink ? "Uploading Payload" : "Receiving Payload"}
+              {isUplink ? "Sending File" : "Receiving File"}
             </h3>
             <p className="text-muted text-xs font-mono mt-1 truncate max-w-xs">{fileName}</p>
           </div>
@@ -120,9 +120,7 @@ export default function TransferProgressPanel({
             >
               {percentage.toFixed(0)}%
             </span>
-            <span className="text-white/30 text-xs uppercase tracking-wider">
-              {isUplink ? "Completion" : "Integrity"}
-            </span>
+            <span className="text-white/30 text-xs uppercase tracking-wider">Progress</span>
           </div>
         </div>
 
@@ -173,19 +171,15 @@ export default function TransferProgressPanel({
             {isPaused
               ? pausedBy === "remote"
                 ? "Paused by Peer"
-                : isUplink
-                  ? "Resume Uplink"
-                  : "RESUME DOWNLINK"
-              : isUplink
-                ? "Pause"
-                : "Halt"}
+                : "Resume Transfer"
+              : "Pause Transfer"}
           </button>
           <button
             onClick={onCancel}
             className="h-12 bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
             <span className="material-symbols-outlined !text-[18px]">block</span>
-            Abort
+            Cancel Transfer
           </button>
         </div>
 
@@ -198,7 +192,7 @@ export default function TransferProgressPanel({
             <span className="material-symbols-outlined text-[14px]">
               {showDetails ? "keyboard_arrow_up" : "keyboard_arrow_down"}
             </span>
-            Technical Diagnostics
+            Connection Details
           </button>
 
           {showDetails && (

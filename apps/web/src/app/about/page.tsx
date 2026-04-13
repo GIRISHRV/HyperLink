@@ -231,22 +231,19 @@ export default function AboutPage() {
         <div className="bg-gradient-to-br from-bauhaus-blue/20 to-bauhaus-red/20 border-2 border-primary/30 p-12 text-center">
           <h2 className="text-4xl font-black uppercase tracking-tight mb-4">Ready to Transfer?</h2>
           <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
-            Experience secure, fast, peer-to-peer file sharing. No registration required.
+            Sign in to start secure peer-to-peer file sharing and keep your transfer history.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/send">
-              <Button
-                size="lg"
-                className="bg-bauhaus-blue hover:bg-blue-600 text-white w-full sm:w-auto"
-              >
-                Send a File
-              </Button>
-            </Link>
-            <Link href="/receive">
-              <Button size="lg" variant="destructive" className="w-full sm:w-auto">
-                Receive a File
-              </Button>
-            </Link>
+            <Button
+              asChild
+              size="lg"
+              className="bg-bauhaus-blue hover:bg-blue-600 text-white w-full sm:w-auto"
+            >
+              <Link href="/send">Send a File</Link>
+            </Button>
+            <Button asChild size="lg" variant="destructive" className="w-full sm:w-auto">
+              <Link href="/receive">Receive a File</Link>
+            </Button>
           </div>
         </div>
       </div>

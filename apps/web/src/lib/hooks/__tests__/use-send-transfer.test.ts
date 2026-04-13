@@ -207,8 +207,7 @@ vi.mock("@/lib/hooks/use-transfer-guard", () => ({
 
 vi.mock("@/lib/utils/notification", () => ({
   requestNotificationPermission: () => m.mockRequestNotificationPermission(),
-  notifyTransferComplete: (...args: unknown[]) =>
-    m.mockNotifyTransferComplete(...args),
+  notifyTransferComplete: (...args: unknown[]) => m.mockNotifyTransferComplete(...args),
   playErrorSound: () => m.mockPlayErrorSound(),
   playSuccessSound: () => m.mockPlaySuccessSound(),
   playConnectionSound: () => m.mockPlayConnectionSound(),
@@ -287,17 +286,13 @@ beforeEach(() => {
 describe("useSendTransfer", () => {
   describe("initialization", () => {
     it("starts with isPeerReady=false and no error", () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
       expect(result.current.isPeerReady).toBe(false);
       expect(result.current.error).toBe("");
     });
 
     it("sets isPeerReady=true after successful PeerManager initialization", async () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.isPeerReady).toBe(true));
       // Verify initialize was called with hl- prefix, stable peer ID, and auth token
       expect(m.mockPMInitialize).toHaveBeenCalledWith(
@@ -307,9 +302,7 @@ describe("useSendTransfer", () => {
     });
 
     it("skips initialization when user is null", async () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions({ user: null }))
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions({ user: null })));
       // Give enough time for any async init to run
       await new Promise((r) => setTimeout(r, 50));
       expect(result.current.isPeerReady).toBe(false);
@@ -317,22 +310,16 @@ describe("useSendTransfer", () => {
     });
 
     it("reports error when PeerManager initialization fails", async () => {
-      m.mockPMInitialize.mockRejectedValueOnce(
-        new Error("Connection refused")
-      );
+      m.mockPMInitialize.mockRejectedValueOnce(new Error("Connection refused"));
 
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
 
       await waitFor(() => expect(result.current.error).toMatch(/Connection refused/));
       expect(result.current.isPeerReady).toBe(false);
     });
 
     it("destroys PeerManager on unmount", async () => {
-      const { unmount } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { unmount } = renderHook(() => useSendTransfer(defaultOptions()));
       await waitFor(() => expect(m.mockPMInitialize).toHaveBeenCalled());
 
       unmount();
@@ -343,9 +330,7 @@ describe("useSendTransfer", () => {
 
   describe("handleSend guards", () => {
     it("shows toast when file is missing", async () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions({ file: null }))
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions({ file: null })));
 
       await act(async () => {
         await result.current.handleSend();
@@ -356,9 +341,7 @@ describe("useSendTransfer", () => {
     });
 
     it("shows toast when user is null", async () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions({ user: null }))
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions({ user: null })));
 
       await act(async () => {
         await result.current.handleSend();
@@ -369,9 +352,7 @@ describe("useSendTransfer", () => {
     });
 
     it("shows toast when receiverPeerId is empty", async () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions({ receiverPeerId: "" }))
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions({ receiverPeerId: "" })));
 
       await act(async () => {
         await result.current.handleSend();
@@ -380,29 +361,48 @@ describe("useSendTransfer", () => {
       // Hook silently returns when receiverPeerId is missing
       expect(m.mockConnectToPeer).not.toHaveBeenCalled();
     });
+
+    it("fails when data channel does not open before timeout", async () => {
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.isPeerReady).toBe(true));
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          void result.current.handleSend();
+        });
+
+        await act(async () => {
+          vi.advanceTimersByTime(25_001);
+          await Promise.resolve();
+        });
+
+        expect(result.current.error).toMatch(/timed out before channel opened/i);
+        expect(result.current.transferState.status).toBe("failed");
+        expect(m.mockConnClose).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("handleSend – happy path", () => {
     it("transitions through CONNECT → AWAIT_ACCEPTANCE → COMPLETE", async () => {
       // Simulate connection open immediately
-      m.mockConnOn.mockImplementation(
-        (event: string, cb: (...a: unknown[]) => void) => {
-          if (event === "open") {
-            // Trigger open synchronously next tick
-            setTimeout(() => cb(), 0);
-          }
-          (m.connEvents[event] = m.connEvents[event] || []).push(cb);
+      m.mockConnOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+        if (event === "open") {
+          // Trigger open synchronously next tick
+          setTimeout(() => cb(), 0);
         }
-      );
+        (m.connEvents[event] = m.connEvents[event] || []).push(cb);
+      });
       m.mockConnectToPeer.mockReturnValue({
         on: m.mockConnOn,
         send: m.mockConnSend,
         close: m.mockConnClose,
       });
 
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.isPeerReady).toBe(true));
 
       await act(async () => {
@@ -420,21 +420,17 @@ describe("useSendTransfer", () => {
     });
 
     it("updates transfer status to transferring after connection opens", async () => {
-      m.mockConnOn.mockImplementation(
-        (event: string, cb: (...a: unknown[]) => void) => {
-          if (event === "open") setTimeout(() => cb(), 0);
-          (m.connEvents[event] = m.connEvents[event] || []).push(cb);
-        }
-      );
+      m.mockConnOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+        if (event === "open") setTimeout(() => cb(), 0);
+        (m.connEvents[event] = m.connEvents[event] || []).push(cb);
+      });
       m.mockConnectToPeer.mockReturnValue({
         on: m.mockConnOn,
         send: m.mockConnSend,
         close: m.mockConnClose,
       });
 
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.isPeerReady).toBe(true));
 
       await act(async () => {
@@ -452,15 +448,71 @@ describe("useSendTransfer", () => {
         fileSize: FILE.size,
       });
     });
+
+    it("accepts a pasted receive link and connects using its peerId", async () => {
+      m.mockConnOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+        if (event === "open") setTimeout(() => cb(), 0);
+        (m.connEvents[event] = m.connEvents[event] || []).push(cb);
+      });
+      m.mockConnectToPeer.mockReturnValue({
+        on: m.mockConnOn,
+        send: m.mockConnSend,
+        close: m.mockConnClose,
+      });
+
+      const { result } = renderHook(() =>
+        useSendTransfer(
+          defaultOptions({
+            receiverPeerId: "https://example.test/receive?peerId=peer-from-link",
+          })
+        )
+      );
+
+      await waitFor(() => expect(result.current.isPeerReady).toBe(true));
+
+      await act(async () => {
+        result.current.handleSend();
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(m.mockConnectToPeer).toHaveBeenCalledWith("peer-from-link");
+    });
+
+    it("accepts partial query-style input and extracts peerId", async () => {
+      m.mockConnOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+        if (event === "open") setTimeout(() => cb(), 0);
+        (m.connEvents[event] = m.connEvents[event] || []).push(cb);
+      });
+      m.mockConnectToPeer.mockReturnValue({
+        on: m.mockConnOn,
+        send: m.mockConnSend,
+        close: m.mockConnClose,
+      });
+
+      const { result } = renderHook(() =>
+        useSendTransfer(
+          defaultOptions({
+            receiverPeerId: "/receive?peerId=peer-partial",
+          })
+        )
+      );
+
+      await waitFor(() => expect(result.current.isPeerReady).toBe(true));
+
+      await act(async () => {
+        result.current.handleSend();
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(m.mockConnectToPeer).toHaveBeenCalledWith("peer-partial");
+    });
   });
 
   describe("resetSend", () => {
     it("resets transfer state and clears error", async () => {
       m.mockPMInitialize.mockRejectedValueOnce(new Error("Oops"));
 
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
       await waitFor(() => expect(result.current.error).toBeTruthy());
 
       act(() => {
@@ -475,9 +527,7 @@ describe("useSendTransfer", () => {
 
   describe("handlePauseResume", () => {
     it("does nothing when no fileSender is active", () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
 
       // Should not throw
       act(() => {
@@ -491,9 +541,7 @@ describe("useSendTransfer", () => {
 
   describe("confirmCancel", () => {
     it("does nothing when no fileSender is active", () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
 
       act(() => {
         result.current.confirmCancel();
@@ -505,9 +553,7 @@ describe("useSendTransfer", () => {
 
   describe("transferState", () => {
     it("exposes initial idle state", () => {
-      const { result } = renderHook(() =>
-        useSendTransfer(defaultOptions())
-      );
+      const { result } = renderHook(() => useSendTransfer(defaultOptions()));
 
       expect(result.current.transferState.status).toBe("idle");
       expect(result.current.transferState.bytesTransferred).toBe(0);
@@ -530,7 +576,7 @@ describe("useSendTransfer", () => {
       await act(async () => {
         // Find the 'complete' callback registered with FileSender
         // The sender hook registers events in a useEffect when status changes to 'transferring'.
-        // For simplicity, we can simulate the internal `sender.then()` chain 
+        // For simplicity, we can simulate the internal `sender.then()` chain
         // by looking at how the mock could theoretically return.
       });
 
@@ -540,11 +586,9 @@ describe("useSendTransfer", () => {
 
       await act(async () => {
         // Force the connection/transfer state to hit the `.then()` chain in `handleSend`
-        m.mockConnOn.mockImplementation(
-          (event: string, cb: (...a: unknown[]) => void) => {
-            if (event === "open") setTimeout(() => cb(), 0);
-          }
-        );
+        m.mockConnOn.mockImplementation((event: string, cb: (...a: unknown[]) => void) => {
+          if (event === "open") setTimeout(() => cb(), 0);
+        });
         m.mockConnectToPeer.mockReturnValue({
           on: m.mockConnOn,
           send: m.mockConnSend,
@@ -572,13 +616,16 @@ describe("useSendTransfer", () => {
       await act(async () => {
         const firewallBlockedCbs = m.pmEvents["firewall-blocked"];
         if (firewallBlockedCbs) {
-          firewallBlockedCbs.forEach(cb => cb());
+          firewallBlockedCbs.forEach((cb) => cb());
         }
       });
 
-      expect(m.mockToastError).toHaveBeenCalledWith("Firewall Blocked", expect.objectContaining({
-        description: expect.stringContaining("Compatibility Mode")
-      }));
+      expect(m.mockToastError).toHaveBeenCalledWith(
+        "Firewall Blocked",
+        expect.objectContaining({
+          description: expect.stringContaining("Compatibility Mode"),
+        })
+      );
     });
   });
 });

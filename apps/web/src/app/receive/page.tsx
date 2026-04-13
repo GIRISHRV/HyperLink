@@ -111,15 +111,10 @@ export default function ReceivePage() {
         isPeerReady={!!myPeerId}
         status={transferState.status}
         onBackCheck={() => {
-          if (
-            isReceiveTransferActive &&
-            !confirm(
-              "Transfer in progress. Are you sure you want to leave? This will cancel the transfer."
-            )
-          ) {
+          if (isReceiveTransferActive) {
+            setShowCancelModal(true);
             return false;
           }
-          if (isReceiveTransferActive) confirmCancel();
           return true;
         }}
       />
@@ -133,13 +128,15 @@ export default function ReceivePage() {
             progress ? (
               <div className="flex flex-col gap-8 w-full h-full">
                 {/* Page Header */}
-                <div className="flex flex-col gap-1">
-                  <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white uppercase">
-                    Secure Transfer <span className="text-primary">Downlink</span>
-                  </h1>
-                  <div className="flex items-center gap-2 text-muted font-mono text-sm">
-                    <span className="material-symbols-outlined text-sm">lock</span>
-                    <span>/secure_channel/receive</span>
+                <div className="rounded-xl border border-white/10 bg-gradient-to-r from-bauhaus-blue/10 via-white/[0.02] to-primary/10 p-5 md:p-7">
+                  <div className="flex flex-col gap-1">
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white uppercase">
+                      Receiver <span className="text-primary">Monitor</span>
+                    </h1>
+                    <div className="flex items-center gap-2 text-muted font-mono text-xs md:text-sm">
+                      <span className="material-symbols-outlined text-sm">lock</span>
+                      <span>Share your code, verify sender, approve transfer.</span>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -163,127 +160,167 @@ export default function ReceivePage() {
                     direction="downlink"
                   />
                 </div>
-                <TerminalLog logs={logs} />
+                <TerminalLog logs={logs} defaultCollapsed={true} />
               </div>
             ) : (
-              /* === IDLE / OFFERING / COMPLETE / CANCELLED / ERROR (Standard Grid) === */
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 w-full flex-1">
-                {/* Left Column */}
-                <section className="flex flex-col gap-8">
-                  {/* Header */}
-                  <div className="space-y-2">
-                    <h1 className="text-5xl md:text-6xl font-black tracking-tighter uppercase leading-none">
-                      Ready to <span className="text-primary">Receive</span>
-                    </h1>
-                    <p className="text-muted text-lg font-medium max-w-md">
-                      Securely receive encrypted files directly to your device via WebRTC.
-                    </p>
-                  </div>
-
-                  {/* Peer ID Card */}
-                  <PeerIdCard
-                    peerId={myPeerId}
-                    onCopy={copyPeerId}
-                    onShowQR={() => setShowMyQRModal(true)}
-                  />
-
-                  {/* Instructions */}
-                  <div className="p-6 border border-dashed border-subtle-bauhaus flex gap-4 items-start">
-                    <span className="material-symbols-outlined text-primary text-2xl">info</span>
-                    <div className="flex flex-col gap-1">
-                      <h4 className="text-white font-bold uppercase text-sm">How it works</h4>
-                      <p className="text-muted text-sm leading-relaxed">
-                        Share your Peer ID with the sender. Keep this tab open. The transfer will
-                        start automatically once connected.
-                      </p>
-                    </div>
-                  </div>
-
-                  <RadarVisualizer
-                    status={transferState.status}
-                    isPeerReady={!!myPeerId}
-                    className="flex-1"
-                  />
-                </section>
-
-                {/* Right Column */}
-                <section className="flex flex-col gap-8 h-full">
-                  <div className="flex flex-col gap-4">
-                    <h3 className="text-muted text-xs font-bold uppercase tracking-wider border-b border-subtle-bauhaus pb-2">
-                      Incoming Queue
-                    </h3>
-
-                    {transferState.status === "idle" && (
-                      <div className="text-center py-12 text-gray-500 border-2 border-dashed border-white/5 rounded-sm bg-white/[0.02]">
-                        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center animate-pulse">
-                          <span className="material-symbols-outlined text-4xl opacity-50">
-                            wifi_tethering
-                          </span>
-                        </div>
-                        <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-1">
-                          Receiver Active
-                        </h3>
-                        <p className="font-mono text-xs text-muted">
-                          Awaiting incoming secure handshake...
+              <div className="flex flex-col gap-6 w-full flex-1">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8 w-full items-start">
+                  <section
+                    data-testid="receive-identity-column"
+                    className="xl:col-span-5 rounded-xl bg-black/20 border border-white/10 p-6 flex flex-col gap-5"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 border-b border-white/10 pb-4">
+                      <div>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white uppercase">
+                          Receive File
+                        </h1>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Share your receiver code and keep this tab open for incoming transfers.
                         </p>
                       </div>
-                    )}
-
-                    {transferState.status === "offering" && pendingOffer && (
-                      <IncomingOfferCard pendingOffer={pendingOffer} />
-                    )}
-
-                    {transferState.status === "complete" && receivedFile && (
-                      <ReceivedFileView
-                        receivedFile={receivedFile}
-                        onDownload={handleDownload}
-                        onShare={handleShare}
-                        showShareFallback={showShareFallback}
-                        onTextShareFallback={handleTextShareFallback}
-                        onReset={resetReceive}
-                        cleanupProgress={cleanupProgress}
-                        isWakeLockActive={isWakeLockActive}
-                      />
-                    )}
-
-                    {/* Error Display */}
-                    {error && (
-                      <div className="mb-6">
-                        <ErrorDisplay
-                          error={getErrorInfo(parseError(error))}
-                          onDismiss={() => resetReceive()}
+                      <div className="flex items-center gap-2 text-xs font-mono text-gray-400">
+                        <span
+                          className={`inline-flex size-2 rounded-full ${myPeerId ? "bg-green-400" : "bg-gray-500"}`}
                         />
+                        <span>{myPeerId ? "Receiver ready" : "Initializing endpoint"}</span>
                       </div>
-                    )}
+                    </div>
 
-                    {transferState.status === "cancelled" && (
-                      <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-white/5 p-2">
-                              <span className="material-symbols-outlined text-gray-400">
-                                cancel
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm text-gray-300">Transfer Cancelled</p>
-                              <p className="text-xs text-white/50 font-mono">
-                                {receivedFile ? formatFileSize(receivedFile.size) : "—"} • Cancelled
-                              </p>
+                    <div data-testid="receive-identity-panel">
+                      <PeerIdCard
+                        peerId={myPeerId}
+                        onCopy={copyPeerId}
+                        onShowQR={() => setShowMyQRModal(true)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">
+                          Tunnel Security
+                        </p>
+                        <p className="text-sm font-bold text-primary">End-to-end encrypted</p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">
+                          Connection Health
+                        </p>
+                        <p
+                          className={`text-sm font-bold ${myPeerId ? "text-green-300" : "text-gray-400"}`}
+                        >
+                          {myPeerId ? "Ready for sender" : "Initializing"}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section data-testid="receive-inbox-column" className="xl:col-span-7 h-full">
+                    <article
+                      data-testid="receive-inbox-panel"
+                      className="rounded-xl bg-black/20 border border-white/10 p-6 flex flex-col gap-4 h-full"
+                    >
+                      <div className="flex items-center justify-between border-b border-subtle-bauhaus pb-3">
+                        <h3 className="text-muted text-xs font-bold uppercase tracking-wider">
+                          Incoming Queue
+                        </h3>
+                        <span className="text-[10px] uppercase tracking-widest text-gray-500">
+                          State: {transferState.status}
+                        </span>
+                      </div>
+
+                      {transferState.status === "idle" && (
+                        <div className="text-center py-12 px-4 text-gray-500 border border-dashed border-white/10 rounded-xl bg-gradient-to-b from-white/[0.04] to-white/[0.01]">
+                          <div className="w-20 h-20 mx-auto mb-6 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center animate-pulse">
+                            <span className="material-symbols-outlined text-4xl opacity-60">
+                              wifi_tethering
+                            </span>
+                          </div>
+                          <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-1">
+                            Waiting for Sender
+                          </h3>
+                          <p className="font-mono text-xs text-muted">
+                            Keep this screen open while the sender connects.
+                          </p>
+                        </div>
+                      )}
+
+                      {transferState.status === "offering" && pendingOffer && (
+                        <IncomingOfferCard pendingOffer={pendingOffer} />
+                      )}
+
+                      {transferState.status === "complete" && receivedFile && (
+                        <ReceivedFileView
+                          receivedFile={receivedFile}
+                          onDownload={handleDownload}
+                          onShare={handleShare}
+                          showShareFallback={showShareFallback}
+                          onTextShareFallback={handleTextShareFallback}
+                          onReset={resetReceive}
+                          cleanupProgress={cleanupProgress}
+                          isWakeLockActive={isWakeLockActive}
+                        />
+                      )}
+
+                      {error && (
+                        <div className="mb-2" data-testid="receive-error-banner">
+                          <ErrorDisplay
+                            error={getErrorInfo(parseError(error))}
+                            onDismiss={() => resetReceive()}
+                          />
+                        </div>
+                      )}
+
+                      {transferState.status === "cancelled" && (
+                        <div className="rounded-xl bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="rounded-md bg-white/5 p-2">
+                                <span className="material-symbols-outlined text-gray-400">
+                                  cancel
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm text-gray-300">
+                                  Transfer Cancelled
+                                </p>
+                                <p className="text-xs text-white/50 font-mono">
+                                  {receivedFile ? formatFileSize(receivedFile.size) : "—"} •
+                                  Cancelled
+                                </p>
+                              </div>
                             </div>
                           </div>
+                          <button
+                            onClick={resetReceive}
+                            className="w-full h-9 bg-primary text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors hover:bg-white"
+                          >
+                            Ready for New Transfer
+                          </button>
                         </div>
-                        <button
-                          onClick={resetReceive}
-                          className="w-full h-9 bg-primary text-black text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors hover:bg-white"
-                        >
-                          Ready for New Transfer
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </article>
+                  </section>
+                </div>
 
-                  <TerminalLog logs={logs} className="flex-1 mt-auto min-h-[250px]" />
+                <section
+                  data-testid="receive-connection-details"
+                  className="rounded-xl border border-white/10 bg-black/20 p-4 md:p-6"
+                >
+                  <details>
+                    <summary className="cursor-pointer list-none flex items-center justify-between text-xs md:text-sm font-bold uppercase tracking-[0.12em] text-gray-300">
+                      <span>Connection Details</span>
+                      <span className="material-symbols-outlined text-base">expand_more</span>
+                    </summary>
+                    <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      <RadarVisualizer
+                        status={transferState.status}
+                        isPeerReady={!!myPeerId}
+                        className="min-h-[240px] rounded-lg border border-white/10 bg-black/20"
+                      />
+
+                      <TerminalLog logs={logs} className="min-h-[280px]" defaultCollapsed={true} />
+                    </div>
+                  </details>
                 </section>
               </div>
             )}
@@ -297,6 +334,7 @@ export default function ReceivePage() {
         filename={pendingOffer?.filename ?? ""}
         fileSize={pendingOffer?.fileSize ?? 0}
         fileType={pendingOffer?.fileType ?? ""}
+        senderPeerId={pendingOffer?.connection?.peer}
         onAccept={handleAcceptOffer}
         onReject={handleRejectOffer}
       />

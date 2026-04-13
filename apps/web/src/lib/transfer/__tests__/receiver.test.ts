@@ -530,5 +530,21 @@ describe("FileReceiver", () => {
         expect.objectContaining({ type: "chunk-ack", payload: { chunkIndex: 1 } })
       );
     });
+
+    it("does not drop out-of-order chunks as duplicates", async () => {
+      const offer = createOfferMessage({ totalChunks: 3, fileSize: 65536 * 3 });
+      await receiver.handleOffer(offer);
+
+      const completeCb = vi.fn();
+      receiver.onComplete(completeCb);
+
+      // Deliberately send out of order: old resumeFrom logic could incorrectly skip chunk 0.
+      await receiver.handleChunk(createChunkMessage(1));
+      await receiver.handleChunk(createChunkMessage(0));
+      await receiver.handleChunk(createChunkMessage(2));
+
+      expect(mockAddChunk).toHaveBeenCalledTimes(3);
+      expect(completeCb).toHaveBeenCalledWith(expect.any(Blob), "document.pdf");
+    });
   });
 });

@@ -70,12 +70,12 @@ export default function Error({
             Try Again
           </Button>
 
-          <Link href="/">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
+          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+            <Link href="/">
               <span className="material-symbols-outlined">home</span>
               Go Home
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         {/* Technical Info */}

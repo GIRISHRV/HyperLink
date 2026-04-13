@@ -8,7 +8,7 @@
  *   - GET /health   — shape, rate limiter headers, public access
  *   - GET /         — root endpoint
  *   - CORS          — allowed origins, blocked origins, prefix-spoof prevention
- *   - JWT auth      — no token, invalid token, wrong secret, query param, valid header/query
+ *   - JWT auth      — no token, invalid token, wrong secret, header token, query token scope
  *   - Auth disabled — warns and skips in dev mode (no secret)
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -186,10 +186,10 @@ describe("JWT authentication middleware (SEC-011 / SEC-012)", () => {
     expect(res.body.error).toBe("Invalid or expired token");
   });
 
-  it("rejects a bad token passed via query param with 403", async () => {
+  it("rejects query token on non-peer paths with 401", async () => {
     const app = await importApp();
     const res = await request(app).get("/protected-path?token=garbage");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
   });
 
   it("accepts a valid HS256 token via Authorization header", async () => {
@@ -201,10 +201,18 @@ describe("JWT authentication middleware (SEC-011 / SEC-012)", () => {
     expect(res.status).not.toBe(403);
   });
 
-  it("accepts a valid token passed as ?token= query param", async () => {
+  it("rejects valid query token on non-peer paths", async () => {
     const app = await importApp();
     const token = makeToken();
     const res = await request(app).get(`/protected-path?token=${token}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("accepts valid query token only on peer paths", async () => {
+    const app = await importApp();
+    const token = makeToken();
+    const res = await request(app).get(`/myapp/peerjs?token=${token}`);
+    // Auth passes — Express returns 404 since /myapp/peerjs has no handler in this test harness.
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
   });

@@ -73,6 +73,17 @@ describe("zip-helper", () => {
       expect(onProgress).toHaveBeenCalledWith(100);
     });
 
+    it("handles worker payload objects and preserves archive bytes", async () => {
+      const zipBytes = new Uint8Array([80, 75, 3, 4, 1, 2, 3, 4]);
+      mockExecute.mockResolvedValueOnce({ data: zipBytes, progress: 100 });
+
+      const result = await zipFiles([makeFile("a.txt", "AAA"), makeFile("b.txt", "BBB")]);
+
+      expect(result.size).toBe(zipBytes.length);
+      const archiveBytes = new Uint8Array(await result.arrayBuffer());
+      expect(Array.from(archiveBytes)).toEqual(Array.from(zipBytes));
+    });
+
     it("uses webkitRelativePath as the key when available", async () => {
       const file = makeFile("subfolder/image.png");
       Object.defineProperty(file, "webkitRelativePath", {
@@ -100,6 +111,14 @@ describe("zip-helper", () => {
       mockExecute.mockRejectedValueOnce(new Error("Compression failed"));
 
       await expect(zipFiles([makeFile("bad.txt")])).rejects.toThrow("Compression failed");
+    });
+
+    it("rejects when worker response does not include binary data", async () => {
+      mockExecute.mockResolvedValueOnce({ progress: 100 });
+
+      await expect(zipFiles([makeFile("bad-payload.txt")])).rejects.toThrow(
+        "Invalid ZIP worker response"
+      );
     });
 
     it("works with a single file", async () => {

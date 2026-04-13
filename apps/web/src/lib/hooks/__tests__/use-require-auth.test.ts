@@ -6,7 +6,7 @@
  * This separation prevents the redirect loops that occur when both
  * middleware and client-side code try to redirect simultaneously.
  */
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -22,6 +22,7 @@ vi.mock("@/lib/services/auth-service", () => ({
 import { useRequireAuth } from "@/lib/hooks/use-require-auth";
 
 const mockUser = { id: "user-123", email: "test@example.com" };
+const AUTH_LOADING_TIMEOUT_MS = 8000;
 
 describe("useRequireAuth", () => {
   beforeEach(() => {
@@ -90,5 +91,24 @@ describe("useRequireAuth", () => {
 
     // If we got here without errors, no router was needed
     expect(result.current.user).toBeNull();
+  });
+
+  it("clears loading after timeout if auth call hangs", async () => {
+    vi.useFakeTimers();
+    mockGetCurrentUser.mockReturnValue(new Promise(() => {}));
+
+    try {
+      const { result } = renderHook(() => useRequireAuth());
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        vi.advanceTimersByTime(AUTH_LOADING_TIMEOUT_MS + 1);
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.user).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

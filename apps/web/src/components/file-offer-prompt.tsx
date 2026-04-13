@@ -8,6 +8,7 @@ interface FileOfferPromptProps {
   filename: string;
   fileSize: number;
   fileType: string;
+  senderPeerId?: string;
   onAccept: () => void;
   onReject: () => void;
 }
@@ -17,6 +18,7 @@ export default function FileOfferPrompt({
   filename,
   fileSize,
   fileType,
+  senderPeerId,
   onAccept,
   onReject,
 }: FileOfferPromptProps) {
@@ -24,6 +26,9 @@ export default function FileOfferPrompt({
   if (!isOpen) return null;
 
   const extension = filename.split(".").pop()?.toUpperCase() || "FILE";
+  const senderLabel = senderPeerId
+    ? `${senderPeerId.slice(0, 6)}...${senderPeerId.slice(-4)}`
+    : "Unknown";
 
   return (
     <div
@@ -78,10 +83,15 @@ export default function FileOfferPrompt({
                 {formatFileSize(fileSize)}
               </span>
             </div>
+            <div className="flex justify-between items-center pt-2 border-t border-white/5">
+              <span className="text-xs text-gray-500 uppercase tracking-wider">Sender</span>
+              <span className="text-sm font-mono text-white font-bold">{senderLabel}</span>
+            </div>
           </div>
 
           <p className="text-gray-500 text-xs leading-relaxed">
-            The file will be transferred directly peer-to-peer. No data is stored on any server.
+            Verify the sender code before accepting. The file transfers directly peer-to-peer and is
+            not stored on our server.
           </p>
         </div>
 

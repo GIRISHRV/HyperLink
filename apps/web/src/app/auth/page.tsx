@@ -48,6 +48,7 @@ export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -80,12 +81,12 @@ export default function AuthPage() {
       <div className="bg-background-light dark:bg-background-dark min-h-screen text-background-dark dark:text-white flex flex-col font-display">
         <AppHeader variant="landing" />
         <main className="flex-grow flex items-center justify-center p-6">
-          <div className="w-full max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-0 border border-subtle overflow-hidden">
+          <div className="w-full max-w-[1200px] grid grid-cols-1 lg:grid-cols-2 gap-0 border border-subtle overflow-hidden rounded-xl">
             <div className="bg-surface p-12 lg:p-16 min-h-[400px] lg:min-h-[600px] flex items-center justify-center">
-              <div className="w-full h-full border border-white/5 bg-white/5 animate-pulse rounded-md" />
+              <div className="w-full h-full border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.03] animate-pulse rounded-xl" />
             </div>
             <div className="bg-white dark:bg-background-dark p-8 lg:p-12 border-l border-subtle flex items-center justify-center">
-              <div className="w-full max-w-md h-96 border border-white/5 bg-white/5 animate-pulse rounded-md" />
+              <div className="w-full max-w-md h-96 border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.03] animate-pulse rounded-xl" />
             </div>
           </div>
         </main>
@@ -109,7 +110,7 @@ export default function AuthPage() {
 
     try {
       // SEC-003: Client-side password length validation for sign-up
-      if (!showForgotPassword && !useMagicLink && password.length < 8) {
+      if (isSignUp && !showForgotPassword && !useMagicLink && password.length < 8) {
         setError("Password must be at least 8 characters.");
         setLoading(false);
         return;
@@ -129,8 +130,17 @@ export default function AuthPage() {
           setLoading(false);
           return;
         }
-        setSuccess("Account created! Redirecting...");
-        router.replace(getRedirect());
+
+        if (data.session) {
+          setSuccess("Account created. Redirecting...");
+          router.replace(getRedirect());
+        } else {
+          setSuccess("Account created. Check your email to verify your account, then sign in.");
+          setIsSignUp(false);
+          setUseMagicLink(false);
+          setShowAdvancedOptions(false);
+          setPassword("");
+        }
       } else {
         const { data, error } = await signIn(email, password);
         if (error || !data?.user) {
@@ -234,7 +244,11 @@ export default function AuthPage() {
               <p className="text-lg font-medium text-gray-600 dark:text-gray-400 max-w-md leading-relaxed">
                 {showForgotPassword
                   ? "Enter your email to receive a password reset link."
-                  : "Authenticate to access the secure P2P file transfer network."}
+                  : useMagicLink
+                    ? "Sign in with a one-time magic link sent to your email."
+                    : isSignUp
+                      ? "Create your account to send and receive files securely."
+                      : "Sign in to continue your secure transfers."}
               </p>
 
               {/* WebRTC Status Indicator */}
@@ -283,21 +297,12 @@ export default function AuthPage() {
               {/* Password Input */}
               {!useMagicLink && !showForgotPassword && (
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label
-                      htmlFor="auth-password"
-                      className="text-xs font-bold uppercase tracking-widest text-gray-500"
-                    >
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotPassword(true)}
-                      className="text-xs text-gray-500 hover:text-primary transition-colors uppercase font-bold"
-                    >
-                      Forgot?
-                    </button>
-                  </div>
+                  <label
+                    htmlFor="auth-password"
+                    className="text-xs font-bold uppercase tracking-widest text-gray-500"
+                  >
+                    Password
+                  </label>
                   <input
                     id="auth-password"
                     className="w-full bg-surface border-2 border-subtle focus:border-primary text-white px-4 py-4 placeholder:text-gray-600 focus:ring-0 focus:outline-none transition-colors font-mono text-sm"
@@ -341,7 +346,7 @@ export default function AuthPage() {
                         ? "Send Magic Link"
                         : isSignUp
                           ? "Create Account"
-                          : "Authenticate"}
+                          : "Sign In"}
                 </span>
                 <span className="material-symbols-outlined relative z-10 group-hover:translate-x-1 transition-transform">
                   arrow_forward
@@ -350,43 +355,70 @@ export default function AuthPage() {
 
               {/* Alternative Options */}
               {!showForgotPassword && (
-                <>
-                  <div className="relative flex py-4 items-center">
-                    <div className="flex-grow border-t border-subtle"></div>
-                    <span className="flex-shrink-0 mx-4 text-gray-600 text-xs uppercase font-bold tracking-wider">
-                      Or
-                    </span>
-                    <div className="flex-grow border-t border-subtle"></div>
-                  </div>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setUseMagicLink(false);
+                      setShowAdvancedOptions(false);
+                      setError("");
+                      setSuccess("");
+                    }}
+                    className="w-full text-sm text-gray-300 hover:text-white transition-colors font-bold uppercase tracking-wider"
+                    type="button"
+                  >
+                    {isSignUp ? "Already have an account? Sign In" : "New here? Create Account"}
+                  </button>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setUseMagicLink(!useMagicLink)}
-                      className="flex items-center justify-center gap-2 h-12 bg-surface border border-subtle hover:border-primary transition-colors text-sm font-bold uppercase text-gray-300 hover:text-white"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-base">
-                        {useMagicLink ? "password" : "hub"}
-                      </span>
-                      <span>{useMagicLink ? "Password" : "Magic Link"}</span>
-                    </button>
-                    <button
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="flex items-center justify-center gap-2 h-12 bg-surface border border-subtle hover:border-primary transition-colors text-sm font-bold uppercase text-gray-300 hover:text-white"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-base">
-                        {isSignUp ? "login" : "person_add"}
-                      </span>
-                      <span>{isSignUp ? "Sign In" : "Sign Up"}</span>
-                    </button>
-                  </div>
-                </>
+                  <button
+                    onClick={() => setShowAdvancedOptions((prev) => !prev)}
+                    className="w-full text-xs text-gray-500 hover:text-primary transition-colors font-bold uppercase tracking-wider"
+                    type="button"
+                  >
+                    {showAdvancedOptions ? "Hide More Options" : "More Sign-In Options"}
+                  </button>
+
+                  {showAdvancedOptions && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        onClick={() => {
+                          setUseMagicLink(!useMagicLink);
+                          setError("");
+                          setSuccess("");
+                        }}
+                        className="flex items-center justify-center gap-2 h-12 bg-surface border border-subtle hover:border-primary transition-colors text-sm font-bold uppercase text-gray-300 hover:text-white"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-base">
+                          {useMagicLink ? "password" : "hub"}
+                        </span>
+                        <span>{useMagicLink ? "Use Password" : "Use Magic Link"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowForgotPassword(true);
+                          setUseMagicLink(false);
+                          setError("");
+                          setSuccess("");
+                        }}
+                        className="flex items-center justify-center gap-2 h-12 bg-surface border border-subtle hover:border-primary transition-colors text-sm font-bold uppercase text-gray-300 hover:text-white"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-base">key</span>
+                        <span>Reset Password</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               {showForgotPassword && (
                 <button
-                  onClick={() => setShowForgotPassword(false)}
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setShowAdvancedOptions(false);
+                  }}
                   className="text-sm text-gray-400 hover:text-white transition-colors font-bold uppercase tracking-wider"
                   type="button"
                 >

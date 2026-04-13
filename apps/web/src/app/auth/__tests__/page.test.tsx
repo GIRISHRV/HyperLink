@@ -52,7 +52,7 @@ describe("AuthPage Security Tests", () => {
     );
 
     // Switch to sign up mode
-    fireEvent.click(screen.getByRole("button", { name: /Sign Up/i }));
+    fireEvent.click(screen.getByRole("button", { name: /new here\? create account/i }));
 
     // Enter short password
     fireEvent.change(screen.getByPlaceholderText("user@hyperlink.network"), {
@@ -95,7 +95,7 @@ describe("AuthPage Security Tests", () => {
       target: { value: "password123" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Authenticate/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Sign In/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Invalid email or password.")).toBeInTheDocument();

@@ -73,9 +73,9 @@ act push -W .github/workflows/test.yml -j foundation
 act push -W .github/workflows/test.yml --secret-file .secrets
 ```
 
-### .secrets file format:
+### .secrets file format
 
-```
+```text
 NEXT_PUBLIC_SUPABASE_URL=your_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
 E2E_TEST_EMAIL=sender@example.com

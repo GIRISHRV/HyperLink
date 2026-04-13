@@ -18,6 +18,7 @@
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
+    "@fontsource/material-symbols-outlined": "^5.2.41",
     "@repo/types": "*",
     "@repo/utils": "*",
     "@sentry/nextjs": "^10.38.0",

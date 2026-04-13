@@ -1,6 +1,23 @@
-import * as Sentry from "@sentry/nextjs";
+type SentryModule = typeof import("@sentry/nextjs");
+
+let sentryModulePromise: Promise<SentryModule> | null = null;
+
+function isSentryEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DISABLE_SENTRY !== "true";
+}
+
+async function getSentry(): Promise<SentryModule> {
+  if (!sentryModulePromise) {
+    sentryModulePromise = import("@sentry/nextjs");
+  }
+  return sentryModulePromise;
+}
 
 export async function register() {
+  if (!isSentryEnabled()) return;
+
+  const Sentry = await getSentry();
+
   if (process.env.NEXT_RUNTIME === "nodejs") {
     Sentry.init({
       dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -44,6 +61,10 @@ export async function onRequestError(
   request: Request,
   context: { routerKind: string; routerType: string; route: string }
 ) {
+  if (!isSentryEnabled()) return;
+
+  const Sentry = await getSentry();
+
   // Filter headers to only include safe ones
   const safeHeaders: Record<string, string> = {};
   for (const [key, value] of request.headers.entries()) {

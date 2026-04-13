@@ -34,6 +34,8 @@ export class FileReceiver {
   private errorCallback?: (error: Error | string) => void;
   private cleanupCallback?: (cleared: number, total: number) => void;
   private resumeFromChunk: number = 0; // For crash recovery
+  private processedChunkIndexes: Set<number> = new Set();
+  private inflightChunkIndexes: Set<number> = new Set();
   private writableStream?: FileSystemWritableFileStream;
   private fileHandle?: FileSystemFileHandle;
 
@@ -118,6 +120,8 @@ export class FileReceiver {
     this.receivedChunks = 0;
     this.bytesReceived = 0;
     this.resumeFromChunk = 0;
+    this.processedChunkIndexes.clear();
+    this.inflightChunkIndexes.clear();
 
     // Check IDB for previously received chunks (crash recovery)
     this.onLog?.("[DB] Scanning IndexedDB for partial transfer data...");
@@ -127,6 +131,9 @@ export class FileReceiver {
         this.receivedChunks = lastIndex + 1;
         this.bytesReceived = Math.min(this.receivedChunks * INITIAL_CHUNK_SIZE, this.fileSize);
         this.resumeFromChunk = lastIndex + 1;
+        for (let i = 0; i <= lastIndex; i++) {
+          this.processedChunkIndexes.add(i);
+        }
         logger.debug(
           {
             transferId: this.transferId,
@@ -182,11 +189,8 @@ export class FileReceiver {
     const { chunkIndex, data, offset } = message.payload;
     const isProbe = message.type === "chunk-probe";
 
-    // IDEMPOTENCY CHECK: If we already processed this chunk, just ACK and skip.
-    // This is crucial for Task 2 (ACK Resilience) so we don't do redundant IDB writes.
-    // Since we are mostly sequential (sliding window), index < resumeFromChunk is a solid indicator.
-    // For intermediate duplicates, we rely on the fact that we increment receivedChunks only for NEW ones.
-    if (chunkIndex < this.resumeFromChunk) {
+    // IDEMPOTENCY CHECK: If we already persisted this chunk, ACK and skip.
+    if (chunkIndex < this.resumeFromChunk || this.processedChunkIndexes.has(chunkIndex)) {
       if (isProbe) {
         logger.debug(
           { chunkIndex },
@@ -200,112 +204,127 @@ export class FileReceiver {
       return;
     }
 
+    // If a duplicate chunk arrives while the original is being processed, ignore it.
+    // The original path will ACK after durable storage succeeds.
+    if (this.inflightChunkIndexes.has(chunkIndex)) {
+      if (isProbe) {
+        this.onLog?.(`[NET] Probe for in-flight chunk ${chunkIndex} received. Awaiting write...`);
+      }
+      return;
+    }
+    this.inflightChunkIndexes.add(chunkIndex);
+
     let chunkData = data;
 
-    // Decrypt if encrypted
-    if (this.isEncrypted) {
-      if (!this.cryptoKey) {
-        logger.error("[RECEIVER] Received chunk but no key available!");
-        // We could buffer or fail?
-        // Ideally we shouldn't have accepted the file (sent file-accept) until we had the key.
-        return;
+    try {
+      // Decrypt if encrypted
+      if (this.isEncrypted) {
+        if (!this.cryptoKey) {
+          logger.error("[RECEIVER] Received chunk but no key available!");
+          return;
+        }
+
+        try {
+          chunkData = await encryptionWorkerClient.decrypt(data, this.cryptoKey);
+        } catch (e) {
+          logger.error({ chunkIndex, e }, "[RECEIVER] Decryption failed! Wrong password?");
+          this.onLog?.("[ERR] [SEC] Decryption failed! Incorrect password or corrupted data.");
+
+          if (this.errorCallback) {
+            this.errorCallback("DECRYPTION_FAILED");
+          }
+
+          this.cancel();
+          return;
+        }
       }
 
       try {
-        chunkData = await encryptionWorkerClient.decrypt(data, this.cryptoKey);
-      } catch (e) {
-        logger.error({ chunkIndex, e }, "[RECEIVER] Decryption failed! Wrong password?");
-        this.onLog?.("[ERR] [SEC] Decryption failed! Incorrect password or corrupted data.");
-
-        // Notify UI about specific error
-        if (this.errorCallback) {
-          this.errorCallback("DECRYPTION_FAILED");
+        if (this.writableStream) {
+          // Direct-to-Disk: Write directly to the file at the specific offset
+          await this.writableStream.write({
+            type: "write",
+            position: offset,
+            data: chunkData,
+          });
+        } else {
+          // Fallback or Dual-Write: Store chunk to IndexedDB
+          const chunk: FileChunk = {
+            transferId: this.transferId,
+            chunkIndex,
+            data: new Blob([chunkData]),
+            timestamp: Date.now(),
+          };
+          await addChunk(chunk);
         }
-
-        // Send error back?
-        // Or just fail locally.
+      } catch (error) {
+        logger.error({ chunkIndex, error }, "[RECEIVER] Write failed");
+        this.onLog?.(`[WARN] [FS] Write failed for chunk ${chunkIndex}.`);
+        // Notify sender of failure
+        if (this.connection) {
+          const errorMsg: PeerMessage = {
+            type: "transfer-error",
+            transferId: this.transferId,
+            payload: { message: "Disk write failed" },
+            timestamp: Date.now(),
+          };
+          this.connection.send(errorMsg);
+        }
         this.cancel();
         return;
       }
-    }
 
-    try {
-      if (this.writableStream) {
-        // Direct-to-Disk: Write directly to the file at the specific offset
-        await this.writableStream.write({
-          type: "write",
-          position: offset,
-          data: chunkData,
+      this.processedChunkIndexes.add(chunkIndex);
+      this.receivedChunks++;
+      this.bytesReceived += chunkData.byteLength; // Track decrypted size
+
+      // Only advance resumeFromChunk when we have contiguous chunks.
+      while (this.processedChunkIndexes.has(this.resumeFromChunk)) {
+        this.resumeFromChunk++;
+      }
+
+      // Log progress every 10%
+      const percentage = (this.bytesReceived / this.fileSize) * 100;
+      if (this.receivedChunks % Math.ceil(this.totalChunks / 10) === 0) {
+        logger.debug(
+          {
+            percentage: percentage.toFixed(0),
+            chunk: this.receivedChunks,
+            total: this.totalChunks,
+          },
+          "[RECEIVER] Progress"
+        );
+      }
+
+      // Update progress callback
+      if (this.progressCallback) {
+        const elapsedTime = Math.max(1, Date.now() - this.startTime);
+        const speed = this.bytesReceived / (elapsedTime / 1000);
+        const timeRemaining = (this.fileSize - this.bytesReceived) / speed;
+
+        this.progressCallback({
+          transferId: this.transferId,
+          bytesTransferred: this.bytesReceived,
+          totalBytes: this.fileSize,
+          percentage,
+          speed,
+          timeRemaining,
+          chunkSize: (message.payload as ChunkPayload).chunkSize,
+          windowSize: (message.payload as ChunkPayload).windowSize,
         });
-      } else {
-        // Fallback or Dual-Write: Store chunk to IndexedDB
-        const chunk: FileChunk = {
-          transferId: this.transferId,
-          chunkIndex,
-          data: new Blob([chunkData]),
-          timestamp: Date.now(),
-        };
-        await addChunk(chunk);
       }
-    } catch (error) {
-      logger.error({ chunkIndex, error }, "[RECEIVER] Write failed");
-      this.onLog?.(`[WARN] [FS] Write failed for chunk ${chunkIndex}.`);
-      // Notify sender of failure
-      if (this.connection) {
-        const errorMsg: PeerMessage = {
-          type: "transfer-error",
-          transferId: this.transferId,
-          payload: { message: "Disk write failed" },
-          timestamp: Date.now(),
-        };
-        this.connection.send(errorMsg);
+
+      // CRITICAL: Send ACK back to sender AFTER storing chunk
+      this.sendAck(chunkIndex);
+
+      // Check if transfer is complete via byte count (Safety)
+      if (this.bytesReceived >= this.fileSize) {
+        logger.debug("[RECEIVER] All bytes received via count, assembling file...");
+        this.onLog?.("[FS] All bytes received via count. Initiating file assembly...");
+        await this.assembleFile();
       }
-      this.cancel();
-      return;
-    }
-
-    this.receivedChunks++;
-    this.bytesReceived += chunkData.byteLength; // Track decrypted size
-    // For live idempotency (Task 2), keep resumeFromChunk updated as the progress pointer
-    if (chunkIndex >= this.resumeFromChunk) {
-      this.resumeFromChunk = chunkIndex + 1;
-    }
-
-    // Log progress every 10%
-    const percentage = (this.bytesReceived / this.fileSize) * 100;
-    if (this.receivedChunks % Math.ceil(this.totalChunks / 10) === 0) {
-      logger.debug(
-        { percentage: percentage.toFixed(0), chunk: this.receivedChunks, total: this.totalChunks },
-        "[RECEIVER] Progress"
-      );
-    }
-
-    // Update progress callback
-    if (this.progressCallback) {
-      const elapsedTime = Math.max(1, Date.now() - this.startTime);
-      const speed = this.bytesReceived / (elapsedTime / 1000);
-      const timeRemaining = (this.fileSize - this.bytesReceived) / speed;
-
-      this.progressCallback({
-        transferId: this.transferId,
-        bytesTransferred: this.bytesReceived,
-        totalBytes: this.fileSize,
-        percentage,
-        speed,
-        timeRemaining,
-        chunkSize: (message.payload as ChunkPayload).chunkSize,
-        windowSize: (message.payload as ChunkPayload).windowSize,
-      });
-    }
-
-    // CRITICAL: Send ACK back to sender AFTER storing chunk
-    this.sendAck(chunkIndex);
-
-    // Check if transfer is complete via byte count (Safety)
-    if (this.bytesReceived >= this.fileSize) {
-      logger.debug("[RECEIVER] All bytes received via count, assembling file...");
-      this.onLog?.("[FS] All bytes received via count. Initiating file assembly...");
-      await this.assembleFile();
+    } finally {
+      this.inflightChunkIndexes.delete(chunkIndex);
     }
   }
 

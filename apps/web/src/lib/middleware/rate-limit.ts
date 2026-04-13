@@ -41,6 +41,43 @@ interface WindowEntry {
   resetAt: number;
 }
 
+function normalizeIp(rawIp: string): string {
+  const trimmed = rawIp.trim();
+
+  // Strip surrounding [] and optional :port suffix when present.
+  const withoutBrackets = trimmed.replace(/^\[(.+)\]$/, "$1");
+  const withoutPort = withoutBrackets.replace(/:(\d+)$/, "");
+
+  // Accept only IPv4/IPv6 compatible characters.
+  if (!/^[a-fA-F0-9:.]+$/.test(withoutPort)) {
+    return "unknown";
+  }
+
+  return withoutPort || "unknown";
+}
+
+export function getClientIp(request: Request): string {
+  const headers = (request as { headers: Headers }).headers;
+
+  // Prefer platform-provided single IP headers first.
+  const vercelForwarded = headers.get("x-vercel-forwarded-for");
+  if (vercelForwarded) return normalizeIp(vercelForwarded);
+
+  const cloudflare = headers.get("cf-connecting-ip");
+  if (cloudflare) return normalizeIp(cloudflare);
+
+  const realIp = headers.get("x-real-ip");
+  if (realIp) return normalizeIp(realIp);
+
+  // Fall back to first IP in XFF chain.
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    return normalizeIp(forwarded.split(",")[0] || "unknown");
+  }
+
+  return "unknown";
+}
+
 // Initialize Redis client if credentials are available
 let redis: any = null;
 let redisInitPromise: Promise<void> | null = null;
@@ -79,9 +116,8 @@ function createRateLimiter(options: RateLimiterOptions) {
       await redisInitPromise;
     }
 
-    // Extract client IP
-    const forwarded = (request as { headers: Headers }).headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+    // Extract client IP from trusted/standard forwarding headers.
+    const ip = getClientIp(request);
 
     const now = Date.now();
     const windowStart = Math.floor(now / windowMs) * windowMs;
@@ -111,9 +147,19 @@ function createRateLimiter(options: RateLimiterOptions) {
         }
       }
     } catch (error) {
-      // If Redis fails, allow the request (fail open for availability)
-      logger.warn({ error, ip }, "Rate limiter Redis error, allowing request");
-      count = 1;
+      // Redis failure fallback: still enforce limits in memory for this process.
+      logger.warn({ error, ip }, "Rate limiter Redis error, falling back to in-memory limiting");
+
+      const fallbackKey = `ratelimit:fallback:${ip}:${windowStart}`;
+      const entry = memoryStore.get(fallbackKey);
+
+      if (!entry || now >= entry.resetAt) {
+        count = 1;
+        memoryStore.set(fallbackKey, { count, resetAt });
+      } else {
+        count = entry.count + 1;
+        memoryStore.set(fallbackKey, { count, resetAt });
+      }
     }
 
     const remaining = Math.max(0, max - count);

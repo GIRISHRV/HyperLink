@@ -12,9 +12,7 @@ import ConfirmCancelModal from "@/components/confirm-cancel-modal";
 import PasswordModal from "@/components/password-modal";
 import ChatDrawer from "@/components/chat-drawer";
 import QRScannerModal from "@/components/qr-scanner-modal";
-import FileDropZone from "@/components/transfer/file-drop-zone";
-import SelectedFileCard from "@/components/transfer/selected-file-card";
-import FilePreviewBox from "@/components/transfer/file-preview-box";
+import SendFileWorkspace from "@/components/transfer/send-file-workspace";
 import SendControlPanel from "@/components/transfer/send-control-panel";
 import TransferProgressPanel from "@/components/transfer/transfer-progress-panel";
 import TransferVisualizer from "@/components/transfer/transfer-visualizer";
@@ -244,15 +242,10 @@ function SendPageContent() {
             transferState.status === "connecting" ||
             transferState.status === "awaiting_acceptance" ||
             transferState.status === "transferring";
-          if (
-            isActive &&
-            !confirm(
-              "Transfer in progress. Are you sure you want to leave? This will cancel the transfer."
-            )
-          ) {
+          if (isActive) {
+            setShowCancelModal(true);
             return false;
           }
-          if (isActive) confirmCancel();
           return true;
         }}
       />
@@ -260,79 +253,98 @@ function SendPageContent() {
       <main className="flex-grow flex flex-col relative">
         <section className="flex-1 flex flex-col relative">
           <div className="flex-1 p-6 md:p-12 flex flex-col max-w-7xl mx-auto w-full gap-8">
-            {/* Page Header */}
-            <div className="flex flex-col gap-1">
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white uppercase">
-                Secure Transfer <span className="text-primary">Uplink</span>
-              </h1>
-              <div className="flex items-center gap-2 text-muted font-mono text-sm">
-                <span className="material-symbols-outlined text-sm">lock</span>
-                <span>/secure_channel/send</span>
-                {swStatus !== "active" && (
-                  <span className="ml-2 text-xs px-1.5 py-0.5 border border-bauhaus-red text-bauhaus-red animate-pulse">
-                    SW_WAITING: REFRESH AGAIN
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* === IDLE STATE === */}
             {transferState.status === "idle" && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 w-full flex-1">
-                {/* Left Column */}
-                <section className="col-span-1 lg:col-span-5 flex flex-col gap-8">
-                  <FileDropZone
-                    file={file}
-                    fileInputRef={fileInputRef}
-                    onDrop={handleDrop}
-                    onFileSelect={handleFileSelect}
-                  />
-
-                  {file && (
-                    <div className="flex flex-col gap-8">
-                      <SelectedFileCard file={file} onRemove={removeFile} />
+              <div className="flex flex-col gap-6 w-full flex-1">
+                <section
+                  data-testid="send-main-panel"
+                  className="rounded-xl bg-black/20 border border-white/10 p-6 md:p-7"
+                >
+                  <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 border-b border-white/10 pb-4 mb-6">
+                    <div>
+                      <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white uppercase">
+                        Send File
+                      </h1>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Drop a file, add a receiver code, and start an encrypted transfer.
+                      </p>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2 text-xs font-mono text-gray-400">
+                      <span
+                        className={`inline-flex size-2 rounded-full ${isPeerReady ? "bg-green-400" : "bg-gray-500"}`}
+                      />
+                      <span>{isPeerReady ? "System ready" : "Initializing connection"}</span>
+                      {swStatus !== "active" && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full border border-bauhaus-red/50 text-bauhaus-red">
+                          Update pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                  <FilePreviewBox file={file} />
-                  <RadarVisualizer
-                    status={transferState.status}
-                    isPeerReady={isPeerReady}
-                    className="flex-1"
-                  />
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    <div className="xl:col-span-8">
+                      <SendFileWorkspace
+                        file={file}
+                        fileInputRef={fileInputRef}
+                        onDrop={handleDrop}
+                        onFileSelect={handleFileSelect}
+                        onRemoveFile={removeFile}
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4 h-full">
+                      <SendControlPanel
+                        receiverPeerId={receiverPeerId}
+                        onPeerIdChange={setReceiverPeerId}
+                        onQRScan={() => setShowQRScanner(true)}
+                        password={password}
+                        onSetPassword={() => setShowPasswordModal(true)}
+                        onRemovePassword={() => setPassword("")}
+                        onSend={handleSend}
+                        isPeerReady={isPeerReady}
+                        hasFile={!!file}
+                      />
+                    </div>
+
+                    {error && (
+                      <div
+                        data-testid="send-error-banner"
+                        className="xl:col-span-12 bg-bauhaus-red/10 border border-bauhaus-red/30 px-4 py-3"
+                      >
+                        <p className="text-sm text-bauhaus-red font-medium">{error}</p>
+                      </div>
+                    )}
+                  </div>
                 </section>
 
-                {/* Right Column */}
-                <section className="col-span-1 lg:col-span-7 flex flex-col gap-4 h-full">
-                  {file && (
-                    <SendControlPanel
-                      receiverPeerId={receiverPeerId}
-                      onPeerIdChange={setReceiverPeerId}
-                      onQRScan={() => setShowQRScanner(true)}
-                      password={password}
-                      onSetPassword={() => setShowPasswordModal(true)}
-                      onRemovePassword={() => setPassword("")}
-                      onSend={handleSend}
-                      isPeerReady={isPeerReady}
-                      hasFile={!!file}
-                    />
-                  )}
+                <section
+                  data-testid="send-connection-details"
+                  className="rounded-xl border border-white/10 bg-black/20 p-4 md:p-6"
+                >
+                  <details>
+                    <summary className="cursor-pointer list-none flex items-center justify-between text-xs md:text-sm font-bold uppercase tracking-[0.12em] text-gray-300">
+                      <span>Connection Details</span>
+                      <span className="material-symbols-outlined text-base">expand_more</span>
+                    </summary>
+                    <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      <RadarVisualizer
+                        status={transferState.status}
+                        isPeerReady={isPeerReady}
+                        className="min-h-[260px] rounded-xl border border-white/10 bg-black/20"
+                      />
 
-                  {error && (
-                    <div className="bg-bauhaus-red/10 border border-bauhaus-red/30 px-4 py-3">
-                      <p className="text-sm text-bauhaus-red font-medium">{error}</p>
+                      <TerminalLog logs={logs} className="min-h-[260px]" defaultCollapsed={true} />
                     </div>
-                  )}
-
-                  <TerminalLog logs={logs} className="flex-1 mt-auto min-h-[250px]" />
+                  </details>
                 </section>
               </div>
             )}
 
             {/* === PROCESSING FILES MODAL === */}
             <Modal isOpen={isProcessing} showCloseButton={false}>
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center">
+              <div className="text-center rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-5">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_24px_rgba(255,229,0,0.18)]">
                   <span className="material-symbols-outlined text-3xl text-black animate-spin">
                     hourglass_empty
                   </span>
@@ -344,8 +356,8 @@ function SendPageContent() {
 
             {/* === ZIPPING MODAL === */}
             <Modal isOpen={isZipping} showCloseButton={false}>
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
+              <div className="text-center rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-5">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-primary flex items-center justify-center animate-pulse shadow-[0_0_24px_rgba(255,229,0,0.18)]">
                   <span className="material-symbols-outlined text-3xl text-black animate-spin">
                     folder_zip
                   </span>
@@ -375,8 +387,8 @@ function SendPageContent() {
 
             {/* === CONNECTING === */}
             {transferState.status === "connecting" && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
+              <div className="mx-auto w-full max-w-xl rounded-xl border border-white/10 bg-surface-elevated px-6 py-10 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-primary flex items-center justify-center animate-pulse">
                   <span className="material-symbols-outlined text-3xl text-black animate-spin">
                     sync
                   </span>
@@ -396,8 +408,8 @@ function SendPageContent() {
 
             {/* === AWAITING ACCEPTANCE === */}
             {transferState.status === "awaiting_acceptance" && (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-primary flex items-center justify-center animate-pulse">
+              <div className="mx-auto w-full max-w-xl rounded-xl border border-white/10 bg-surface-elevated px-6 py-10 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-primary flex items-center justify-center animate-pulse">
                   <span className="material-symbols-outlined text-3xl text-black">
                     hourglass_empty
                   </span>
@@ -456,10 +468,10 @@ function SendPageContent() {
 
             {/* === CANCELLED === */}
             {transferState.status === "cancelled" && (
-              <div className="bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
+              <div className="rounded-xl bg-surface p-4 border-l-4 border-gray-500 flex flex-col gap-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    <div className="bg-white/5 p-2">
+                    <div className="rounded-md bg-white/5 p-2">
                       <span className="material-symbols-outlined text-gray-400">cancel</span>
                     </div>
                     <div>
@@ -485,7 +497,7 @@ function SendPageContent() {
             )}
 
             {/* Terminal Log is rendered in the grid for 'idle', but we still need it for other states */}
-            {transferState.status !== "idle" && <TerminalLog logs={logs} />}
+            {transferState.status !== "idle" && <TerminalLog logs={logs} defaultCollapsed={true} />}
           </div>
         </section>
       </main>

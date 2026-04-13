@@ -132,12 +132,18 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_profiles' AND policyname='Users can update own profile') THEN
     CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE
-      USING (auth.uid() = user_id);
+      USING (auth.uid() = user_id)
+      WITH CHECK (auth.uid() = user_id);
   END IF;
   -- AUDIT FIX: Removed over-permissive "Users can view active_peer_id of others" policy
   -- that granted SELECT on ALL columns (including is_admin, display_name, etc.) to ALL authenticated users.
   -- Replaced with a restricted view below that only exposes user_id and active_peer_id.
 END $$;
+
+-- Restrict authenticated users to non-privileged profile columns only.
+-- This prevents self-escalation via updates to sensitive fields like is_admin.
+REVOKE UPDATE ON public.user_profiles FROM authenticated;
+GRANT UPDATE (display_name, avatar_icon, avatar_color, active_peer_id) ON public.user_profiles TO authenticated;
 
 -- Create a restricted view for peer discovery that only exposes necessary fields
 -- This prevents authenticated users from seeing sensitive profile data like is_admin, display_name, etc.

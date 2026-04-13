@@ -185,7 +185,7 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
         logger.debug({ userId: user.id }, "[RECEIVE] User authenticated");
 
         const iceServers = await getIceServers();
-        // Support Compatibility Mode (Forced Relay)
+        // Compatibility mode is opt-in; default keeps direct+relay candidate policy.
         const forceRelay = localStorage.getItem("hl_compatibility_mode") === "true";
         const config = await getPeerConfigAsync(iceServers, forceRelay);
         config.onLog = addLog;
@@ -283,11 +283,35 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
           onLog?.("[SYS] Peer connected");
           logger.debug("[CONNECTION] Incoming peer connection detected");
 
+          const OFFER_WAIT_TIMEOUT_MS = 25000;
+          let offerReceived = false;
+          const offerWaitTimeout = setTimeout(() => {
+            if (offerReceived) return;
+            if (activeConnectionRef.current !== connection) return;
+
+            const timeoutMessage = "Timed out waiting for sender file offer. Ask sender to retry.";
+            setError(timeoutMessage);
+            onLog?.(`[ERR] ${timeoutMessage}`);
+            dispatchTransfer({ type: "FAIL", error: timeoutMessage });
+            try {
+              connection.close();
+            } catch {
+              // No-op: safe to ignore if already closed
+            }
+            activeConnectionRef.current = null;
+          }, OFFER_WAIT_TIMEOUT_MS);
+
+          const clearOfferWaitTimeout = () => {
+            clearTimeout(offerWaitTimeout);
+          };
+
           connection.on("open", () => {
             if (activeConnectionRef.current !== connection) return;
+            onLog?.("[NET] Data channel opened with sender");
           });
 
           connection.on("close", () => {
+            clearOfferWaitTimeout();
             if (activeConnectionRef.current !== connection) return;
             logger.debug("[CONNECTION] Peer connection closed");
 
@@ -307,6 +331,7 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
           });
 
           connection.on("error", (err: unknown) => {
+            clearOfferWaitTimeout();
             if (activeConnectionRef.current !== connection) return;
             logger.error({ err }, "[RECEIVE PAGE] Connection ERROR");
             setError(`Connection error: ${err}`);
@@ -324,6 +349,8 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
             if (!message) return;
 
             if (message.type === "file-offer") {
+              offerReceived = true;
+              clearOfferWaitTimeout();
               logger.debug(
                 { payload: message.payload },
                 "[useReceiveTransfer] Received file-offer"
@@ -353,6 +380,7 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
                 await fileReceiverRef.current.handleChunk(message as PeerMessage<ChunkPayload>);
               }
             } else if (
+              message.type === "transfer-complete" ||
               message.type === "transfer-cancel" ||
               message.type === "transfer-pause" ||
               message.type === "transfer-resume"
@@ -376,6 +404,14 @@ export function useReceiveTransfer({ user, onData, onLog }: UseReceiveTransferOp
                   dispatchTransfer({ type: "RESUME" });
                 }
               }
+            } else if (message.type === "transfer-error") {
+              const remoteMessage =
+                typeof (message.payload as { message?: unknown })?.message === "string"
+                  ? (message.payload as { message: string }).message
+                  : "Receiver reported a transfer error.";
+              setError(remoteMessage);
+              onLog?.(`[ERR] ${remoteMessage}`);
+              dispatchTransfer({ type: "FAIL", error: remoteMessage });
             }
           });
         });

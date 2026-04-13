@@ -72,7 +72,7 @@ export class ReceivePage {
    * Pause the ongoing transfer (halt downlink)
    */
   async pauseTransfer(): Promise<void> {
-    const pauseBtn = this.page.locator('button:has-text("Halt")');
+    const pauseBtn = this.page.locator('button:has-text("Pause Transfer")');
     await expect(pauseBtn).toBeVisible({ timeout: 15000 });
     await pauseBtn.click();
   }
@@ -81,7 +81,7 @@ export class ReceivePage {
    * Resume a paused transfer
    */
   async resumeTransfer(): Promise<void> {
-    const resumeBtn = this.page.locator('button:has-text("RESUME DOWNLINK")');
+    const resumeBtn = this.page.locator('button:has-text("Resume Transfer")');
     await expect(resumeBtn).toBeVisible({ timeout: 5000 });
     await resumeBtn.click();
   }

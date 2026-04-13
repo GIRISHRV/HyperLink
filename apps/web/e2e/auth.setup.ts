@@ -23,9 +23,19 @@ setup("authenticate sender", async ({ page, context, browserName }) => {
 
   // Clear localStorage and sessionStorage
   await page.goto("/");
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     localStorage.clear();
     sessionStorage.clear();
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
   });
 
   await page.goto("/auth", { waitUntil: "domcontentloaded" });
@@ -35,15 +45,26 @@ setup("authenticate sender", async ({ page, context, browserName }) => {
     // If no skeleton found, that's fine - page might have loaded quickly
   });
 
-  // Wait for the auth form to be ready
-  await expect(page.locator("#auth-email")).toBeVisible({ timeout: 15_000 });
+  // Wait for the auth form to be ready; fallback through Login nav when landing shell appears.
+  const senderEmailInput = page.locator("#auth-email");
+  const senderFormVisible = await senderEmailInput.isVisible({ timeout: 5000 }).catch(() => false);
+  if (!senderFormVisible) {
+    const loginLink = page.getByRole("link", { name: /login/i }).first();
+    const loginVisible = await loginLink.isVisible({ timeout: 5000 }).catch(() => false);
+    if (loginVisible) {
+      await loginLink.click();
+    } else {
+      await page.goto("/auth", { waitUntil: "networkidle" });
+    }
+  }
+  await expect(senderEmailInput).toBeVisible({ timeout: 15_000 });
 
   // Fill in credentials
   await page.locator("#auth-email").fill(email);
   await page.locator("#auth-password").fill(password);
 
   // Submit the form
-  await page.getByRole("button", { name: /authenticate/i }).click();
+  await page.getByRole("button", { name: /sign in/i }).click();
 
   // Wait for redirect to dashboard after successful login
   await page.waitForURL("/dashboard", { timeout: 15_000 });
@@ -67,9 +88,19 @@ setup("authenticate receiver", async ({ page, context, browserName }) => {
 
   // Clear localStorage and sessionStorage
   await page.goto("/");
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     localStorage.clear();
     sessionStorage.clear();
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
   });
 
   // If the receiver env is the same as the sender, generate a unique receiver email
@@ -97,21 +128,35 @@ setup("authenticate receiver", async ({ page, context, browserName }) => {
     // If no skeleton found, that's fine - page might have loaded quickly
   });
 
-  await expect(page.locator("#auth-email")).toBeVisible({ timeout: 15_000 });
+  // Wait for the auth form to be ready; fallback through Login nav when landing shell appears.
+  const receiverEmailInput = page.locator("#auth-email");
+  const receiverFormVisible = await receiverEmailInput
+    .isVisible({ timeout: 5000 })
+    .catch(() => false);
+  if (!receiverFormVisible) {
+    const loginLink = page.getByRole("link", { name: /login/i }).first();
+    const loginVisible = await loginLink.isVisible({ timeout: 5000 }).catch(() => false);
+    if (loginVisible) {
+      await loginLink.click();
+    } else {
+      await page.goto("/auth", { waitUntil: "networkidle" });
+    }
+  }
+  await expect(receiverEmailInput).toBeVisible({ timeout: 15_000 });
 
   // Fill in credentials
   await page.locator("#auth-email").fill(receiverEmail as string);
   await page.locator("#auth-password").fill(password);
 
   // Try normal login
-  await page.getByRole("button", { name: /authenticate/i }).click();
+  await page.getByRole("button", { name: /sign in/i }).click();
 
   // If login fails (e.g. account doesn't exist yet), switch to Sign Up
   const errorMsg = page.locator("text=Invalid email or password");
   try {
     await expect(errorMsg).toBeVisible({ timeout: 3000 });
     // Account might not exist, let's sign up
-    await page.getByRole("button", { name: /Sign Up/i }).click();
+    await page.getByRole("button", { name: /new here\? create account/i }).click();
     await page.locator("#auth-password").fill(password); // re-fill just in case
     await page.getByRole("button", { name: /Create Account/i }).click();
   } catch {

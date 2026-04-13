@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { logger } from "@repo/utils";
 
 const SW_UPDATED_KEY = "sw:just-updated";
 
@@ -16,28 +17,33 @@ const SW_UPDATED_KEY = "sw:just-updated";
  * UI can show a brief "App updated" confirmation banner.
  */
 export function useSwUpdate() {
-    const [justUpdated, setJustUpdated] = useState(false);
+  const [justUpdated, setJustUpdated] = useState(false);
 
-    useEffect(() => {
-        if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
-        // Check if we just reloaded due to an SW update
-        if (sessionStorage.getItem(SW_UPDATED_KEY) === "1") {
-            sessionStorage.removeItem(SW_UPDATED_KEY);
-            setJustUpdated(true);
-        }
+    // Check if we just reloaded due to an SW update
+    if (sessionStorage.getItem(SW_UPDATED_KEY) === "1") {
+      sessionStorage.removeItem(SW_UPDATED_KEY);
+      setJustUpdated(true);
+    }
 
-        // When a new SW takes control, silently reload to pick up fresh assets
-        const handleControllerChange = () => {
-            sessionStorage.setItem(SW_UPDATED_KEY, "1");
-            window.location.reload();
-        };
+    // When a new SW takes control, silently reload to pick up fresh assets
+    const handleControllerChange = () => {
+      // AUDIT FIX: Skip auto-reload during E2E tests to avoid race conditions
+      if (navigator.webdriver) {
+        logger.debug("[SW] Controller change detected, skipping reload in E2E environment.");
+        return;
+      }
+      sessionStorage.setItem(SW_UPDATED_KEY, "1");
+      window.location.reload();
+    };
 
-        navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
-        return () => {
-            navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
-        };
-    }, []);
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    };
+  }, []);
 
-    return { justUpdated, dismiss: () => setJustUpdated(false) };
+  return { justUpdated, dismiss: () => setJustUpdated(false) };
 }

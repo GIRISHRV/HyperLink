@@ -13,11 +13,8 @@ test.describe("Navigation", () => {
 
     await link.click();
 
-    // Wait for navigation
-    await page.waitForURL("/about", {
-      timeout: navigationTimeout,
-      waitUntil: "domcontentloaded",
-    });
+    // Wait for navigation without lifecycle events
+    await expect(page).toHaveURL("/about", { timeout: navigationTimeout });
 
     await expect(page.getByRole("heading", { name: /how it works/i })).toBeVisible({
       timeout: 10_000,
@@ -37,10 +34,7 @@ test.describe("Navigation", () => {
     await link.click();
 
     // Wait for navigation
-    await page.waitForURL("/status", {
-      timeout: navigationTimeout,
-      waitUntil: "domcontentloaded",
-    });
+    await expect(page).toHaveURL("/status", { timeout: navigationTimeout });
 
     await expect(page.locator("body")).toContainText(/signaling server/i, { timeout: 10_000 });
   });
@@ -58,7 +52,7 @@ test.describe("Navigation", () => {
     await link.click();
 
     // Wait for navigation
-    await page.waitForURL("/auth", { timeout: navigationTimeout, waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL("/auth", { timeout: navigationTimeout });
 
     await expect(page.locator("#auth-email")).toBeVisible({ timeout: 10_000 });
   });

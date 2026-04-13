@@ -5,11 +5,11 @@ import { useRequireAuth } from "@/lib/hooks/use-require-auth";
 import { supabase } from "@/lib/supabase/client";
 import AppHeader from "@/components/app-header";
 import Link from "next/link";
+import { useAdminStatus } from "@/lib/hooks/use-admin-status";
 
 export default function AdminDashboardPage() {
   const { user } = useRequireAuth();
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
   const [stats, setStats] = useState({
     totalIncidents: 0,
     activeIncidents: 0,
@@ -19,36 +19,31 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (!user) return;
 
-    const checkAdminStatus = async () => {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select("is_admin")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!error && data) {
-        setIsAdmin(data.is_admin || false);
-      }
-      setLoading(false);
-    };
-
     const fetchStats = async () => {
-      const { data: incidents } = await supabase.from("incidents").select("status");
+      const [{ count: totalIncidents }, { count: resolvedIncidents }, { count: activeIncidents }] =
+        await Promise.all([
+          supabase.from("incidents").select("id", { count: "exact", head: true }),
+          supabase
+            .from("incidents")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "resolved"),
+          supabase
+            .from("incidents")
+            .select("id", { count: "exact", head: true })
+            .neq("status", "resolved"),
+        ]);
 
-      if (incidents) {
-        setStats({
-          totalIncidents: incidents.length,
-          activeIncidents: incidents.filter((i) => i.status !== "resolved").length,
-          resolvedIncidents: incidents.filter((i) => i.status === "resolved").length,
-        });
-      }
+      setStats({
+        totalIncidents: totalIncidents ?? 0,
+        activeIncidents: activeIncidents ?? 0,
+        resolvedIncidents: resolvedIncidents ?? 0,
+      });
     };
 
-    checkAdminStatus();
     fetchStats();
   }, [user]);
 
-  if (loading) {
+  if (adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-white">Loading...</div>

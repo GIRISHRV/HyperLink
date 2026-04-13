@@ -21,7 +21,7 @@ export default function FileDropZone({
       role="button"
       tabIndex={0}
       aria-label="File drop zone. Press Enter or Space to browse files"
-      className="group relative w-full h-80 md:h-96 border-[2px] border-white/10 bg-surface-deep/50 backdrop-blur-sm hover:bg-surface-deep/80 focus:-outline-offset-2 focus:ring-2 focus:ring-primary transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-6 overflow-hidden hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_50px_-10px_rgba(255,234,46,0.1)]"
+      className="group relative w-full h-[320px] md:h-[320px] border border-white/10 bg-black/20 backdrop-blur-sm hover:bg-black/30 focus:-outline-offset-2 focus:ring-2 focus:ring-primary transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-6 overflow-hidden hover:scale-[1.01] active:scale-[0.99] hover:shadow-[0_0_50px_-10px_rgba(255,234,46,0.1)]"
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -35,7 +35,7 @@ export default function FileDropZone({
         }
       }}
     >
-      <div className="absolute inset-0 border-[2px] border-primary/20 group-hover:border-primary/60 transition-colors duration-500 mask-container"></div>
+      <div className="absolute inset-0 border border-primary/20 group-hover:border-primary/60 transition-colors duration-500 mask-container"></div>
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,rgba(255,234,46,0.05)_0%,transparent_70%)]"></div>
 
       <input
@@ -66,10 +66,10 @@ export default function FileDropZone({
         ) : (
           <div className="text-center space-y-2">
             <p className="text-2xl font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors">
-              Initiate Sequence
+              Select a File
             </p>
             <p className="font-mono text-muted text-xs uppercase tracking-widest">
-              Drop Payload or Click to Browse
+              Drag and drop here or click to browse
             </p>
           </div>
         )}

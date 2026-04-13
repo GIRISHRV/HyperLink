@@ -36,18 +36,15 @@ export default function PeerIdCard({ peerId, onCopy, onShowQR }: PeerIdCardProps
   };
 
   return (
-    <div className="bg-surface-elevated border border-subtle-bauhaus p-1 shadow-2xl shadow-black/50">
-      <div className="bg-surface-inset border border-subtle-bauhaus/50 p-6 flex flex-col gap-6 relative overflow-hidden group">
-        {/* Decorative blur */}
-        <div className="absolute -right-10 -top-10 size-32 bg-primary/5 rounded-full blur-2xl"></div>
-
+    <div className="rounded-xl border border-primary/25 bg-black/20 p-5">
+      <div className="flex flex-col gap-5 relative overflow-hidden">
         <div className="flex flex-col gap-2 z-10">
           <label className="text-muted text-xs font-bold uppercase tracking-[0.15em]">
             Your Peer ID
           </label>
           <div
             data-testid="my-peer-id"
-            className="font-mono text-2xl md:text-3xl text-white font-bold tracking-tight break-all border-l-4 border-primary pl-4 py-2"
+            className="rounded-lg border border-primary/40 bg-black/30 px-4 py-3 font-mono text-xl md:text-2xl text-white font-bold tracking-tight break-all"
           >
             {peerId ? (
               peerId
@@ -64,21 +61,23 @@ export default function PeerIdCard({ peerId, onCopy, onShowQR }: PeerIdCardProps
           </div>
         </div>
 
-        <div className="h-px w-full bg-subtle-bauhaus"></div>
+        <div className="h-px w-full bg-primary/20"></div>
 
         <div className="flex flex-col gap-3 z-10">
           <div className="flex gap-3">
             <button
+              data-testid="peer-id-copy-button"
               onClick={onCopy}
-              className="flex-1 h-12 bg-primary hover:bg-primary-hover text-surface-inset text-base font-bold tracking-wide uppercase flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 h-11 rounded-lg bg-primary hover:bg-primary-hover text-black text-sm font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 transition-colors"
             >
               <span className="material-symbols-outlined">content_copy</span>
               Copy ID
             </button>
             <button
+              data-testid="peer-id-show-qr-button"
               onClick={onShowQR}
               disabled={!peerId}
-              className="flex-1 h-12 bg-transparent border-2 border-primary hover:bg-primary/10 text-primary text-base font-bold tracking-wide uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 h-11 rounded-lg border border-primary/70 hover:bg-primary/10 text-primary text-sm font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined">qr_code_2</span>
               Show QR
@@ -86,9 +85,10 @@ export default function PeerIdCard({ peerId, onCopy, onShowQR }: PeerIdCardProps
           </div>
 
           <button
+            data-testid="peer-transfer-link-button"
             onClick={copyTransferLink}
             disabled={!peerId}
-            className="w-full h-12 bg-bauhaus-blue/20 border-2 border-bauhaus-blue hover:bg-bauhaus-blue/30 text-bauhaus-blue text-base font-bold tracking-wide uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-10 rounded-lg bg-black/30 border border-primary/30 hover:border-primary/60 hover:bg-black/40 text-gray-300 hover:text-primary text-xs font-bold tracking-[0.12em] uppercase flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined">{linkCopied ? "check" : "link"}</span>
             {linkCopied ? "Link Copied!" : "Copy Transfer Link"}

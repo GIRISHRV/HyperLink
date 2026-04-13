@@ -181,8 +181,9 @@ export default function AppHeader({
   // Peer ready badge — only rendered for the transfer variant
   const PeerBadge = ({ mobile = false }: { mobile?: boolean }) => (
     <div
-      className={`${mobile ? "flex" : "hidden md:flex"} items-center gap-3 px-4 py-2 bg-surface border border-subtle`}
+      className="flex items-center gap-3 px-4 py-2 bg-surface border border-subtle"
       role="status"
+      data-testid="peer-status-badge"
       aria-label={isPeerReady ? "System status: Ready" : "System status: Initializing"}
     >
       <div className="flex h-3 w-3 relative">
@@ -193,7 +194,7 @@ export default function AppHeader({
           className={`relative inline-flex rounded-none h-3 w-3 ${isPeerReady ? "bg-green-500" : "bg-red-500"}`}
         />
       </div>
-      <span className="text-xs font-mono text-gray-400">
+      <span className="text-xs font-mono text-gray-400" data-testid="peer-status-text">
         {isPeerReady ? "System Ready" : "Initializing..."}
       </span>
       {email && !mobile && <span className="text-xs font-mono text-white ml-2">• {email}</span>}
@@ -204,7 +205,11 @@ export default function AppHeader({
 
   return (
     <>
-      <header className="relative z-20 sticky top-0 border-b border-subtle bg-surface/80 backdrop-blur-md">
+      <header
+        data-testid="app-header"
+        data-header-variant={variant}
+        className="relative z-20 sticky top-0 border-b border-subtle bg-surface/80 backdrop-blur-md"
+      >
         {!isOnline && (
           <div className="absolute top-full left-0 w-full bg-red-500 text-white text-center text-xs font-bold uppercase tracking-widest py-1 animate-in slide-in-from-top-2 z-50">
             You are currently offline. Transfers may be interrupted.

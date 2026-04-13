@@ -25,12 +25,12 @@ export default function SelectedFileCard({ file, onRemove }: SelectedFileCardPro
   }, [file, fileType]);
 
   return (
-    <div>
-      <h3 className="font-mono text-muted text-sm mb-4 uppercase tracking-widest">
+    <div className="rounded-xl border border-white/10 bg-black/20 p-5 h-full">
+      <h3 className="font-mono text-muted text-[11px] mb-4 uppercase tracking-[0.2em]">
         Selected Payload
       </h3>
-      <div className="corner-fold bg-surface-dark p-6 md:p-8 min-h-[200px] flex gap-6 shadow-2xl">
-        <div className="w-32 h-32 bg-surface-inset flex items-center justify-center shrink-0 border border-subtle-bauhaus overflow-hidden">
+      <div className="rounded-lg border border-white/10 bg-black/30 p-5 md:p-6 min-h-[220px] h-full flex gap-5">
+        <div className="w-28 h-28 rounded-lg bg-surface-inset flex items-center justify-center shrink-0 border border-subtle-bauhaus overflow-hidden">
           {thumbnail ? (
             <Image
               src={thumbnail}
@@ -47,7 +47,7 @@ export default function SelectedFileCard({ file, onRemove }: SelectedFileCardPro
         </div>
         <div className="flex flex-col justify-between flex-1 py-1 min-w-0">
           <div>
-            <h4 className="text-white text-xl md:text-2xl font-bold leading-tight mb-2 break-all line-clamp-3">
+            <h4 className="text-white text-lg md:text-xl font-bold leading-tight mb-2 break-all line-clamp-3">
               {file.name}
             </h4>
             <div className="flex flex-col gap-1 font-mono text-sm text-muted">
@@ -62,7 +62,7 @@ export default function SelectedFileCard({ file, onRemove }: SelectedFileCardPro
               e.stopPropagation();
               onRemove();
             }}
-            className="self-start text-bauhaus-red hover:text-red-400 font-bold text-sm uppercase tracking-wider flex items-center gap-2 mt-4"
+            className="self-start rounded-md px-2 py-1 text-bauhaus-red hover:bg-bauhaus-red/10 hover:text-red-300 font-bold text-xs uppercase tracking-[0.12em] flex items-center gap-2 mt-4 transition-colors"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
               delete
@@ -71,34 +71,6 @@ export default function SelectedFileCard({ file, onRemove }: SelectedFileCardPro
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-  .corner - fold {
-  clip - path: polygon(
-    0 0,
-    calc(100 % - 48px) 0,
-    100 % 48px,
-    100 % 100 %,
-    0 100 %
-          );
-  position: relative;
-}
-        .corner - fold::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 48px;
-  height: 48px;
-  background: linear - gradient(
-    to bottom left,
-    transparent 50 %,
-    rgba(255, 255, 255, 0.15) 50 %,
-    rgba(0, 0, 0, 0.3) 100 %
-          );
-  pointer - events: none;
-}
-`}</style>
     </div>
   );
 }

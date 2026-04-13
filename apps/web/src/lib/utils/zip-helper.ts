@@ -2,6 +2,14 @@ import { WorkerPool } from "./worker-pool";
 
 const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for reading files
 
+type ZipWorkerResult =
+  | Uint8Array
+  | ArrayBuffer
+  | {
+      data?: Uint8Array | ArrayBuffer;
+      progress?: number;
+    };
+
 // Cancellation token
 let cancelZipping = false;
 
@@ -101,7 +109,7 @@ export async function zipFiles(
 
   // Compress using Web Worker (70-100%)
   const workerPool = getZipWorkerPool();
-  const zipped = await workerPool.execute<Uint8Array>(
+  const workerResult = await workerPool.execute<ZipWorkerResult>(
     "zip",
     { files: fileDataArray },
     (workerProgress) => {
@@ -113,9 +121,24 @@ export async function zipFiles(
     }
   );
 
-  // Create File object - copy to ensure proper ArrayBuffer type
-  const zipData = new Uint8Array(zipped);
-  const zipBlob = new Blob([zipData], { type: "application/zip" });
+  // Worker responses can be either direct binary data or wrapped in a payload object.
+  let zipData: Uint8Array;
+  if (workerResult instanceof Uint8Array) {
+    zipData = workerResult;
+  } else if (workerResult instanceof ArrayBuffer) {
+    zipData = new Uint8Array(workerResult);
+  } else if (workerResult?.data instanceof Uint8Array) {
+    zipData = workerResult.data;
+  } else if (workerResult?.data instanceof ArrayBuffer) {
+    zipData = new Uint8Array(workerResult.data);
+  } else {
+    throw new Error("Invalid ZIP worker response");
+  }
+
+  // Create File object from a concrete ArrayBuffer to satisfy BlobPart typing.
+  const zipBuffer = new ArrayBuffer(zipData.byteLength);
+  new Uint8Array(zipBuffer).set(zipData);
+  const zipBlob = new Blob([zipBuffer], { type: "application/zip" });
   const zipFile = new File([zipBlob], `archive_${Date.now()}.zip`, { type: "application/zip" });
 
   if (onProgress) onProgress(100);

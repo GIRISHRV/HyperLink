@@ -1,24 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Receive Flow & Hooks Regressions', () => {
-    test.use({ storageState: 'e2e/.auth/user.json' });
+test.describe("Receive Flow & Hooks Regressions", () => {
+  test.use({ storageState: "e2e/.auth/user-chromium.json" });
 
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/receive');
-    });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/receive");
+  });
 
-    test('UI-Audit: Displays clean waiting state and correct visualizer', async ({ page }) => {
-        // 1. Verify idle UI without duplicated visual elements
-        await expect(page.locator('text=Ready to Receive')).toBeVisible();
-        await expect(page.locator('[data-testid="radar-visualizer"]')).toBeVisible();
+  test("UI-Audit: Displays clean waiting state and correct visualizer", async ({ page }) => {
+    // 1. Verify idle UI heading + key panels
+    await expect(page.getByRole("heading", { name: /receive file/i })).toBeVisible();
+    await expect(page.locator('[data-testid="receive-identity-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="receive-inbox-panel"]')).toBeVisible();
 
-        // Ensure no overlapping connection bubbles
-        const peerBubbles = await page.locator('.rounded-full.bg-bauhaus-blue').count();
-        expect(peerBubbles).toBe(1); // Should just be the receiver itself
-    });
+    // 2. Visualizer is inside collapsed connection details; expand and verify.
+    const detailsSummary = page
+      .locator('[data-testid="receive-connection-details"] summary')
+      .first();
+    await expect(detailsSummary).toBeVisible();
+    await detailsSummary.click();
+    await expect(page.locator('[data-testid="radar-visualizer"]')).toBeVisible();
+  });
 
-    test('Transfer Status: Accepts connection and claims ownership', async () => {
-        // Regression check for `claimTransferAsReceiver` being strictly awaited before WebRTC begins
-        // E2E mock placeholder 
-    });
+  test("Transfer Status: Accepts connection and claims ownership", async () => {
+    // Regression check for `claimTransferAsReceiver` being strictly awaited before WebRTC begins
+    // E2E mock placeholder
+  });
 });

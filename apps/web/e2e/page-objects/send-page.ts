@@ -45,7 +45,7 @@ export class SendPage {
    * @param peerId - The peer ID to connect to
    */
   async enterReceiverPeerId(peerId: string): Promise<void> {
-    const peerInput = this.page.getByPlaceholder("Enter hash...");
+    const peerInput = this.page.getByPlaceholder("Enter receiver code");
     await expect(peerInput).toBeVisible({ timeout: 5000 });
     await peerInput.fill(peerId.trim());
   }
@@ -87,7 +87,7 @@ export class SendPage {
    * Pause the ongoing transfer
    */
   async pauseTransfer(): Promise<void> {
-    const pauseBtn = this.page.locator('button:has-text("Pause")');
+    const pauseBtn = this.page.locator('button:has-text("Pause Transfer")');
     await expect(pauseBtn).toBeVisible({ timeout: 15000 });
     await pauseBtn.click();
   }
@@ -96,7 +96,7 @@ export class SendPage {
    * Resume a paused transfer
    */
   async resumeTransfer(): Promise<void> {
-    const resumeBtn = this.page.locator('button:has-text("Resume")');
+    const resumeBtn = this.page.locator('button:has-text("Resume Transfer")');
     await expect(resumeBtn).toBeVisible({ timeout: 5000 });
     await resumeBtn.click();
   }
@@ -105,10 +105,10 @@ export class SendPage {
    * Cancel the ongoing transfer
    */
   async cancelTransfer(): Promise<void> {
-    // Click abort button
-    const abortBtn = this.page.getByRole("button", { name: /abort/i });
-    await expect(abortBtn).toBeVisible({ timeout: 15000 });
-    await abortBtn.click();
+    // Click cancel button on transfer panel
+    const cancelBtn = this.page.getByRole("button", { name: /cancel transfer/i }).first();
+    await expect(cancelBtn).toBeVisible({ timeout: 15000 });
+    await cancelBtn.click();
 
     // Confirm cancellation in modal
     const confirmBtn = this.page.getByRole("button", { name: /cancel transfer/i });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
+import { logger } from "@repo/utils";
 
 /**
  * FINDING-029: Health check endpoint for the web application.
@@ -35,17 +36,20 @@ export async function GET(request: NextRequest) {
 
     // Check Supabase connectivity
     try {
+      const supabase = await createClient();
       const { error } = await supabase.from("user_profiles").select("id").limit(1);
       if (error) {
-        health.checks.supabase = { status: "error", message: error.message };
+        logger.warn({ error: error.message }, "[health] Deep Supabase health check failed");
+        health.checks.supabase = { status: "error", message: "Connectivity check failed" };
         health.status = "degraded";
       } else {
         health.checks.supabase = { status: "ok" };
       }
     } catch (err) {
+      logger.error({ err }, "[health] Deep health check threw unexpected error");
       health.checks.supabase = {
         status: "error",
-        message: err instanceof Error ? err.message : "Unknown error",
+        message: "Connectivity check failed",
       };
       health.status = "error";
     }

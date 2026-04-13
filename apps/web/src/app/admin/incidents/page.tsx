@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRequireAuth } from "@/lib/hooks/use-require-auth";
 import { supabase } from "@/lib/supabase/client";
 import AppHeader from "@/components/app-header";
+import { useAdminStatus } from "@/lib/hooks/use-admin-status";
 
 interface Incident {
   id: string;
@@ -18,9 +19,9 @@ interface Incident {
 
 export default function IncidentsAdminPage() {
   const { user } = useRequireAuth();
+  const { isAdmin, loading: adminLoading } = useAdminStatus(user?.id);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -34,8 +35,9 @@ export default function IncidentsAdminPage() {
   const fetchIncidents = async () => {
     const { data, error } = await supabase
       .from("incidents")
-      .select("*")
-      .order("started_at", { ascending: false });
+      .select("id, title, description, status, severity, started_at, resolved_at, created_at")
+      .order("started_at", { ascending: false })
+      .limit(100);
 
     if (!error && data) {
       setIncidents(data);
@@ -45,20 +47,6 @@ export default function IncidentsAdminPage() {
 
   useEffect(() => {
     if (!user) return;
-
-    const checkAdminStatus = async () => {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select("is_admin")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!error && data) {
-        setIsAdmin(data.is_admin || false);
-      }
-    };
-
-    checkAdminStatus();
     fetchIncidents();
   }, [user]);
 
@@ -116,7 +104,7 @@ export default function IncidentsAdminPage() {
     }
   };
 
-  if (loading) {
+  if (loading || adminLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-white">Loading...</div>

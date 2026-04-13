@@ -18,9 +18,31 @@ import { logger } from "@repo/utils";
  * Must NOT be cached — each invocation must actually hit the services.
  * Vercel Cron calls this with the CRON_SECRET bearer token.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const timestamp = new Date().toISOString();
   const signalingUrl = process.env.RENDER_SIGNALING_URL;
+  const cronSecret = process.env.CRON_SECRET;
+  const noStoreHeaders = {
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+  };
+
+  // Protect against public abuse: only Vercel cron with CRON_SECRET can call this.
+  if (!cronSecret) {
+    logger.error("[keep-alive] CRON_SECRET is missing; refusing to process keep-alive");
+    return NextResponse.json(
+      { error: "Keep-alive is not configured" },
+      { status: 503, headers: noStoreHeaders }
+    );
+  }
+
+  const authorization = request.headers.get("authorization");
+  if (authorization !== `Bearer ${cronSecret}`) {
+    logger.warn(
+      { hasAuthorizationHeader: !!authorization },
+      "[keep-alive] Unauthorized keep-alive attempt blocked"
+    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noStoreHeaders });
+  }
 
   // ── Run both pings in parallel ────────────────────────────────────────────
   const [supabaseResult, signalingResult] = await Promise.allSettled([
@@ -84,6 +106,6 @@ export async function GET() {
         signaling: signalingOk ? "ok" : signalingUrl ? "error" : "skipped",
       },
     },
-    { status: httpStatus, headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    { status: httpStatus, headers: noStoreHeaders }
   );
 }

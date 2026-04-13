@@ -52,8 +52,8 @@ const {
     },
   };
 
-  const deleteTransferMock = vi.fn().mockResolvedValue(undefined);
-  const deleteMultipleMock = vi.fn().mockResolvedValue({ count: 0 });
+  const deleteTransferMock = vi.fn().mockResolvedValue(true);
+  const deleteMultipleMock = vi.fn().mockResolvedValue(true);
 
   return {
     channelHandlers,
@@ -125,8 +125,8 @@ beforeEach(() => {
   for (const k of Object.keys(channelHandlers)) delete channelHandlers[k];
   rewireChannelMock();
   rewireQueryMock();
-  deleteTransferMock.mockResolvedValue(undefined);
-  deleteMultipleMock.mockResolvedValue({ count: 0 });
+  deleteTransferMock.mockResolvedValue(true);
+  deleteMultipleMock.mockResolvedValue(true);
 });
 
 // ──────────────────────────────────────────────────────────────
@@ -210,6 +210,25 @@ describe("useUserTransfersRealtime", () => {
     expect(deleteTransferMock).toHaveBeenCalledWith("transfer-a");
   });
 
+  it("rolls back removeTransfer() when DB delete fails", async () => {
+    queryMock.range.mockResolvedValueOnce({
+      data: [TRANSFER_A, TRANSFER_B],
+    });
+    deleteTransferMock.mockResolvedValueOnce(false);
+
+    const { result } = renderHook(() => useUserTransfersRealtime());
+    await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
+
+    await act(async () => {
+      const deleted = await result.current.removeTransfer("transfer-a");
+      expect(deleted).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.transfers.find((t) => t.id === "transfer-a")).toBeDefined();
+    });
+  });
+
   it("optimistically removes multiple transfers via removeMultipleTransfers()", async () => {
     queryMock.range.mockResolvedValueOnce({
       data: [TRANSFER_A, TRANSFER_B],
@@ -219,11 +238,31 @@ describe("useUserTransfersRealtime", () => {
     await waitFor(() => expect(result.current.transfers.length).toBeGreaterThan(0));
 
     await act(async () => {
-      await result.current.removeMultipleTransfers(["transfer-a", "transfer-b"]);
+      const deleted = await result.current.removeMultipleTransfers(["transfer-a", "transfer-b"]);
+      expect(deleted).toBe(true);
     });
 
     expect(result.current.transfers).toHaveLength(0);
     expect(deleteMultipleMock).toHaveBeenCalledWith(["transfer-a", "transfer-b"]);
+  });
+
+  it("rolls back removeMultipleTransfers() when DB delete fails", async () => {
+    queryMock.range.mockResolvedValueOnce({
+      data: [TRANSFER_A, TRANSFER_B],
+    });
+    deleteMultipleMock.mockResolvedValueOnce(false);
+
+    const { result } = renderHook(() => useUserTransfersRealtime());
+    await waitFor(() => expect(result.current.transfers.length).toBe(2));
+
+    await act(async () => {
+      const deleted = await result.current.removeMultipleTransfers(["transfer-a", "transfer-b"]);
+      expect(deleted).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.transfers).toHaveLength(2);
+    });
   });
 
   it("calls removeChannel on unmount", async () => {

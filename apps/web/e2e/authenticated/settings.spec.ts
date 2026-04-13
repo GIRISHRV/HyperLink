@@ -121,16 +121,29 @@ test.describe("Settings Page (authenticated)", () => {
     await expect(previewIcon).toHaveText("star", { timeout: 3000 });
   });
 
-  test("Sign Out button redirects to /auth", async ({ page }) => {
-    // Stub the Supabase sign-out endpoint to prevent actual session revocation.
-    // If the real logout API is called it would invalidate the shared test session
-    // in user.json, causing transfer.spec.ts and two-account-history.spec.ts to fail
-    // because those tests load the same session tokens via chromium.launch() + storageState.
-    await page.route("**/auth/v1/logout**", (route) =>
-      route.fulfill({ status: 200, body: "{}", contentType: "application/json" })
-    );
-    await page.getByRole("button", { name: /sign out/i }).click();
-    // Auth page may include redirect parameter, so use regex
+  test("Sign Out button redirects to /auth", async ({ page, context }) => {
+    let mockedLogoutRequests = 0;
+
+    // Intercept at context scope (not page scope) so logout calls from any frame/worker
+    // are consistently mocked and cannot revoke the shared auth session used by later tests.
+    await context.route(/\/auth\/v1\/logout(?:\?.*)?$/, async (route) => {
+      mockedLogoutRequests += 1;
+      await route.fulfill({
+        status: 200,
+        body: "{}",
+        contentType: "application/json",
+      });
+    });
+
+    await page
+      .getByRole("button", { name: /sign out/i })
+      .first()
+      .click();
+
+    // Auth page may include redirect params, so use regex.
     await expect(page).toHaveURL(/\/auth/, { timeout: 10_000 });
+
+    // Guard against accidental real logout calls due route mismatch/regression.
+    expect(mockedLogoutRequests).toBeGreaterThan(0);
   });
 });

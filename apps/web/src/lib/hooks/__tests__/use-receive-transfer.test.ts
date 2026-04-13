@@ -431,6 +431,33 @@ describe("useReceiveTransfer", () => {
       // The open handler sets up a 'receiver-busy' send
       expect(conn2.mockSend).not.toHaveBeenCalled(); // not yet opened
     });
+
+    it("fails when no file-offer arrives before timeout", async () => {
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+      const { conn } = buildMockConnection();
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          await m.pmEvents["incoming-connection"][0](conn);
+        });
+
+        expect(result.current.transferState.status).toBe("connecting");
+
+        await act(async () => {
+          vi.advanceTimersByTime(25_001);
+          await Promise.resolve();
+        });
+
+        expect(result.current.error).toMatch(/Timed out waiting for sender file offer/i);
+        expect(result.current.transferState.status).toBe("failed");
+        expect(conn.mockClose).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("resetReceive", () => {
@@ -639,6 +666,41 @@ describe("useReceiveTransfer", () => {
 
       expect(m.mockRecvHandleChunk).toHaveBeenCalledWith(probeMsg);
     });
+
+    it("routes transfer-complete to FileReceiver.handleControlMessage", async () => {
+      const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));
+      await waitFor(() => expect(result.current.myPeerId).toBe("recv-peer-id"));
+
+      const { connEvents, conn } = buildMockConnection();
+      await act(async () => {
+        const incomingHandlers = m.pmEvents["incoming-connection"];
+        if (incomingHandlers) await incomingHandlers[0](conn);
+      });
+
+      const offerMsg = makeFileOfferMessage();
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(offerMsg));
+      });
+
+      await act(async () => {
+        result.current.handleAcceptOffer();
+        await new Promise((r) => setTimeout(r, 200));
+      });
+
+      const completeMsg = {
+        type: "transfer-complete",
+        transferId: "tx-001",
+        payload: null,
+        timestamp: Date.now(),
+      };
+
+      await act(async () => {
+        connEvents["data"]?.forEach((cb) => cb(completeMsg as any));
+      });
+
+      expect(m.mockRecvHandleControlMessage).toHaveBeenCalledWith(completeMsg);
+    });
+
     describe("NAT Traversal (Task #4)", () => {
       it("Task #4: shows toast error when firewall-blocked is emitted", async () => {
         const { result } = renderHook(() => useReceiveTransfer(defaultOptions()));

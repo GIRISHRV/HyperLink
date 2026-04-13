@@ -55,6 +55,8 @@ export default function IncomingOfferCard({ pendingOffer }: IncomingOfferCardPro
   const mimeType = pendingOffer.fileType || getFileTypeFromName(pendingOffer.filename);
   const fileType = getFileType(mimeType);
   const icon = getFileIcon(fileType);
+  const senderPeerId = pendingOffer.connection?.peer || "Unknown";
+  const senderFingerprint = `${senderPeerId.slice(0, 6)}...${senderPeerId.slice(-4)}`;
 
   return (
     <div className="bg-surface p-6 border-l-4 border-bauhaus-blue flex flex-col gap-4 shadow-[0_0_30px_-10px_rgba(46,149,255,0.2)]">
@@ -65,13 +67,14 @@ export default function IncomingOfferCard({ pendingOffer }: IncomingOfferCardPro
           </div>
           <div>
             <p className="font-black text-lg uppercase tracking-tight text-white mb-1">
-              Incoming Transmission
+              Incoming File Request
             </p>
             <p className="font-bold text-sm text-gray-300">{pendingOffer.filename}</p>
             <p className="text-xs text-white/50 font-mono mt-1">
               {formatFileSize(pendingOffer.fileSize)} •{" "}
               <span className="text-bauhaus-blue">SECURE LINK</span>
             </p>
+            <p className="text-xs text-gray-400 font-mono mt-1">Sender: {senderFingerprint}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">

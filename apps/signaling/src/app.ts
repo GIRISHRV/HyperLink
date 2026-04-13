@@ -129,8 +129,17 @@ export function createApp(connectedPeers: () => number) {
       return next();
     }
 
-    const token =
-      req.headers["authorization"]?.toString().split(" ")[1] || (req.query.token as string);
+    const authorization = req.headers["authorization"]?.toString();
+    const headerToken = authorization?.startsWith("Bearer ")
+      ? authorization.split(" ")[1]
+      : undefined;
+
+    const queryToken = typeof req.query.token === "string" ? req.query.token : undefined;
+
+    // Keep query-token fallback only for PeerJS handshake paths where browser clients
+    // cannot reliably send custom headers. Non-peer routes must use Authorization header.
+    const allowQueryToken = req.path.startsWith("/myapp");
+    const token = headerToken || (allowQueryToken ? queryToken : undefined);
 
     if (!token) {
       logger.info({ ip: req.ip }, "[AUTH] Rejected: no token provided");
