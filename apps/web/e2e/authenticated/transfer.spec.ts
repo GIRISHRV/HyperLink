@@ -118,6 +118,28 @@ async function waitForProgress(
 }
 
 /**
+ * Read current progress safely without waiting on an element that may have
+ * already unmounted after transfer completion.
+ */
+async function readProgressSafe(page: any): Promise<number | null> {
+  const progressLocator = page.locator('[data-testid="progress"]').first();
+  const isVisible = await progressLocator.isVisible({ timeout: 1500 }).catch(() => false);
+
+  if (isVisible) {
+    const text = await progressLocator.textContent({ timeout: 1500 }).catch(() => null);
+    const value = parseInt((text || "").replace("%", ""), 10);
+    return Number.isNaN(value) ? null : value;
+  }
+
+  const bodyText = await page.textContent("body").catch(() => "");
+  if (/transfer complete|100%/i.test(bodyText || "")) {
+    return 100;
+  }
+
+  return null;
+}
+
+/**
  * Wait for WebRTC connection with retry logic and stability checks
  * @param page - Playwright page instance
  * @param maxRetries - Maximum number of retry attempts
@@ -394,14 +416,13 @@ test("complete file transfer between two authenticated peers", async ({ browserN
     await waitForProgress(senderPage, 50, transferTimeout / 2);
     console.log("[TEST] Transfer reached 50% on sender");
 
-    // Just log progress for debugging - don't enforce strict sync
-    const senderProgress = await senderPage.locator('[data-testid="progress"]').textContent();
-    const receiverProgress = await receiverPage.locator('[data-testid="progress"]').textContent();
-    const senderPercent = parseInt(senderProgress?.replace("%", "") || "0");
-    const receiverPercent = parseInt(receiverProgress?.replace("%", "") || "0");
+    // Just log progress for debugging - don't enforce strict sync.
+    // Progress UI can unmount quickly after completion, so read safely.
+    const senderPercent = await readProgressSafe(senderPage);
+    const receiverPercent = await readProgressSafe(receiverPage);
 
     console.log(
-      `[TEST] Progress sync check - Sender: ${senderPercent}%, Receiver: ${receiverPercent}%`
+      `[TEST] Progress sync check - Sender: ${senderPercent ?? "N/A"}%, Receiver: ${receiverPercent ?? "N/A"}%`
     );
 
     // ── STEP 6: Both sides complete ──
